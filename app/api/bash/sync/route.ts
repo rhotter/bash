@@ -3,7 +3,7 @@ import { sql } from "@/lib/db"
 import { getCurrentSeason, getSeasonById, getAllSeasons } from "@/lib/seasons"
 
 const BASE_URL = "https://secure.sportability.com/spx/Leagues"
-const MAX_BOXSCORES_PER_SYNC = 3
+const MAX_BOXSCORES_PER_SYNC = 8
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim()
@@ -476,15 +476,15 @@ export async function GET(request: Request) {
       LIMIT ${MAX_BOXSCORES_PER_SYNC}
     `
 
-    let boxscoresSynced = 0
-    for (const game of gamesNeedingBoxscore) {
-      try {
-        await syncBoxscore(game.id, current.leagueId, current.id)
-        boxscoresSynced++
-      } catch (err) {
-        console.error(`Failed to sync boxscore for game ${game.id}:`, err)
-      }
-    }
+    const boxscoreResults = await Promise.allSettled(
+      gamesNeedingBoxscore.map((game: { id: string }) =>
+        syncBoxscore(game.id, current.leagueId, current.id)
+      )
+    )
+    const boxscoresSynced = boxscoreResults.filter(r => r.status === 'fulfilled').length
+    boxscoreResults.filter(r => r.status === 'rejected').forEach((r, i) => {
+      console.error(`Failed to sync boxscore for game ${gamesNeedingBoxscore[i].id}:`, (r as PromiseRejectedResult).reason)
+    })
 
     await sql`
       INSERT INTO sync_metadata (key, value)
