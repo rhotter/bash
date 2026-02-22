@@ -1,0 +1,288 @@
+"use client"
+
+import { useState, useMemo } from "react"
+import { useGameDetail, type BashGame } from "@/lib/hockey-data"
+import { formatGameDate } from "@/lib/format-time"
+import { cn } from "@/lib/utils"
+import { ChevronLeft, ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import Link from "next/link"
+
+type SkaterSortKey = "points" | "goals" | "assists" | "pim"
+type SortDir = "asc" | "desc"
+
+interface GameDetailProps {
+  game: BashGame
+}
+
+export function GameDetail({ game }: GameDetailProps) {
+  const { detail, isLoading, isError } = useGameDetail(game.id)
+  const isFinal = game.status === "final"
+
+  return (
+    <div className="w-full">
+      {/* Back nav */}
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-5 group"
+        aria-label="Back to scores"
+      >
+        <ChevronLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+        <span>All Scores</span>
+      </Link>
+
+      {/* Game meta */}
+      <div className="flex items-center gap-2 mb-3 text-[11px] text-muted-foreground tracking-wide uppercase font-medium flex-wrap">
+        <span>{formatGameDate(game.date)}</span>
+        <span className="text-border">|</span>
+        <span className="normal-case tracking-normal">{game.time}</span>
+        <span className="text-border">|</span>
+        <span className="normal-case tracking-normal">{game.location}</span>
+      </div>
+
+      {/* Hero Scoreboard */}
+      <div className={cn(
+        "relative rounded-2xl overflow-hidden",
+        "bg-gradient-to-b from-card via-card to-background",
+        "border border-border/60"
+      )}>
+        <div className="relative px-6 py-8 sm:py-10">
+          <div className="flex items-center justify-between gap-2">
+            {/* Away team */}
+            <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+              <div className="text-center">
+                <div className="text-sm font-bold text-foreground leading-tight">
+                  {game.awayTeam}
+                </div>
+              </div>
+            </div>
+
+            {/* Score block */}
+            <div className="flex flex-col items-center gap-2 px-4">
+              <div className="flex items-baseline gap-3">
+                <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
+                  {game.awayScore ?? "-"}
+                </span>
+                <span className="text-2xl text-muted-foreground/40 font-light select-none">&ndash;</span>
+                <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
+                  {game.homeScore ?? "-"}
+                </span>
+              </div>
+              <div className={cn(
+                "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full",
+                isFinal && "bg-secondary text-secondary-foreground",
+                game.status === "upcoming" && "bg-secondary/40 text-muted-foreground"
+              )}>
+                {isFinal ? (game.isOvertime ? "Final/OT" : "Final") : "Upcoming"}
+              </div>
+            </div>
+
+            {/* Home team */}
+            <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+              <div className="text-center">
+                <div className="text-sm font-bold text-foreground leading-tight">
+                  {game.homeTeam}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="pt-6">
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-xs text-muted-foreground">Loading box score&hellip;</span>
+          </div>
+        )}
+
+        {isError && (
+          <div className="text-center py-8">
+            <p className="text-xs text-muted-foreground">Unable to load game details.</p>
+          </div>
+        )}
+
+        {game.status === "upcoming" && !detail && !isLoading && (
+          <div className="text-center py-8">
+            <p className="text-xs text-muted-foreground">Game has not been played yet.</p>
+          </div>
+        )}
+
+        {detail && (
+          <div className="flex flex-col gap-8">
+            {/* Away team box score */}
+            {detail.awayPlayers.length > 0 && (
+              <div>
+                <SectionHeader>{detail.awayTeam}</SectionHeader>
+                <PlayerBoxScore players={detail.awayPlayers} />
+              </div>
+            )}
+
+            {/* Away goalies */}
+            {detail.awayGoalies.length > 0 && (
+              <GoalieBoxScore goalies={detail.awayGoalies} />
+            )}
+
+            {/* Home team box score */}
+            {detail.homePlayers.length > 0 && (
+              <div>
+                <SectionHeader>{detail.homeTeam}</SectionHeader>
+                <PlayerBoxScore players={detail.homePlayers} />
+              </div>
+            )}
+
+            {/* Home goalies */}
+            {detail.homeGoalies.length > 0 && (
+              <GoalieBoxScore goalies={detail.homeGoalies} />
+            )}
+
+            {/* Officials */}
+            {detail.officials.length > 0 && (
+              <div>
+                <SectionHeader>Officials</SectionHeader>
+                <div className="flex flex-wrap gap-2">
+                  {detail.officials.map((o, i) => (
+                    <span key={i} className="text-xs text-muted-foreground bg-card/50 px-3 py-1.5 rounded-md">
+                      {o.name}
+                      <span className="text-muted-foreground/50 ml-1 text-[9px] uppercase">({o.role})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground whitespace-nowrap">
+        {children}
+      </h4>
+      <div className="h-px flex-1 bg-border/60" />
+    </div>
+  )
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/30" />
+  return dir === "desc"
+    ? <ChevronDown className="h-2.5 w-2.5 text-primary" />
+    : <ChevronUp className="h-2.5 w-2.5 text-primary" />
+}
+
+function PlayerBoxScore({ players }: { players: { id: number; name: string; goals: number; assists: number; points: number; pim: number }[] }) {
+  const [sortKey, setSortKey] = useState<SkaterSortKey>("points")
+  const [sortDir, setSortDir] = useState<SortDir>("desc")
+
+  function toggleSort(key: SkaterSortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "desc" ? "asc" : "desc"))
+    else { setSortKey(key); setSortDir("desc") }
+  }
+
+  const sorted = useMemo(() => {
+    return [...players].sort((a, b) => {
+      const av = a[sortKey]
+      const bv = b[sortKey]
+      const cmp = sortDir === "desc" ? bv - av : av - bv
+      if (cmp !== 0) return cmp
+      return b.points - a.points || b.goals - a.goals
+    })
+  }, [players, sortKey, sortDir])
+
+  return (
+    <div className="overflow-x-auto -mx-4 px-4 mb-3">
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
+            <th className="text-left font-medium py-2 pr-2 min-w-[120px]">Player</th>
+            <SortableTh label="G" sortKey="goals" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="A" sortKey="assists" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="PTS" sortKey="points" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold />
+            <SortableTh label="PIM" sortKey="pim" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((p, i) => (
+            <tr
+              key={p.name}
+              className={cn(
+                "border-t border-border/30",
+                i % 2 === 0 && "bg-card/20"
+              )}
+            >
+              <td className="py-2 pr-2">
+                <span className={cn("font-medium", p.points > 0 && "font-semibold text-foreground")}>{p.name}</span>
+              </td>
+              <td className={cn("text-center tabular-nums py-2", p.goals > 0 && "font-medium")}>{p.goals}</td>
+              <td className={cn("text-center tabular-nums py-2", p.assists > 0 && "font-medium")}>{p.assists}</td>
+              <td className={cn("text-center tabular-nums py-2", p.points > 0 && "font-medium")}>{p.points}</td>
+              <td className="text-center tabular-nums py-2 text-muted-foreground">{p.pim}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function GoalieBoxScore({ goalies }: { goalies: { id: number; name: string; minutes: number; goalsAgainst: number; shotsAgainst: number; saves: number; savePercentage: string; result: string | null }[] }) {
+  return (
+    <div className="overflow-x-auto -mx-4 px-4">
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
+            <th className="text-left font-medium py-2 pr-2 min-w-[120px]">Goalie</th>
+            <th className="text-center font-medium py-2 w-10">MIN</th>
+            <th className="text-center font-medium py-2 w-10">SA</th>
+            <th className="text-center font-medium py-2 w-10">SV</th>
+            <th className="text-center font-medium py-2 w-10">GA</th>
+            <th className="text-center font-medium py-2 w-12">SV%</th>
+            <th className="text-center font-medium py-2 w-10">DEC</th>
+          </tr>
+        </thead>
+        <tbody>
+          {goalies.map((g, i) => (
+            <tr
+              key={g.name}
+              className={cn(
+                "border-t border-border/30",
+                i % 2 === 0 && "bg-card/20"
+              )}
+            >
+              <td className="py-2 pr-2 font-medium">{g.name}</td>
+              <td className="text-center tabular-nums py-2 text-muted-foreground">{g.minutes}</td>
+              <td className="text-center tabular-nums py-2 text-muted-foreground">{g.shotsAgainst}</td>
+              <td className="text-center tabular-nums py-2 font-medium">{g.saves}</td>
+              <td className="text-center tabular-nums py-2 text-muted-foreground">{g.goalsAgainst}</td>
+              <td className="text-center tabular-nums py-2 font-bold">{g.savePercentage}</td>
+              <td className="text-center tabular-nums py-2 text-muted-foreground">{g.result ?? "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SortableTh({ label, sortKey, currentKey, dir, onToggle, bold }: {
+  label: string; sortKey: SkaterSortKey; currentKey: SkaterSortKey; dir: SortDir
+  onToggle: (k: SkaterSortKey) => void; bold?: boolean
+}) {
+  return (
+    <th
+      className="text-center font-medium py-2 w-8 cursor-pointer select-none"
+      onClick={() => onToggle(sortKey)}
+    >
+      <div className="flex items-center justify-center gap-0.5">
+        <span className={cn(bold && "font-bold")}>{label}</span>
+        <SortIcon active={currentKey === sortKey} dir={dir} />
+      </div>
+    </th>
+  )
+}
