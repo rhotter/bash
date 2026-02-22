@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation"
 import type { TeamDetail } from "@/app/api/bash/team/[slug]/route"
 import { useSort, SortableTh, statsRowClass, SectionHeader } from "@/components/stats-table"
 
-type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gp" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen"
+type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gp" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen" | "ptsPg"
 type GoalieSortKey = "savePercentage" | "gaa" | "wins" | "losses" | "gp" | "shutouts" | "saves" | "goalsAgainst" | "shotsAgainst" | "goalieAssists"
 
 const goalieAscKeys = new Set<GoalieSortKey>(["gaa"])
@@ -62,6 +62,7 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                   <SortableTh label="G" sortKey="goals" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
                   <SortableTh label="A" sortKey="assists" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
                   <SortableTh label="PTS" sortKey="points" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} bold />
+                  <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
                   <SortableTh label="GWG" sortKey="gwg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
                   <SortableTh label="PPG" sortKey="ppg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
                   <SortableTh label="SHG" sortKey="shg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
@@ -74,12 +75,16 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                 {sortedSkaters.map((p, i) => (
                   <tr key={p.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
                     <td className="py-2 pr-2">
-                      <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{p.name}</Link>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{i + 1}</span>
+                        <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{p.name}</Link>
+                      </div>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
                     <td className={cn("text-center tabular-nums py-2 px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
                     <td className={cn("text-center tabular-nums py-2 px-3", p.assists > 0 && "font-medium")}>{p.assists}</td>
                     <td className="text-center tabular-nums py-2 px-3 font-bold">{p.points}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ptsPg}</td>
                     <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (p.gwg ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.gwg ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ppg ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.shg ?? 0}</td>
@@ -118,7 +123,10 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                 {sortedGoalies.map((g, i) => (
                   <tr key={g.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
                     <td className="py-2 pr-2">
-                      <Link href={`/player/${playerSlug(g.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{g.name}</Link>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{i + 1}</span>
+                        <Link href={`/player/${playerSlug(g.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{g.name}</Link>
+                      </div>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.gp}</td>
                     <td className={cn("text-center tabular-nums py-2 px-3", (g.wins ?? 0) > 0 && "font-medium")}>{g.wins}</td>

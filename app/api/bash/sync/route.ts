@@ -214,6 +214,8 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
   const res = await fetch(url, { cache: "no-store" })
   const html = await res.text()
 
+  let hasAnyStats = false
+
   // Build team name → slug lookup
   const teamRows = await sql`SELECT slug, name FROM teams`
   const teamNameToSlug: Record<string, string> = {}
@@ -268,6 +270,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
     // PLAYER STATS TABLE
     if (firstRowText.includes("player stats")) {
       let currentTeamSlug: string | null = null
+      let statsInserted = false
 
       for (let i = 1; i < trs.length; i++) {
         const cells = trs[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi)
@@ -332,12 +335,16 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
             eng = EXCLUDED.eng, hat_tricks = EXCLUDED.hat_tricks,
             pen = EXCLUDED.pen, pim = EXCLUDED.pim
         `
+        statsInserted = true
       }
+
+      if (statsInserted) hasAnyStats = true
     }
 
     // GOALIE STATS TABLE
     if (firstRowText.includes("goalie stats")) {
       let currentTeamSlug: string | null = null
+      let statsInserted = false
 
       for (let i = 1; i < trs.length; i++) {
         const cells = trs[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi)
@@ -398,11 +405,16 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
             shutouts = EXCLUDED.shutouts, goalie_assists = EXCLUDED.goalie_assists,
             result = EXCLUDED.result
         `
+        statsInserted = true
       }
+
+      if (statsInserted) hasAnyStats = true
     }
   }
 
-  await sql`UPDATE games SET has_boxscore = true WHERE id = ${gameId}`
+  if (hasAnyStats) {
+    await sql`UPDATE games SET has_boxscore = true WHERE id = ${gameId}`
+  }
 }
 
 export async function GET(request: Request) {
