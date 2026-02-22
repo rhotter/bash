@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { getCurrentSeason, getSeasonById, getAllSeasons } from "@/lib/seasons"
 
 const BASE_URL = "https://secure.sportability.com/spx/Leagues"
-const LEAGUE_ID = "50562"
-const SEASON_ID = "2025-2026"
 const MAX_BOXSCORES_PER_SYNC = 3
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim()
 }
 
-async function syncSchedule() {
-  const url = `${BASE_URL}/Schedule.asp?LgID=${LEAGUE_ID}`
+function nameToSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
+// Sync scores for games already in the DB (current season quick sync)
+async function syncScheduleScores(leagueId: string, seasonId: string) {
+  const url = `${BASE_URL}/Schedule.asp?LgID=${leagueId}`
   const res = await fetch(url, { cache: "no-store" })
   const html = await res.text()
 
@@ -47,7 +51,7 @@ async function syncSchedule() {
       UPDATE games
       SET home_score = ${u.homeScore}, away_score = ${u.awayScore},
           status = 'final', is_overtime = ${u.isOT}
-      WHERE id = ${u.id} AND season_id = ${SEASON_ID}
+      WHERE id = ${u.id} AND season_id = ${seasonId}
         AND (home_score IS NULL OR home_score != ${u.homeScore} OR away_score != ${u.awayScore})
     `
     updated++
@@ -56,8 +60,146 @@ async function syncSchedule() {
   return { gamesChecked: gameIds.length, updatesApplied: updated }
 }
 
-async function syncBoxscore(gameId: string) {
-  const url = `${BASE_URL}/Game.asp?LgID=${LEAGUE_ID}&GID=${gameId}`
+// Full schedule sync: parse all games from a schedule page and create them
+// Schedule pages use table rows: <td>Date</td> <td>Time</td> <td><a href="...GID=X">Away Score at Home Score</a></td>
+async function syncFullSchedule(leagueId: string, seasonId: string) {
+  const url = `${BASE_URL}/Schedule.asp?LgID=${leagueId}`
+  const res = await fetch(url, { cache: "no-store" })
+  const html = await res.text()
+
+  // Ensure season exists in DB
+  const season = getSeasonById(seasonId)
+  if (!season) throw new Error(`Unknown season: ${seasonId}`)
+
+  await sql`
+    INSERT INTO seasons (id, name, league_id, is_current)
+    VALUES (${season.id}, ${season.name}, ${season.leagueId}, false)
+    ON CONFLICT (id) DO NOTHING
+  `
+
+  // Parse table rows — each <tr> with GID= is a game
+  const rowPattern = /<tr[^>]*class="tablecontent"[^>]*>([\s\S]*?)<\/tr>/gi
+  const rows: string[] = []
+  let rowMatch
+  while ((rowMatch = rowPattern.exec(html)) !== null) {
+    rows.push(rowMatch[1])
+  }
+
+  // Build existing team lookup
+  const existingTeams = await sql`SELECT slug, name FROM teams`
+  const teamNameToSlug: Record<string, string> = {}
+  for (const t of existingTeams) {
+    teamNameToSlug[t.name.toLowerCase()] = t.slug
+  }
+
+  let currentDate = ""
+  let gamesCreated = 0
+  let gamesFound = 0
+
+  for (const row of rows) {
+    // Must have a game link
+    const gidMatch = row.match(/GID=(\d+)/)
+    if (!gidMatch) continue
+
+    const gid = gidMatch[1]
+    gamesFound++
+
+    // Extract cells
+    const cellPattern = /<td[^>]*>([\s\S]*?)<\/td>/gi
+    const cells: string[] = []
+    let cellMatch
+    while ((cellMatch = cellPattern.exec(row)) !== null) {
+      cells.push(cellMatch[1])
+    }
+
+    // Cell 0: date (e.g., "Sat 10/5/2024" — only present on first game of date)
+    const dateText = stripHtml(cells[0] || "").trim()
+    const dateParsed = dateText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+    if (dateParsed) {
+      const [, month, day, year] = dateParsed
+      currentDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    }
+
+    if (!currentDate) continue
+
+    // Cell 1: time (e.g., "9:00a")
+    const timeText = stripHtml(cells[1] || "").trim()
+    const time = timeText.replace(/&nbsp;/g, "").trim() || "TBD"
+
+    // Cell 2: game link with scores — strip HTML to get text like:
+    //   "(Pla) TeamA 2 at TeamB 3(Overtime)" or "TeamA at TeamB"
+    const gameCellHtml = cells[2] || ""
+    const gameText = stripHtml(gameCellHtml).trim()
+
+    const isPlayoff = /\(Pla\)/i.test(gameText)
+    const isOT = /Overtime|ShootOut/i.test(gameCellHtml)
+
+    // Parse "Away Score at Home Score" — scores may be on either side of "at"
+    // Patterns: "TeamA 2 at TeamB 3", "(Pla) TeamA 2 at TeamB 3(Overtime)"
+    const cleanText = gameText.replace(/^\(Pla\)\s*/i, "").replace(/\(Overtime\)|\(ShootOut\)|\(If Necessary\)/gi, "").trim()
+
+    const scoreMatch = cleanText.match(/^(.+?)\s+(\d+)\s+at\s+(.+?)\s+(\d+)$/)
+    const upcomingMatch = !scoreMatch ? cleanText.match(/^(.+?)\s+at\s+(.+?)$/) : null
+
+    let awayName: string | null = null
+    let homeName: string | null = null
+    let awayScore: number | null = null
+    let homeScore: number | null = null
+    let status = "upcoming"
+
+    if (scoreMatch) {
+      awayName = scoreMatch[1].trim()
+      awayScore = parseInt(scoreMatch[2])
+      homeName = scoreMatch[3].trim()
+      homeScore = parseInt(scoreMatch[4])
+      status = "final"
+    } else if (upcomingMatch) {
+      awayName = upcomingMatch[1].trim()
+      homeName = upcomingMatch[2].trim()
+    }
+
+    if (!awayName || !homeName || awayName.length < 2 || homeName.length < 2) continue
+
+    // Cell 4: location
+    const location = stripHtml(cells[4] || "").trim() || "James Lick Arena"
+
+    // Look up or create teams
+    let awaySlug = teamNameToSlug[awayName.toLowerCase()]
+    if (!awaySlug) {
+      awaySlug = nameToSlug(awayName)
+      await sql`INSERT INTO teams (slug, name) VALUES (${awaySlug}, ${awayName}) ON CONFLICT (slug) DO NOTHING`
+      teamNameToSlug[awayName.toLowerCase()] = awaySlug
+    }
+
+    let homeSlug = teamNameToSlug[homeName.toLowerCase()]
+    if (!homeSlug) {
+      homeSlug = nameToSlug(homeName)
+      await sql`INSERT INTO teams (slug, name) VALUES (${homeSlug}, ${homeName}) ON CONFLICT (slug) DO NOTHING`
+      teamNameToSlug[homeName.toLowerCase()] = homeSlug
+    }
+
+    // Ensure season_teams entries
+    await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${awaySlug}) ON CONFLICT DO NOTHING`
+    await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${homeSlug}) ON CONFLICT DO NOTHING`
+
+    // Upsert game
+    await sql`
+      INSERT INTO games (id, season_id, date, time, away_team, home_team, away_score, home_score, status, is_overtime, is_playoff, location, has_boxscore)
+      VALUES (${gid}, ${seasonId}, ${currentDate}, ${time}, ${awaySlug}, ${homeSlug}, ${awayScore}, ${homeScore}, ${status}, ${isOT}, ${isPlayoff}, ${location}, false)
+      ON CONFLICT (id) DO UPDATE SET
+        away_score = EXCLUDED.away_score,
+        home_score = EXCLUDED.home_score,
+        status = EXCLUDED.status,
+        is_overtime = EXCLUDED.is_overtime
+    `
+    gamesCreated++
+  }
+
+  return { gamesFound, gamesCreated }
+}
+
+async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) {
+  const url = `${BASE_URL}/Game.asp?LgID=${leagueId}&GID=${gameId}`
   const res = await fetch(url, { cache: "no-store" })
   const html = await res.text()
 
@@ -68,7 +210,7 @@ async function syncBoxscore(gameId: string) {
     teamNameToSlug[t.name.toLowerCase()] = t.slug
   }
 
-  // Parse officials: "Ref 1: Name", "Ref 2: Name", "Scorekeeper: Name"
+  // Parse officials
   const refPattern = /Ref\s*\d*\s*:\s*([^<\n]+)/gi
   let refMatch
   const refs: string[] = []
@@ -113,8 +255,6 @@ async function syncBoxscore(gameId: string) {
     const firstRowText = stripHtml(trs[0]).toLowerCase()
 
     // PLAYER STATS TABLE
-    // Both teams are in ONE table, separated by team header rows where
-    // cell[0] is "{TeamName} Players" and cell[1] is "GP", etc.
     if (firstRowText.includes("player stats")) {
       let currentTeamSlug: string | null = null
 
@@ -124,12 +264,19 @@ async function syncBoxscore(gameId: string) {
 
         const cell0Text = stripHtml(cells[0])
 
-        // Check if this is a team header row: cell[0] = "{TeamName} Players"
         if (/\bPlayers$/i.test(cell0Text)) {
           const teamMatch = cell0Text.match(/^(.+?)\s+Players$/i)
           if (teamMatch) {
             const teamName = teamMatch[1].trim().toLowerCase()
             currentTeamSlug = teamNameToSlug[teamName] || null
+            // Auto-create team if not found
+            if (!currentTeamSlug) {
+              const slug = nameToSlug(teamMatch[1].trim())
+              await sql`INSERT INTO teams (slug, name) VALUES (${slug}, ${teamMatch[1].trim()}) ON CONFLICT (slug) DO NOTHING`
+              await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${slug}) ON CONFLICT DO NOTHING`
+              teamNameToSlug[teamName] = slug
+              currentTeamSlug = slug
+            }
           }
           continue
         }
@@ -140,7 +287,6 @@ async function syncBoxscore(gameId: string) {
         const playerName = cell0Text
         if (!playerName || /total/i.test(playerName) || /^(&nbsp;|\s*)$/.test(playerName)) continue
 
-        // Columns: [0]Player, [1]GP, [2]G, [3]A, [4]Pts, [5]PtsPG, [6]GWG, [7]PPG, [8]SHG, [9]ENG, [10]Hat, [11]PMkr, [12]Star, [13]Pen, [14]PIM
         const goals = parseInt(stripHtml(cells[2])) || 0
         const assists = parseInt(stripHtml(cells[3])) || 0
         const points = parseInt(stripHtml(cells[4])) || 0
@@ -162,7 +308,7 @@ async function syncBoxscore(gameId: string) {
 
         await sql`
           INSERT INTO player_seasons (player_id, season_id, team_slug, is_goalie)
-          VALUES (${playerId}, ${SEASON_ID}, ${currentTeamSlug}, false)
+          VALUES (${playerId}, ${seasonId}, ${currentTeamSlug}, false)
           ON CONFLICT (player_id, season_id) DO NOTHING
         `
 
@@ -179,7 +325,6 @@ async function syncBoxscore(gameId: string) {
     }
 
     // GOALIE STATS TABLE
-    // Both teams in ONE table, separated by rows where cell[0] = "{TeamName} Goalies"
     if (firstRowText.includes("goalie stats")) {
       let currentTeamSlug: string | null = null
 
@@ -189,12 +334,18 @@ async function syncBoxscore(gameId: string) {
 
         const cell0Text = stripHtml(cells[0])
 
-        // Check if this is a team header row: cell[0] = "{TeamName} Goalies"
         if (/\bGoalies$/i.test(cell0Text)) {
           const teamMatch = cell0Text.match(/^(.+?)\s+Goalies$/i)
           if (teamMatch) {
             const teamName = teamMatch[1].trim().toLowerCase()
             currentTeamSlug = teamNameToSlug[teamName] || null
+            if (!currentTeamSlug) {
+              const slug = nameToSlug(teamMatch[1].trim())
+              await sql`INSERT INTO teams (slug, name) VALUES (${slug}, ${teamMatch[1].trim()}) ON CONFLICT (slug) DO NOTHING`
+              await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${slug}) ON CONFLICT DO NOTHING`
+              teamNameToSlug[teamName] = slug
+              currentTeamSlug = slug
+            }
           }
           continue
         }
@@ -205,7 +356,6 @@ async function syncBoxscore(gameId: string) {
         const playerName = cell0Text
         if (!playerName || /total/i.test(playerName) || /^(&nbsp;|\s*)$/.test(playerName)) continue
 
-        // Columns: [0]Player, [1]GP, [2]Min, [3]GA, [4]GAA, [5]Shots, [6]Saves, [7]Sv%, [8]SO, [9]A, [10]Star, [11]Pen, [12]PIM, [13]Result
         const minutes = parseInt(stripHtml(cells[2])) || 0
         const ga = parseInt(stripHtml(cells[3])) || 0
         const shotsAgainst = parseInt(stripHtml(cells[5])) || 0
@@ -224,7 +374,7 @@ async function syncBoxscore(gameId: string) {
 
         await sql`
           INSERT INTO player_seasons (player_id, season_id, team_slug, is_goalie)
-          VALUES (${playerId}, ${SEASON_ID}, ${currentTeamSlug}, true)
+          VALUES (${playerId}, ${seasonId}, ${currentTeamSlug}, true)
           ON CONFLICT (player_id, season_id) DO UPDATE SET is_goalie = true
         `
 
@@ -244,13 +394,58 @@ async function syncBoxscore(gameId: string) {
   await sql`UPDATE games SET has_boxscore = true WHERE id = ${gameId}`
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const scheduleResult = await syncSchedule()
+    const { searchParams } = new URL(request.url)
+    const seasonParam = searchParams.get("seasonId")
+
+    // If a specific season is requested, do a full sync for that season
+    if (seasonParam) {
+      const season = getSeasonById(seasonParam)
+      if (!season) {
+        return NextResponse.json({ ok: false, error: `Unknown season: ${seasonParam}` }, { status: 400 })
+      }
+
+      // Full schedule sync (creates games from scratch)
+      const scheduleResult = await syncFullSchedule(season.leagueId, season.id)
+
+      // Sync all boxscores for historical seasons, limited for current
+      const limit = season.id === getCurrentSeason().id ? MAX_BOXSCORES_PER_SYNC : 999
+      const gamesNeedingBoxscore = await sql`
+        SELECT id FROM games
+        WHERE season_id = ${season.id}
+          AND status = 'final'
+          AND has_boxscore = false
+        ORDER BY date ASC
+        LIMIT ${limit}
+      `
+
+      let boxscoresSynced = 0
+      for (const game of gamesNeedingBoxscore) {
+        try {
+          await syncBoxscore(game.id, season.leagueId, season.id)
+          boxscoresSynced++
+        } catch (err) {
+          console.error(`Failed to sync boxscore for game ${game.id}:`, err)
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        season: season.id,
+        schedule: scheduleResult,
+        boxscoresSynced,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    // Default: sync current season (quick mode — just update scores + boxscores)
+    const current = getCurrentSeason()
+    const scheduleResult = await syncScheduleScores(current.leagueId, current.id)
 
     const gamesNeedingBoxscore = await sql`
       SELECT id FROM games
-      WHERE season_id = ${SEASON_ID}
+      WHERE season_id = ${current.id}
         AND status = 'final'
         AND has_boxscore = false
       ORDER BY date ASC
@@ -260,7 +455,7 @@ export async function GET() {
     let boxscoresSynced = 0
     for (const game of gamesNeedingBoxscore) {
       try {
-        await syncBoxscore(game.id)
+        await syncBoxscore(game.id, current.leagueId, current.id)
         boxscoresSynced++
       } catch (err) {
         console.error(`Failed to sync boxscore for game ${game.id}:`, err)

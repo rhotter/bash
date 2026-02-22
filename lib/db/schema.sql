@@ -101,5 +101,8 @@ CREATE INDEX IF NOT EXISTS idx_games_season ON games(season_id);
 CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
 CREATE INDEX IF NOT EXISTS idx_player_seasons_season ON player_seasons(season_id);
 CREATE INDEX IF NOT EXISTS idx_player_game_stats_game ON player_game_stats(game_id);
+CREATE INDEX IF NOT EXISTS idx_player_game_stats_player ON player_game_stats(player_id);
 CREATE INDEX IF NOT EXISTS idx_goalie_game_stats_game ON goalie_game_stats(game_id);
+CREATE INDEX IF NOT EXISTS idx_goalie_game_stats_player ON goalie_game_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_seasons_player ON player_seasons(player_id);
 CREATE INDEX IF NOT EXISTS idx_game_officials_game ON game_officials(game_id);

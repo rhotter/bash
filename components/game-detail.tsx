@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useGameDetail, type BashGame } from "@/lib/hockey-data"
+import { useGameDetail, type BashGame, type BashGameDetail } from "@/lib/hockey-data"
 import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
@@ -13,10 +13,11 @@ type SortDir = "asc" | "desc"
 
 interface GameDetailProps {
   game: BashGame
+  initialDetail?: BashGameDetail
 }
 
-export function GameDetail({ game }: GameDetailProps) {
-  const { detail, isLoading, isError } = useGameDetail(game.id)
+export function GameDetail({ game, initialDetail }: GameDetailProps) {
+  const { detail, isLoading, isError } = useGameDetail(game.id, initialDetail)
   const isFinal = game.status === "final"
 
   return (

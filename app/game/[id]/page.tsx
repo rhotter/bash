@@ -1,30 +1,19 @@
-"use client"
-
-import { use } from "react"
-import { useBashData } from "@/lib/hockey-data"
-import { GameDetail } from "@/components/game-detail"
 import { SiteHeader } from "@/components/site-header"
-import { Loader2 } from "lucide-react"
+import { GamePageContent } from "@/components/game-page-content"
+import { fetchGameDetail } from "@/lib/fetch-game-detail"
 import Link from "next/link"
 
-export default function GamePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const { games, isLoading } = useBashData()
+export const revalidate = 30
 
-  const game = games.find((g) => g.id === id)
+export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const detail = await fetchGameDetail(id)
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 md:py-8">
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Loading game&hellip;</span>
-          </div>
-        )}
-
-        {!isLoading && !game && (
+        {!detail && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <p className="text-sm text-muted-foreground">Game not found.</p>
             <Link
@@ -35,8 +24,7 @@ export default function GamePage({ params }: { params: Promise<{ id: string }> }
             </Link>
           </div>
         )}
-
-        {game && <GameDetail game={game} />}
+        {detail && <GamePageContent initialDetail={detail} />}
       </main>
     </div>
   )

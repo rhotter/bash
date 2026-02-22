@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { getCurrentSeason } from "@/lib/seasons"
 
 export interface GoalieRoster {
   id: number
@@ -70,10 +71,13 @@ export interface TeamDetail {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params
+  const { searchParams } = new URL(request.url)
+  const seasonParam = searchParams.get("season")
+  const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
 
   try {
     // Check team exists
@@ -83,7 +87,7 @@ export async function GET(
     }
     const team = teamRows[0]
 
-    // Skaters with aggregated stats
+    // Skaters with aggregated stats — join through games to scope by season (bug fix)
     const skaterRows = await sql`
       SELECT
         p.id, p.name,
@@ -99,8 +103,9 @@ export async function GET(
         SUM(pgs.pen)::int as pen,
         SUM(pgs.pim)::int as pim
       FROM players p
-      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = '2025-2026'
+      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       JOIN player_game_stats pgs ON pgs.player_id = p.id
+      JOIN games g ON pgs.game_id = g.id AND g.season_id = ${seasonId}
       WHERE ps.team_slug = ${slug} AND ps.is_goalie = false
       GROUP BY p.id, p.name
       ORDER BY points DESC, goals DESC, p.name ASC
@@ -124,7 +129,7 @@ export async function GET(
       pim: r.pim,
     }))
 
-    // Goalies with aggregated stats
+    // Goalies with aggregated stats — join through games to scope by season (bug fix)
     const goalieRows = await sql`
       SELECT
         p.id, p.name,
@@ -138,8 +143,9 @@ export async function GET(
         COUNT(*) FILTER (WHERE ggs.result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE ggs.result = 'L')::int as losses
       FROM players p
-      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = '2025-2026'
+      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       JOIN goalie_game_stats ggs ON ggs.player_id = p.id
+      JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId}
       WHERE ps.team_slug = ${slug} AND ps.is_goalie = true
       GROUP BY p.id, p.name
       ORDER BY gp DESC, p.name ASC
@@ -175,7 +181,7 @@ export async function GET(
       FROM games g
       JOIN teams ht ON g.home_team = ht.slug
       JOIN teams awt ON g.away_team = awt.slug
-      WHERE g.season_id = '2025-2026'
+      WHERE g.season_id = ${seasonId}
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
       ORDER BY g.date DESC, g.time DESC
@@ -240,14 +246,14 @@ export async function GET(
       FROM season_teams t
       CROSS JOIN LATERAL (
         SELECT * FROM games g2
-        WHERE g2.season_id = '2025-2026' AND g2.status = 'final' AND NOT g2.is_playoff
+        WHERE g2.season_id = ${seasonId} AND g2.status = 'final' AND NOT g2.is_playoff
           AND (g2.home_team = t.team_slug OR g2.away_team = t.team_slug)
       ) g
-      WHERE t.season_id = '2025-2026'
+      WHERE t.season_id = ${seasonId}
       GROUP BY t.team_slug
       ORDER BY pts DESC, (SUM(CASE WHEN g.home_team = t.team_slug THEN g.home_score ELSE g.away_score END) - SUM(CASE WHEN g.home_team = t.team_slug THEN g.away_score ELSE g.home_score END)) DESC
     `
-    const totalTeams = await sql`SELECT COUNT(*)::int as count FROM season_teams WHERE season_id = '2025-2026'`
+    const totalTeams = await sql`SELECT COUNT(*)::int as count FROM season_teams WHERE season_id = ${seasonId}`
     record.totalTeams = totalTeams[0].count
     const rankIdx = allTeamResults.findIndex(r => r.team_slug === slug)
     record.rank = rankIdx >= 0 ? rankIdx + 1 : 0

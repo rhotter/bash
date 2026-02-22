@@ -3,8 +3,9 @@ import type { BashApiData, BashGame, Standing } from "@/app/api/bash/route"
 import type { PlayerStatsData, SkaterStat, GoalieStat } from "@/app/api/bash/players/route"
 import type { RefStatsData, RefStat } from "@/app/api/bash/refs/route"
 import type { BashGameDetail } from "@/app/api/bash/game/[id]/route"
+import type { SeasonsData } from "@/app/api/bash/seasons/route"
 
-export type { BashApiData, BashGame, Standing, PlayerStatsData, SkaterStat, GoalieStat, RefStatsData, RefStat, BashGameDetail }
+export type { BashApiData, BashGame, Standing, PlayerStatsData, SkaterStat, GoalieStat, RefStatsData, RefStat, BashGameDetail, SeasonsData }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -16,29 +17,36 @@ function triggerSync() {
   fetch("/api/bash/sync").catch(() => {})
 }
 
-export function useBashData() {
-  const { data, error, isLoading, mutate } = useSWR<BashApiData>("/api/bash", fetcher, {
+export function useBashData(season?: string, fallbackData?: BashApiData) {
+  const url = season ? `/api/bash?season=${season}` : "/api/bash"
+  const isCurrentSeason = !season || season === "2025-2026"
+
+  const { data, error, isLoading, mutate } = useSWR<BashApiData>(url, fetcher, {
     refreshInterval: 60_000,
     revalidateOnFocus: true,
     dedupingInterval: 30_000,
-    onSuccess: () => triggerSync(),
+    onSuccess: () => { if (isCurrentSeason) triggerSync() },
+    fallbackData,
   })
 
   return {
     games: data?.games ?? [],
     standings: data?.standings ?? [],
     lastUpdated: data?.lastUpdated ?? null,
-    isLoading,
+    isLoading: fallbackData ? false : isLoading,
     isError: !!error,
     refresh: mutate,
   }
 }
 
-export function usePlayerStats() {
-  const { data, error, isLoading } = useSWR<PlayerStatsData>("/api/bash/players", fetcher, {
+export function usePlayerStats(season?: string, fallbackData?: PlayerStatsData) {
+  const url = season ? `/api/bash/players?season=${season}` : "/api/bash/players"
+
+  const { data, error, isLoading } = useSWR<PlayerStatsData>(url, fetcher, {
     refreshInterval: 120_000,
     revalidateOnFocus: true,
     dedupingInterval: 60_000,
+    fallbackData,
   })
 
   return {
@@ -46,7 +54,7 @@ export function usePlayerStats() {
     goalies: data?.goalies ?? [],
     teams: data?.teams ?? [],
     lastUpdated: data?.lastUpdated ?? null,
-    isLoading,
+    isLoading: fallbackData ? false : isLoading,
     isError: !!error,
   }
 }
@@ -66,15 +74,28 @@ export function useRefStats() {
   }
 }
 
-export function useGameDetail(gameId: string | null) {
+export function useGameDetail(gameId: string | null, fallbackData?: BashGameDetail) {
   const { data, error, isLoading } = useSWR<BashGameDetail>(
     gameId ? `/api/bash/game/${gameId}` : null,
     fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+    { revalidateOnFocus: false, dedupingInterval: 30_000, fallbackData }
   )
 
   return {
     detail: data ?? null,
+    isLoading: fallbackData ? false : isLoading,
+    isError: !!error,
+  }
+}
+
+export function useSeasons() {
+  const { data, error, isLoading } = useSWR<SeasonsData>("/api/bash/seasons", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 300_000,
+  })
+
+  return {
+    seasons: data?.seasons ?? [],
     isLoading,
     isError: !!error,
   }

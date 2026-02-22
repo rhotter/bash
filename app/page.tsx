@@ -1,17 +1,21 @@
-"use client"
-
+import { Suspense } from "react"
 import { SiteHeader } from "@/components/site-header"
-import { ScoresTab } from "@/components/scores-tab"
-import { useBashData } from "@/lib/hockey-data"
+import { HomeContent } from "@/components/home-content"
+import { fetchBashData } from "@/lib/fetch-bash-data"
 
-export default function HomePage() {
-  const { games, isLoading } = useBashData()
+export const revalidate = 30
+
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ season?: string }> }) {
+  const { season } = await searchParams
+  const data = await fetchBashData(season)
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <SiteHeader activeTab="scores" />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 md:py-8">
-        <ScoresTab games={games} isLoading={isLoading} />
+        <Suspense>
+          <HomeContent initialData={data} />
+        </Suspense>
       </main>
     </div>
   )

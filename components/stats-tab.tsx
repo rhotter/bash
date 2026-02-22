@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { usePlayerStats } from "@/lib/hockey-data"
+import { usePlayerStats, type PlayerStatsData } from "@/lib/hockey-data"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -20,9 +20,10 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 const PER_PAGE = 25
 
-export function StatsTab() {
-  const { skaters, goalies, teams, isLoading, isError } = usePlayerStats()
+export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
   const searchParams = useSearchParams()
+  const season = searchParams.get("season") || undefined
+  const { skaters, goalies, teams, isLoading, isError } = usePlayerStats(season, initialData)
   const router = useRouter()
   const rawView = searchParams.get("view")
   const tab = rawView === "goalies" ? "goalies" : "skaters" as const
@@ -151,23 +152,22 @@ export function StatsTab() {
 
       {/* Skaters Table */}
       {tab === "skaters" && (
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <table className="w-full text-[11px]">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full min-w-[700px] text-[11px]">
             <thead>
               <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                <th className="text-center font-medium py-2.5 w-8">#</th>
-                <th className="text-left font-medium py-2.5 min-w-[120px]">Player</th>
-                <th className="text-left font-medium py-2.5 w-20 hidden sm:table-cell">Team</th>
+                <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Player</th>
+                <th className="text-left font-medium py-2.5">Team</th>
                 <SortableTh label="GP" sortKey="gp" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="G" sortKey="goals" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="A" sortKey="assists" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="PTS" sortKey="points" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold />
-                <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="GWG" sortKey="gwg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="PPG" sortKey="ppg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="SHG" sortKey="shg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="ENG" sortKey="eng" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell" />
-                <SortableTh label="HAT" sortKey="hatTricks" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell" />
+                <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="GWG" sortKey="gwg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="PPG" sortKey="ppg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="SHG" sortKey="shg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="ENG" sortKey="eng" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="HAT" sortKey="hatTricks" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="PIM" sortKey="pim" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
               </tr>
             </thead>
@@ -180,26 +180,25 @@ export function StatsTab() {
                     i % 2 === 0 && "bg-card/15"
                   )}
                 >
-                  <td className="text-center py-2 text-muted-foreground/40 tabular-nums">{(skaterPage - 1) * PER_PAGE + i + 1}</td>
-                  <td className="py-2 pr-2">
-                    <div className="flex flex-col">
-                      <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors">{p.name}</Link>
-                      <Link href={`/team/${p.teamSlug}`} className="text-[9px] text-muted-foreground/50 hover:text-primary transition-colors sm:hidden">{p.team}</Link>
+                  <td className="py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
+                    <div className="flex items-baseline gap-2 pr-4">
+                      <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(skaterPage - 1) * PER_PAGE + i + 1}</span>
+                      <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
                     </div>
                   </td>
-                  <td className="hidden sm:table-cell py-2 text-muted-foreground text-xs">
-                    <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors">{p.team}</Link>
+                  <td className="py-2 text-muted-foreground text-xs">
+                    <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
                   </td>
                   <td className="text-center tabular-nums py-2 text-muted-foreground">{p.gp}</td>
                   <td className={cn("text-center tabular-nums py-2", p.goals > 0 && "font-medium")}>{p.goals}</td>
                   <td className={cn("text-center tabular-nums py-2", p.assists > 0 && "font-medium")}>{p.assists}</td>
                   <td className="text-center tabular-nums py-2 font-bold">{p.points}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.ptsPg}</td>
-                  <td className={cn("text-center tabular-nums py-2 hidden sm:table-cell", p.gwg > 0 && "font-medium")}>{p.gwg}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.ppg}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.shg}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.eng}</td>
-                  <td className={cn("text-center tabular-nums py-2 hidden sm:table-cell", p.hatTricks > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.ptsPg}</td>
+                  <td className={cn("text-center tabular-nums py-2", p.gwg > 0 && "font-medium")}>{p.gwg}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.ppg}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.shg}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.eng}</td>
+                  <td className={cn("text-center tabular-nums py-2", p.hatTricks > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks}</td>
                   <td className="text-center tabular-nums py-2 text-muted-foreground">{p.pim}</td>
                 </tr>
               ))}
@@ -218,23 +217,22 @@ export function StatsTab() {
 
       {/* Goalies Table */}
       {tab === "goalies" && (
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <table className="w-full text-[11px]">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full min-w-[700px] text-[11px]">
             <thead>
               <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                <th className="text-center font-medium py-2.5 w-8">#</th>
-                <th className="text-left font-medium py-2.5 min-w-[120px]">Goalie</th>
-                <th className="text-left font-medium py-2.5 w-20 hidden sm:table-cell">Team</th>
+                <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Goalie</th>
+                <th className="text-left font-medium py-2.5">Team</th>
                 <GoalieSortableTh label="GP" sortKey="gp" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
                 <GoalieSortableTh label="W" sortKey="wins" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
                 <GoalieSortableTh label="L" sortKey="losses" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
                 <GoalieSortableTh label="SV%" sortKey="savePercentage" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} bold />
                 <GoalieSortableTh label="GAA" sortKey="gaa" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="SO" sortKey="shutouts" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
-                <GoalieSortableTh label="SV" sortKey="saves" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
-                <GoalieSortableTh label="GA" sortKey="goalsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
-                <GoalieSortableTh label="SA" sortKey="shotsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
-                <GoalieSortableTh label="A" sortKey="goalieAssists" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
+                <GoalieSortableTh label="SO" sortKey="shutouts" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                <GoalieSortableTh label="SV" sortKey="saves" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                <GoalieSortableTh label="GA" sortKey="goalsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                <GoalieSortableTh label="SA" sortKey="shotsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                <GoalieSortableTh label="A" sortKey="goalieAssists" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
               </tr>
             </thead>
             <tbody>
@@ -246,15 +244,14 @@ export function StatsTab() {
                     i % 2 === 0 && "bg-card/15"
                   )}
                 >
-                  <td className="text-center py-2 text-muted-foreground/40 tabular-nums">{(goaliePage - 1) * PER_PAGE + i + 1}</td>
-                  <td className="py-2 pr-2">
-                    <div className="flex flex-col">
-                      <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors">{p.name}</Link>
-                      <Link href={`/team/${p.teamSlug}`} className="text-[9px] text-muted-foreground/50 hover:text-primary transition-colors sm:hidden">{p.team}</Link>
+                  <td className="py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
+                    <div className="flex items-baseline gap-2 pr-4">
+                      <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(goaliePage - 1) * PER_PAGE + i + 1}</span>
+                      <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
                     </div>
                   </td>
-                  <td className="hidden sm:table-cell py-2 text-muted-foreground text-xs">
-                    <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors">{p.team}</Link>
+                  <td className="py-2 text-muted-foreground text-xs">
+                    <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
                   </td>
                   <td className="text-center tabular-nums py-2 text-muted-foreground">{p.gp}</td>
                   <td className={cn("text-center tabular-nums py-2", p.wins > 0 && "font-medium")}>{p.wins}</td>
@@ -265,11 +262,11 @@ export function StatsTab() {
                   <td className="text-center tabular-nums py-2 text-muted-foreground">
                     {p.gaa !== undefined ? p.gaa.toFixed(2) : "-"}
                   </td>
-                  <td className={cn("text-center tabular-nums py-2 hidden sm:table-cell", p.shutouts > 0 && "font-medium")}>{p.shutouts}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.saves}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.goalsAgainst}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.shotsAgainst}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground hidden sm:table-cell">{p.goalieAssists}</td>
+                  <td className={cn("text-center tabular-nums py-2", p.shutouts > 0 && "font-medium")}>{p.shutouts}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.saves}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.goalsAgainst}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.shotsAgainst}</td>
+                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.goalieAssists}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { getCurrentSeason } from "@/lib/seasons"
 
 // ─── Shared output types ────────────────────────────────────────────────────
 
@@ -98,8 +99,13 @@ function computeStandings(games: BashGame[]): Standing[] {
   return [...teamMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const seasonParam = searchParams.get("season")
+    const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
+
+    // "all" doesn't make sense for scores/standings — fall back to current
     const rows = await sql`
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
@@ -109,7 +115,7 @@ export async function GET() {
       FROM games g
       JOIN teams ht ON g.home_team = ht.slug
       JOIN teams awt ON g.away_team = awt.slug
-      WHERE g.season_id = '2025-2026'
+      WHERE g.season_id = ${seasonId}
       ORDER BY g.date ASC, g.time ASC
     `
 
