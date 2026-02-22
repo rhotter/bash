@@ -112,30 +112,37 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
       cells.push(cellMatch[1])
     }
 
-    // Cell 0: date (e.g., "Sat 10/5/2024" — only present on first game of date)
-    const dateText = stripHtml(cells[0] || "").trim()
-    const dateParsed = dateText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
-    if (dateParsed) {
-      const [, month, day, year] = dateParsed
-      currentDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+    // Find date from any cell that has M/D/YYYY pattern
+    for (const cell of cells) {
+      const dateText = stripHtml(cell).trim()
+      const dateParsed = dateText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+      if (dateParsed) {
+        const [, month, day, year] = dateParsed
+        currentDate = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+        break
+      }
     }
 
     if (!currentDate) continue
 
-    // Cell 1: time (e.g., "9:00a")
-    const timeText = stripHtml(cells[1] || "").trim()
-    const time = timeText.replace(/&nbsp;/g, "").trim() || "TBD"
+    // Find time from the cell with a time pattern (before the game cell)
+    let time = "TBD"
+    for (const cell of cells) {
+      const t = stripHtml(cell).replace(/&nbsp;/g, "").trim()
+      if (/^\d{1,2}:\d{2}[ap]$/.test(t)) { time = t; break }
+    }
 
-    // Cell 2: game link with scores — strip HTML to get text like:
-    //   "(Pla) TeamA 2 at TeamB 3(Overtime)" or "TeamA at TeamB"
-    const gameCellHtml = cells[2] || ""
+    // Find the game cell — the one containing the GID link
+    let gameCellHtml = ""
+    for (const cell of cells) {
+      if (/GID=/.test(cell)) { gameCellHtml = cell; break }
+    }
     const gameText = stripHtml(gameCellHtml).trim()
 
     const isPlayoff = /\(Pla\)/i.test(gameText)
     const isOT = /Overtime|ShootOut/i.test(gameCellHtml)
 
-    // Parse "Away Score at Home Score" — scores may be on either side of "at"
-    // Patterns: "TeamA 2 at TeamB 3", "(Pla) TeamA 2 at TeamB 3(Overtime)"
+    // Parse "Away Score at Home Score"
     const cleanText = gameText.replace(/^\(Pla\)\s*/i, "").replace(/\(Overtime\)|\(ShootOut\)|\(If Necessary\)/gi, "").trim()
 
     const scoreMatch = cleanText.match(/^(.+?)\s+(\d+)\s+at\s+(.+?)\s+(\d+)$/)
@@ -160,8 +167,12 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
 
     if (!awayName || !homeName || awayName.length < 2 || homeName.length < 2) continue
 
-    // Cell 4: location
-    const location = stripHtml(cells[4] || "").trim() || "James Lick Arena"
+    // Find location cell — look for a cell containing "Arena" or "Rink" etc.
+    let location = "James Lick Arena"
+    for (const cell of cells) {
+      const loc = stripHtml(cell).trim()
+      if (loc && /arena|rink|center|park|field/i.test(loc)) { location = loc; break }
+    }
 
     // Look up or create teams
     let awaySlug = teamNameToSlug[awayName.toLowerCase()]
@@ -398,6 +409,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const seasonParam = searchParams.get("seasonId")
+    const scheduleOnly = searchParams.get("scheduleOnly") === "true"
+    const boxscoreLimit = parseInt(searchParams.get("boxscoreLimit") || "0") || (scheduleOnly ? 0 : 999)
 
     // If a specific season is requested, do a full sync for that season
     if (seasonParam) {
@@ -409,32 +422,43 @@ export async function GET(request: Request) {
       // Full schedule sync (creates games from scratch)
       const scheduleResult = await syncFullSchedule(season.leagueId, season.id)
 
-      // Sync all boxscores for historical seasons, limited for current
-      const limit = season.id === getCurrentSeason().id ? MAX_BOXSCORES_PER_SYNC : 999
-      const gamesNeedingBoxscore = await sql`
-        SELECT id FROM games
-        WHERE season_id = ${season.id}
-          AND status = 'final'
-          AND has_boxscore = false
-        ORDER BY date ASC
-        LIMIT ${limit}
-      `
-
+      // Sync boxscores — skip if scheduleOnly, limited for current season
+      const limit = scheduleOnly ? 0 : (season.id === getCurrentSeason().id ? MAX_BOXSCORES_PER_SYNC : boxscoreLimit)
       let boxscoresSynced = 0
-      for (const game of gamesNeedingBoxscore) {
-        try {
-          await syncBoxscore(game.id, season.leagueId, season.id)
-          boxscoresSynced++
-        } catch (err) {
-          console.error(`Failed to sync boxscore for game ${game.id}:`, err)
+      let boxscoresRemaining = 0
+
+      if (limit > 0) {
+        const gamesNeedingBoxscore = await sql`
+          SELECT id FROM games
+          WHERE season_id = ${season.id}
+            AND status = 'final'
+            AND has_boxscore = false
+          ORDER BY date ASC
+          LIMIT ${limit}
+        `
+
+        for (const game of gamesNeedingBoxscore) {
+          try {
+            await syncBoxscore(game.id, season.leagueId, season.id)
+            boxscoresSynced++
+          } catch (err) {
+            console.error(`Failed to sync boxscore for game ${game.id}:`, err)
+          }
         }
       }
+
+      const remaining = await sql`
+        SELECT count(*)::int as count FROM games
+        WHERE season_id = ${season.id} AND status = 'final' AND has_boxscore = false
+      `
+      boxscoresRemaining = remaining[0].count
 
       return NextResponse.json({
         ok: true,
         season: season.id,
         schedule: scheduleResult,
         boxscoresSynced,
+        boxscoresRemaining,
         timestamp: new Date().toISOString(),
       })
     }

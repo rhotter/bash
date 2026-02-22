@@ -141,12 +141,12 @@ export function ScoresTab({ games, isLoading }: { games: BashGame[]; isLoading: 
         </>
       )}
 
-      {/* Recent results (always shown) */}
+      {/* This week (always shown) */}
       {recentResults.length > 0 && (
         <div>
           <div className="flex items-center gap-3 mb-3">
             <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/70 whitespace-nowrap">
-              Recent Results
+              This Week
             </h2>
             <div className="h-px flex-1 bg-border/40" />
           </div>

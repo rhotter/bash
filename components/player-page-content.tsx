@@ -37,7 +37,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-border/20 bg-card/15">
+                <tr className="border-t border-border/20 bg-card/15 hover:bg-card/60 transition-colors">
                   <td className="text-center tabular-nums py-2">{player.seasonStats.gp}</td>
                   <td className="text-center tabular-nums py-2 font-medium">{player.seasonStats.goals}</td>
                   <td className="text-center tabular-nums py-2 font-medium">{player.seasonStats.assists}</td>
@@ -77,7 +77,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-border/20 bg-card/15">
+                <tr className="border-t border-border/20 bg-card/15 hover:bg-card/60 transition-colors">
                   <td className="text-center tabular-nums py-2">{player.goalieSeasonStats.gp}</td>
                   <td className="text-center tabular-nums py-2 font-medium">{player.goalieSeasonStats.wins}</td>
                   <td className="text-center tabular-nums py-2">{player.goalieSeasonStats.losses}</td>

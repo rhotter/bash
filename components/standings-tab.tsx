@@ -60,10 +60,10 @@ export function StandingsTab({
             <SortableTh label="OTW" sortKey="otw" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortableTh label="L" sortKey="l" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortableTh label="OTL" sortKey="otl" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="PTS" sortKey="pts" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold />
             <SortableTh label="GF" sortKey="gf" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortableTh label="GA" sortKey="ga" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortableTh label="+/-" sortKey="gd" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="PTS" sortKey="pts" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold />
           </tr>
         </thead>
         <tbody>
@@ -86,12 +86,12 @@ export function StandingsTab({
               <td className="text-center tabular-nums py-2 text-muted-foreground">{row.otw}</td>
               <td className="text-center tabular-nums py-2 text-muted-foreground">{row.l}</td>
               <td className="text-center tabular-nums py-2 text-muted-foreground">{row.otl}</td>
+              <td className="text-center tabular-nums py-2 font-bold">{row.pts}</td>
               <td className="text-center tabular-nums py-2 text-muted-foreground">{row.gf}</td>
               <td className="text-center tabular-nums py-2 text-muted-foreground">{row.ga}</td>
               <td className="text-center tabular-nums py-2 text-muted-foreground">
                 {row.gd > 0 ? `+${row.gd}` : row.gd}
               </td>
-              <td className="text-center tabular-nums py-2 font-bold">{row.pts}</td>
             </tr>
           ))}
         </tbody>
