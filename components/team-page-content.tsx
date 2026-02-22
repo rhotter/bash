@@ -180,13 +180,15 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
       <span className="text-[10px] text-muted-foreground/40 w-6 shrink-0 text-center">
         {g.isHome ? "vs" : "@"}
       </span>
-      <Link
-        href={`/team/${g.opponentSlug}`}
-        className="text-xs font-medium text-foreground hover:text-primary transition-colors flex-1"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {g.opponent}
-      </Link>
+      <span className="flex-1">
+        <Link
+          href={`/team/${g.opponentSlug}`}
+          className="text-xs font-medium text-foreground hover:text-primary transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {g.opponent}
+        </Link>
+      </span>
       {isFinal ? (
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono tabular-nums font-medium text-muted-foreground">
