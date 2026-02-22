@@ -14,7 +14,10 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'BASH - Bay Area Street Hockey',
+  title: {
+    default: 'BASH - Bay Area Street Hockey',
+    template: '%s | BASH',
+  },
   description: 'Scores, standings, and stats for the Bay Area Street Hockey league.',
 }
 

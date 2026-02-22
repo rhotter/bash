@@ -1,9 +1,27 @@
+import type { Metadata } from "next"
 import { SiteHeader } from "@/components/site-header"
 import { GamePageContent } from "@/components/game-page-content"
 import { fetchGameDetail } from "@/lib/fetch-game-detail"
 import Link from "next/link"
 
 export const revalidate = 30
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  const detail = await fetchGameDetail(id)
+  if (!detail) return { title: "Game Not Found" }
+
+  const score = detail.homeScore != null && detail.awayScore != null
+    ? ` ${detail.homeScore}-${detail.awayScore}`
+    : ""
+  const title = `${detail.awayTeam} @ ${detail.homeTeam}${score}`
+  const ot = detail.isOvertime ? " (OT)" : ""
+  const description = detail.status === "final"
+    ? `Final${ot}: ${detail.awayTeam} ${detail.awayScore}, ${detail.homeTeam} ${detail.homeScore} - ${detail.date}`
+    : `${detail.awayTeam} vs ${detail.homeTeam} - ${detail.date}`
+
+  return { title, description }
+}
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

@@ -1,8 +1,14 @@
+import type { Metadata } from "next"
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { SiteHeader } from "@/components/site-header"
 import { StandingsContent } from "@/components/standings-content"
 import { fetchBashData } from "@/lib/fetch-bash-data"
+
+export const metadata: Metadata = {
+  title: "Standings",
+  description: "BASH league standings - team rankings, points, wins, losses, and goal differential.",
+}
 
 export const revalidate = 30
 

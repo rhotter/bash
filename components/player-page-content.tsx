@@ -28,7 +28,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
               <thead>
                 <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
                   <th className="text-left font-medium py-2.5 whitespace-nowrap pr-3">Season</th>
-                  <th className="text-center font-medium py-2.5 whitespace-nowrap">GP</th>
+                  <th className="text-center font-medium py-2.5 w-10">GP</th>
                   <th className="text-center font-medium py-2.5 w-10">G</th>
                   <th className="text-center font-medium py-2.5 w-10">A</th>
                   <th className="text-center font-medium py-2.5 w-10 font-bold">PTS</th>
@@ -91,7 +91,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
               <thead>
                 <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
                   <th className="text-left font-medium py-2.5 whitespace-nowrap pr-3">Season</th>
-                  <th className="text-center font-medium py-2.5 whitespace-nowrap">GP</th>
+                  <th className="text-center font-medium py-2.5 w-10">GP</th>
                   <th className="text-center font-medium py-2.5 w-10">W</th>
                   <th className="text-center font-medium py-2.5 w-10">L</th>
                   <th className="text-center font-medium py-2.5 w-12 font-bold">SV%</th>
@@ -178,7 +178,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
                         {g.opponent}
                       </Link>
                     </td>
-                    <td className="text-center py-2 text-xs tabular-nums">
+                    <td className="text-center py-2 text-[10px] tabular-nums text-muted-foreground">
                       {g.teamScore != null ? (
                         <Link href={`/game/${g.gameId}`} className="hover:underline transition-colors">
                           {g.teamScore}-{g.opponentScore}
@@ -237,7 +237,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
                         {g.opponent}
                       </Link>
                     </td>
-                    <td className="text-center py-2 text-xs tabular-nums">
+                    <td className="text-center py-2 text-[10px] tabular-nums text-muted-foreground">
                       {g.teamScore != null ? (
                         <Link href={`/game/${g.gameId}`} className="hover:underline transition-colors">
                           {g.teamScore}-{g.opponentScore}

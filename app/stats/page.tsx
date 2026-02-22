@@ -1,7 +1,13 @@
+import type { Metadata } from "next"
 import { Suspense } from "react"
 import { SiteHeader } from "@/components/site-header"
 import { StatsTab } from "@/components/stats-tab"
 import { fetchPlayerStats } from "@/lib/fetch-player-stats"
+
+export const metadata: Metadata = {
+  title: "Stats",
+  description: "BASH player stats and leaderboards - goals, assists, points, and more.",
+}
 
 export const revalidate = 60
 

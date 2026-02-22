@@ -221,7 +221,7 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
               </td>
               <td className={cn("text-center tabular-nums py-2 px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
               <td className={cn("text-center tabular-nums py-2 px-3", p.assists > 0 && "font-medium")}>{p.assists}</td>
-              <td className={cn("text-center tabular-nums py-2 px-3", p.points > 0 && "font-medium")}>{p.points}</td>
+              <td className="text-center tabular-nums py-2 px-3 font-bold">{p.points}</td>
               <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (p.gwg ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.gwg ?? 0}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ppg ?? 0}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.shg ?? 0}</td>
