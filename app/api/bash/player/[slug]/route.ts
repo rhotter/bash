@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { getCurrentSeason, getSeasonById } from "@/lib/seasons"
+import { playerSlug } from "@/lib/player-slug"
 
 export type SkaterStats = {
   gp: number
@@ -87,15 +88,25 @@ export interface PlayerDetail {
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const { id } = await params
+  const { slug } = await params
   const { searchParams } = new URL(request.url)
   const seasonParam = searchParams.get("season")
   const isAllTime = seasonParam === "all"
   const seasonId = !isAllTime ? (seasonParam || getCurrentSeason().id) : null
 
   try {
+    // Look up player by slug (derived from name)
+    const allPlayers = await sql`SELECT id, name FROM players`
+    const matchedPlayer = allPlayers.find(
+      (p) => playerSlug(p.name) === slug
+    )
+    if (!matchedPlayer) {
+      return NextResponse.json({ error: "Player not found" }, { status: 404 })
+    }
+    const playerId = matchedPlayer.id
+
     // Look up the player — use requested season or fall back to most recent
     let playerRows
     if (isAllTime) {
@@ -104,7 +115,7 @@ export async function GET(
         FROM players p
         JOIN player_seasons ps ON p.id = ps.player_id
         JOIN teams t ON ps.team_slug = t.slug
-        WHERE p.id = ${parseInt(id)}
+        WHERE p.id = ${playerId}
         ORDER BY ps.season_id DESC
         LIMIT 1
       `
@@ -114,7 +125,7 @@ export async function GET(
         FROM players p
         JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
         JOIN teams t ON ps.team_slug = t.slug
-        WHERE p.id = ${parseInt(id)}
+        WHERE p.id = ${playerId}
       `
       // Fall back to most recent season if not found in requested season
       if (playerRows.length === 0) {
@@ -123,7 +134,7 @@ export async function GET(
           FROM players p
           JOIN player_seasons ps ON p.id = ps.player_id
           JOIN teams t ON ps.team_slug = t.slug
-          WHERE p.id = ${parseInt(id)}
+          WHERE p.id = ${playerId}
           ORDER BY ps.season_id DESC
           LIMIT 1
         `

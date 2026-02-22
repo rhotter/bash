@@ -3,7 +3,7 @@
 import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import type { PlayerDetail } from "@/app/api/bash/player/[id]/route"
+import type { PlayerDetail } from "@/app/api/bash/player/[slug]/route"
 
 export function PlayerPageContent({ player }: { player: PlayerDetail }) {
   const hasSkaterData = player.perSeasonStats.length > 0 || player.allTimeStats

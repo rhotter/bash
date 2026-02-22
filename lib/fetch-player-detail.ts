@@ -1,12 +1,20 @@
 import { sql } from "@/lib/db"
 import { getCurrentSeason, getSeasonById } from "@/lib/seasons"
-import type { PlayerDetail, SkaterStats, GoalieStats } from "@/app/api/bash/player/[id]/route"
+import { playerSlug } from "@/lib/player-slug"
+import type { PlayerDetail, SkaterStats, GoalieStats } from "@/app/api/bash/player/[slug]/route"
 
 export type { PlayerDetail }
 
-export async function fetchPlayerDetail(id: string): Promise<PlayerDetail | null> {
+export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | null> {
   const currentSeasonId = getCurrentSeason().id
-  const playerId = parseInt(id)
+
+  // Look up player by slug (derived from name) — find all players whose slug matches
+  const allMatches = await sql`SELECT id, name FROM players`
+  const matchedPlayer = allMatches.find(
+    (p) => playerSlug(p.name) === slug
+  )
+  if (!matchedPlayer) return null
+  const playerId = matchedPlayer.id
 
   // Try current season first, then fall back to most recent season
   let playerRows = await sql`

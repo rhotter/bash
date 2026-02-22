@@ -6,6 +6,7 @@ import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { playerSlug } from "@/lib/player-slug"
 import type { PlayerBoxScore, GoalieBoxScore } from "@/app/api/bash/game/[id]/route"
 
 type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen"
@@ -214,7 +215,7 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
               )}
             >
               <td className="py-2 pr-2">
-                <Link href={`/player/${p.id}`} className={cn("hover:text-primary transition-colors font-medium", p.points > 0 && "font-semibold text-foreground")}>
+                <Link href={`/player/${playerSlug(p.name)}`} className={cn("hover:text-primary transition-colors font-medium", p.points > 0 && "font-semibold text-foreground")}>
                   {p.name}
                 </Link>
               </td>
@@ -262,7 +263,7 @@ function GoalieBoxScoreTable({ goalies }: { goalies: GoalieBoxScore[] }) {
               )}
             >
               <td className="py-2 pr-2">
-                <Link href={`/player/${g.id}`} className="font-medium hover:text-primary transition-colors">{g.name}</Link>
+                <Link href={`/player/${playerSlug(g.name)}`} className="font-medium hover:text-primary transition-colors">{g.name}</Link>
               </td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.minutes}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shotsAgainst}</td>

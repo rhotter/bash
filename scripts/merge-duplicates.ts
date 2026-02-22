@@ -133,6 +133,10 @@ function toTitleCase(s: string): string {
     .split(" ")
     .map((w) => {
       if (!w) return w;
+      // Handle initials like "K.G." — uppercase each letter before a period
+      if (/^[a-zA-Z]\.([a-zA-Z]\.)*$/.test(w)) {
+        return w.toUpperCase();
+      }
       // Preserve internal capitalization for names like "McDonald", "O'Brien"
       // But fix ALL-CAPS or all-lowercase
       if (w === w.toUpperCase() || w === w.toLowerCase()) {

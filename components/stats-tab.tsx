@@ -6,6 +6,7 @@ import { usePlayerStats, type PlayerStatsData } from "@/lib/hockey-data"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { playerSlug } from "@/lib/player-slug"
 
 type SortKey = "points" | "goals" | "assists" | "pim" | "gp" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen" | "ptsPg"
 type GoalieSortKey = "savePercentage" | "gaa" | "wins" | "losses" | "saves" | "goalsAgainst" | "shotsAgainst" | "gp" | "shutouts" | "goalieAssists"
@@ -200,7 +201,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                     <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 transition-colors pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
                       <div className="flex items-baseline gap-2 pr-4">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(skaterPage - 1) * PER_PAGE + i + 1}</span>
-                        <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
+                        <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
                       </div>
                     </td>
                     <td className="py-2 text-muted-foreground text-xs">
@@ -266,7 +267,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                     <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 transition-colors pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
                       <div className="flex items-baseline gap-2 pr-4">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(goaliePage - 1) * PER_PAGE + i + 1}</span>
-                        <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
+                        <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
                       </div>
                     </td>
                     <td className="py-2 text-muted-foreground text-xs">

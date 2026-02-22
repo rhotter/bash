@@ -5,6 +5,7 @@ import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
+import { playerSlug } from "@/lib/player-slug"
 import { useRouter } from "next/navigation"
 import type { TeamDetail } from "@/app/api/bash/team/[slug]/route"
 
@@ -84,7 +85,7 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                 {sortedSkaters.map((p, i) => (
                   <tr key={p.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
                     <td className="py-2 pr-2">
-                      <Link href={`/player/${p.id}`} className="text-xs font-semibold hover:text-primary transition-colors">{p.name}</Link>
+                      <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{p.name}</Link>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
                     <td className={cn("text-center tabular-nums py-2 px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
@@ -128,7 +129,7 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                 {sortedGoalies.map((g, i) => (
                   <tr key={g.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
                     <td className="py-2 pr-2">
-                      <Link href={`/player/${g.id}`} className="text-xs font-semibold hover:text-primary transition-colors">{g.name}</Link>
+                      <Link href={`/player/${playerSlug(g.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{g.name}</Link>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.gp}</td>
                     <td className={cn("text-center tabular-nums py-2 px-3", (g.wins ?? 0) > 0 && "font-medium")}>{g.wins}</td>
