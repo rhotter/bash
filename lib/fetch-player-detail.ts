@@ -6,18 +6,33 @@ export type { PlayerDetail }
 
 export async function fetchPlayerDetail(id: string): Promise<PlayerDetail | null> {
   const currentSeasonId = getCurrentSeason().id
+  const playerId = parseInt(id)
 
-  const playerRows = await sql`
-    SELECT p.id, p.name, ps.team_slug, ps.is_goalie, t.name as team_name
+  // Try current season first, then fall back to most recent season
+  let playerRows = await sql`
+    SELECT p.id, p.name, ps.team_slug, ps.is_goalie, t.name as team_name, ps.season_id
     FROM players p
     JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${currentSeasonId}
     JOIN teams t ON ps.team_slug = t.slug
-    WHERE p.id = ${parseInt(id)}
+    WHERE p.id = ${playerId}
   `
+
+  if (playerRows.length === 0) {
+    playerRows = await sql`
+      SELECT p.id, p.name, ps.team_slug, ps.is_goalie, t.name as team_name, ps.season_id
+      FROM players p
+      JOIN player_seasons ps ON p.id = ps.player_id
+      JOIN teams t ON ps.team_slug = t.slug
+      WHERE p.id = ${playerId}
+      ORDER BY ps.season_id DESC
+      LIMIT 1
+    `
+  }
 
   if (playerRows.length === 0) return null
 
   const player = playerRows[0]
+  const playerSeasonId = player.season_id
 
   let seasonStats: PlayerDetail["seasonStats"] = null
   let allTimeStats: PlayerDetail["allTimeStats"] = null
@@ -58,7 +73,7 @@ export async function fetchPlayerDetail(id: string): Promise<PlayerDetail | null
           SUM(eng)::int as eng, SUM(hat_tricks)::int as hat_tricks,
           SUM(pen)::int as pen, SUM(pim)::int as pim
         FROM player_game_stats pgs
-        JOIN games g ON pgs.game_id = g.id AND g.season_id = ${currentSeasonId}
+        JOIN games g ON pgs.game_id = g.id AND g.season_id = ${playerSeasonId}
         WHERE pgs.player_id = ${player.id}
       `,
       sql`
@@ -91,7 +106,7 @@ export async function fetchPlayerDetail(id: string): Promise<PlayerDetail | null
           pgs.goals, pgs.assists, pgs.points, pgs.gwg, pgs.ppg, pgs.shg,
           pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim
         FROM player_game_stats pgs
-        JOIN games g ON pgs.game_id = g.id AND g.season_id = ${currentSeasonId}
+        JOIN games g ON pgs.game_id = g.id AND g.season_id = ${playerSeasonId}
         JOIN teams ht ON g.home_team = ht.slug
         JOIN teams awt ON g.away_team = awt.slug
         WHERE pgs.player_id = ${player.id}
@@ -144,7 +159,7 @@ export async function fetchPlayerDetail(id: string): Promise<PlayerDetail | null
           COUNT(*) FILTER (WHERE result = 'W')::int as wins,
           COUNT(*) FILTER (WHERE result = 'L')::int as losses
         FROM goalie_game_stats ggs
-        JOIN games g ON ggs.game_id = g.id AND g.season_id = ${currentSeasonId}
+        JOIN games g ON ggs.game_id = g.id AND g.season_id = ${playerSeasonId}
         WHERE ggs.player_id = ${player.id}
       `,
       sql`
@@ -179,7 +194,7 @@ export async function fetchPlayerDetail(id: string): Promise<PlayerDetail | null
           ggs.minutes, ggs.goals_against, ggs.shots_against, ggs.saves,
           ggs.shutouts, ggs.goalie_assists, ggs.result
         FROM goalie_game_stats ggs
-        JOIN games g ON ggs.game_id = g.id AND g.season_id = ${currentSeasonId}
+        JOIN games g ON ggs.game_id = g.id AND g.season_id = ${playerSeasonId}
         JOIN teams ht ON g.home_team = ht.slug
         JOIN teams awt ON g.away_team = awt.slug
         WHERE ggs.player_id = ${player.id}
