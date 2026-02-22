@@ -152,58 +152,60 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
 
       {/* Skaters Table */}
       {tab === "skaters" && (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full min-w-[700px] text-[11px]">
-            <thead>
-              <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Player</th>
-                <th className="text-left font-medium py-2.5">Team</th>
-                <SortableTh label="GP" sortKey="gp" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="G" sortKey="goals" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="A" sortKey="assists" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="PTS" sortKey="points" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold />
-                <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="GWG" sortKey="gwg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="PPG" sortKey="ppg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="SHG" sortKey="shg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="ENG" sortKey="eng" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="HAT" sortKey="hatTricks" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="PIM" sortKey="pim" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedSkaters.map((p, i) => (
-                <tr
-                  key={p.id}
-                  className={cn(
-                    "border-t border-border/20 hover:bg-card/60 transition-colors",
-                    i % 2 === 0 && "bg-card/15"
-                  )}
-                >
-                  <td className="py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
-                    <div className="flex items-baseline gap-2 pr-4">
-                      <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(skaterPage - 1) * PER_PAGE + i + 1}</span>
-                      <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
-                    </div>
-                  </td>
-                  <td className="py-2 text-muted-foreground text-xs">
-                    <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
-                  </td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.gp}</td>
-                  <td className={cn("text-center tabular-nums py-2", p.goals > 0 && "font-medium")}>{p.goals}</td>
-                  <td className={cn("text-center tabular-nums py-2", p.assists > 0 && "font-medium")}>{p.assists}</td>
-                  <td className="text-center tabular-nums py-2 font-bold">{p.points}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.ptsPg}</td>
-                  <td className={cn("text-center tabular-nums py-2", p.gwg > 0 && "font-medium")}>{p.gwg}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.ppg}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.shg}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.eng}</td>
-                  <td className={cn("text-center tabular-nums py-2", p.hatTricks > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.pim}</td>
+        <>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full min-w-[700px] text-[11px]">
+              <thead>
+                <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
+                  <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Player</th>
+                  <th className="text-left font-medium py-2.5">Team</th>
+                  <SortableTh label="GP" sortKey="gp" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="G" sortKey="goals" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="A" sortKey="assists" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="PTS" sortKey="points" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold />
+                  <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="GWG" sortKey="gwg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="PPG" sortKey="ppg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="SHG" sortKey="shg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="ENG" sortKey="eng" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="HAT" sortKey="hatTricks" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="PIM" sortKey="pim" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedSkaters.map((p, i) => (
+                  <tr
+                    key={p.id}
+                    className={cn(
+                      "border-t border-border/20 hover:bg-card/60 transition-colors",
+                      i % 2 === 0 && "bg-card/15"
+                    )}
+                  >
+                    <td className="py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
+                      <div className="flex items-baseline gap-2 pr-4">
+                        <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(skaterPage - 1) * PER_PAGE + i + 1}</span>
+                        <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
+                      </div>
+                    </td>
+                    <td className="py-2 text-muted-foreground text-xs">
+                      <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
+                    </td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.gp}</td>
+                    <td className={cn("text-center tabular-nums py-2", p.goals > 0 && "font-medium")}>{p.goals}</td>
+                    <td className={cn("text-center tabular-nums py-2", p.assists > 0 && "font-medium")}>{p.assists}</td>
+                    <td className="text-center tabular-nums py-2 font-bold">{p.points}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.ptsPg}</td>
+                    <td className={cn("text-center tabular-nums py-2", p.gwg > 0 && "font-medium")}>{p.gwg}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.ppg}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.shg}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.eng}</td>
+                    <td className={cn("text-center tabular-nums py-2", p.hatTricks > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.pim}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {skaterTotalPages > 1 && (
             <Pagination
               page={skaterPage}
@@ -212,65 +214,67 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
               onNext={() => setSkaterPage((p) => Math.min(skaterTotalPages, p + 1))}
             />
           )}
-        </div>
+        </>
       )}
 
       {/* Goalies Table */}
       {tab === "goalies" && (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full min-w-[700px] text-[11px]">
-            <thead>
-              <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Goalie</th>
-                <th className="text-left font-medium py-2.5">Team</th>
-                <GoalieSortableTh label="GP" sortKey="gp" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="W" sortKey="wins" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="L" sortKey="losses" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="SV%" sortKey="savePercentage" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} bold />
-                <GoalieSortableTh label="GAA" sortKey="gaa" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="SO" sortKey="shutouts" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="SV" sortKey="saves" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="GA" sortKey="goalsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="SA" sortKey="shotsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-                <GoalieSortableTh label="A" sortKey="goalieAssists" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedGoalies.map((p, i) => (
-                <tr
-                  key={p.id}
-                  className={cn(
-                    "border-t border-border/20 hover:bg-card/60 transition-colors",
-                    i % 2 === 0 && "bg-card/15"
-                  )}
-                >
-                  <td className="py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
-                    <div className="flex items-baseline gap-2 pr-4">
-                      <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(goaliePage - 1) * PER_PAGE + i + 1}</span>
-                      <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
-                    </div>
-                  </td>
-                  <td className="py-2 text-muted-foreground text-xs">
-                    <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
-                  </td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.gp}</td>
-                  <td className={cn("text-center tabular-nums py-2", p.wins > 0 && "font-medium")}>{p.wins}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.losses}</td>
-                  <td className="text-center tabular-nums py-2 font-bold">
-                    {p.savePercentage !== undefined ? p.savePercentage.toFixed(3) : "-"}
-                  </td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">
-                    {p.gaa !== undefined ? p.gaa.toFixed(2) : "-"}
-                  </td>
-                  <td className={cn("text-center tabular-nums py-2", p.shutouts > 0 && "font-medium")}>{p.shutouts}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.saves}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.goalsAgainst}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.shotsAgainst}</td>
-                  <td className="text-center tabular-nums py-2 text-muted-foreground">{p.goalieAssists}</td>
+        <>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full min-w-[700px] text-[11px]">
+              <thead>
+                <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
+                  <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Goalie</th>
+                  <th className="text-left font-medium py-2.5">Team</th>
+                  <GoalieSortableTh label="GP" sortKey="gp" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="W" sortKey="wins" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="L" sortKey="losses" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="SV%" sortKey="savePercentage" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} bold />
+                  <GoalieSortableTh label="GAA" sortKey="gaa" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="SO" sortKey="shutouts" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="SV" sortKey="saves" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="GA" sortKey="goalsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="SA" sortKey="shotsAgainst" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
+                  <GoalieSortableTh label="A" sortKey="goalieAssists" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedGoalies.map((p, i) => (
+                  <tr
+                    key={p.id}
+                    className={cn(
+                      "border-t border-border/20 hover:bg-card/60 transition-colors",
+                      i % 2 === 0 && "bg-card/15"
+                    )}
+                  >
+                    <td className="py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
+                      <div className="flex items-baseline gap-2 pr-4">
+                        <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0">{(goaliePage - 1) * PER_PAGE + i + 1}</span>
+                        <Link href={`/player/${p.id}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
+                      </div>
+                    </td>
+                    <td className="py-2 text-muted-foreground text-xs">
+                      <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
+                    </td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.gp}</td>
+                    <td className={cn("text-center tabular-nums py-2", p.wins > 0 && "font-medium")}>{p.wins}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.losses}</td>
+                    <td className="text-center tabular-nums py-2 font-bold">
+                      {p.savePercentage !== undefined ? p.savePercentage.toFixed(3) : "-"}
+                    </td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">
+                      {p.gaa !== undefined ? p.gaa.toFixed(2) : "-"}
+                    </td>
+                    <td className={cn("text-center tabular-nums py-2", p.shutouts > 0 && "font-medium")}>{p.shutouts}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.saves}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.goalsAgainst}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.shotsAgainst}</td>
+                    <td className="text-center tabular-nums py-2 text-muted-foreground">{p.goalieAssists}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {goalieTotalPages > 1 && (
             <Pagination
               page={goaliePage}
@@ -279,7 +283,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
               onNext={() => setGoaliePage((p) => Math.min(goalieTotalPages, p + 1))}
             />
           )}
-        </div>
+        </>
       )}
     </div>
   )
