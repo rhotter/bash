@@ -35,7 +35,7 @@ async function syncScheduleScores(leagueId: string, seasonId: string) {
     const gid = gidMatch[1]
     const text = stripHtml(row)
     const isOT = /\(OT\)/i.test(text)
-    const atMatch = text.match(/(\d+)\s+@\s+.*?(\d+)/)
+    const atMatch = text.match(/(\d+)\s+at\s+.*?(\d+)/i)
     if (atMatch) {
       const awayScore = parseInt(atMatch[1])
       const homeScore = parseInt(atMatch[2])
