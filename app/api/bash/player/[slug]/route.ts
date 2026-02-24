@@ -100,17 +100,21 @@ export interface PlayerDetail {
   isGoalie: boolean
   seasonStats: SkaterStats | null
   allTimeStats: SkaterStats | null
+  allTimeAllSeasonsStats: SkaterStats | null
   perSeasonStats: SeasonSkaterStats[]
   goalieSeasonStats: GoalieStats | null
   allTimeGoalieStats: GoalieStats | null
+  allTimeAllSeasonsGoalieStats: GoalieStats | null
   perSeasonGoalieStats: SeasonGoalieStats[]
   games: SkaterGameLog[]
   goalieGames: GoalieGameLog[]
   playoffPerSeasonStats: SeasonSkaterStats[]
   playoffAllTimeStats: SkaterStats | null
+  playoffAllTimeAllSeasonsStats: SkaterStats | null
   playoffGames: SkaterGameLog[]
   playoffPerSeasonGoalieStats: SeasonGoalieStats[]
   playoffAllTimeGoalieStats: GoalieStats | null
+  playoffAllTimeAllSeasonsGoalieStats: GoalieStats | null
   playoffGoalieGames: GoalieGameLog[]
   championships: Championship[]
   awards: PlayerAward[]
@@ -157,6 +161,8 @@ export async function GET(
         JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
         JOIN teams t ON ps.team_slug = t.slug
         WHERE p.id = ${playerId}
+        ORDER BY ps.season_id DESC
+        LIMIT 1
       `
       // Fall back to most recent season if not found in requested season
       if (playerRows.length === 0) {
@@ -242,7 +248,7 @@ export async function GET(
         JOIN games g ON pgs.game_id = g.id AND g.season_id = ${gameLogSeasonId} AND NOT g.is_playoff
         WHERE pgs.player_id = ${player.id}
       `,
-      // Skater all-time stats (regular season)
+      // Skater all-time stats (regular season, fall only)
       sql`
         SELECT
           COUNT(*)::int as gp,
@@ -252,6 +258,7 @@ export async function GET(
           SUM(pgs.pen)::int as pen, SUM(pgs.pim)::int as pim
         FROM player_game_stats pgs
         JOIN games g ON pgs.game_id = g.id AND NOT g.is_playoff
+        JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE pgs.player_id = ${player.id}
       `,
       // Skater per-season stats (regular season)
@@ -298,7 +305,7 @@ export async function GET(
         JOIN games g ON ggs.game_id = g.id AND g.season_id = ${gameLogSeasonId} AND NOT g.is_playoff
         WHERE ggs.player_id = ${player.id}
       `,
-      // Goalie all-time stats (regular season)
+      // Goalie all-time stats (regular season, fall only)
       sql`
         SELECT
           COUNT(*)::int as gp,
@@ -309,6 +316,7 @@ export async function GET(
           COUNT(*) FILTER (WHERE result = 'L')::int as losses
         FROM goalie_game_stats ggs
         JOIN games g ON ggs.game_id = g.id AND NOT g.is_playoff
+        JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE ggs.player_id = ${player.id}
       `,
       // Goalie per-season stats (regular season)
@@ -343,7 +351,7 @@ export async function GET(
         WHERE ggs.player_id = ${player.id}
         ORDER BY g.date DESC
       `,
-      // Playoff skater all-time stats
+      // Playoff skater all-time stats (fall only)
       sql`
         SELECT
           COUNT(*)::int as gp,
@@ -353,6 +361,7 @@ export async function GET(
           SUM(pgs.pen)::int as pen, SUM(pgs.pim)::int as pim
         FROM player_game_stats pgs
         JOIN games g ON pgs.game_id = g.id AND g.is_playoff
+        JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE pgs.player_id = ${player.id}
       `,
       // Playoff skater per-season stats
@@ -386,7 +395,7 @@ export async function GET(
         WHERE pgs.player_id = ${player.id}
         ORDER BY g.date DESC
       `,
-      // Playoff goalie all-time stats
+      // Playoff goalie all-time stats (fall only)
       sql`
         SELECT
           COUNT(*)::int as gp,
@@ -397,6 +406,7 @@ export async function GET(
           COUNT(*) FILTER (WHERE result = 'L')::int as losses
         FROM goalie_game_stats ggs
         JOIN games g ON ggs.game_id = g.id AND g.is_playoff
+        JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE ggs.player_id = ${player.id}
       `,
       // Playoff goalie per-season stats
@@ -620,11 +630,11 @@ export async function GET(
       id: player.id, name: player.name,
       team: player.team_name, teamSlug: player.team_slug,
       isGoalie: player.is_goalie,
-      seasonStats, allTimeStats, perSeasonStats,
-      goalieSeasonStats, allTimeGoalieStats, perSeasonGoalieStats,
+      seasonStats, allTimeStats, allTimeAllSeasonsStats: null, perSeasonStats,
+      goalieSeasonStats, allTimeGoalieStats, allTimeAllSeasonsGoalieStats: null, perSeasonGoalieStats,
       games, goalieGames,
-      playoffPerSeasonStats, playoffAllTimeStats, playoffGames,
-      playoffPerSeasonGoalieStats, playoffAllTimeGoalieStats, playoffGoalieGames,
+      playoffPerSeasonStats, playoffAllTimeStats, playoffAllTimeAllSeasonsStats: null, playoffGames,
+      playoffPerSeasonGoalieStats, playoffAllTimeGoalieStats, playoffAllTimeAllSeasonsGoalieStats: null, playoffGoalieGames,
       championships,
       awards,
       hallOfFame,
