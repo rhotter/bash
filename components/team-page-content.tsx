@@ -54,43 +54,43 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
       {sortedSkaters.length > 0 && (
         <div>
           <div className="overflow-x-auto -mx-4 sm:mx-0 sm:px-0">
-            <table className="w-full min-w-[520px] text-[11px] table-fixed">
+            <table className="w-full sm:min-w-[520px] text-[11px] table-fixed">
               <thead>
                 <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                  <th className="text-left font-medium py-2.5 w-[22%] pl-4 sm:pl-0">Player</th>
+                  <th className="text-left font-medium py-2.5 w-[120px] sm:w-auto pl-4 sm:pl-0">Player</th>
                   <SortableTh label="GP" sortKey="gp" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
                   <SortableTh label="G" sortKey="goals" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
                   <SortableTh label="A" sortKey="assists" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
                   <SortableTh label="PTS" sortKey="points" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} bold />
-                  <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
-                  <SortableTh label="GWG" sortKey="gwg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
-                  <SortableTh label="PPG" sortKey="ppg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
-                  <SortableTh label="SHG" sortKey="shg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
-                  <SortableTh label="ENG" sortKey="eng" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
-                  <SortableTh label="HAT" sortKey="hatTricks" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
+                  <SortableTh label="PTS/G" sortKey="ptsPg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
+                  <SortableTh label="GWG" sortKey="gwg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
+                  <SortableTh label="PPG" sortKey="ppg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
+                  <SortableTh label="SHG" sortKey="shg" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
+                  <SortableTh label="ENG" sortKey="eng" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
+                  <SortableTh label="HAT" sortKey="hatTricks" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} className="hidden sm:table-cell" />
                   <SortableTh label="PIM" sortKey="pim" currentKey={skaterSort} dir={skaterDir} onToggle={toggleSkaterSort} />
                 </tr>
               </thead>
               <tbody>
                 {sortedSkaters.map((p, i) => (
                   <tr key={p.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
-                    <td className="py-2 pr-2 pl-4 sm:pl-0 whitespace-nowrap">
-                      <div className="flex items-baseline gap-2">
+                    <td className="py-2 pr-1 pl-4 sm:pl-0 overflow-hidden">
+                      <div className="flex items-baseline gap-1.5 sm:gap-2">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{i + 1}</span>
-                        <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{p.name}</Link>
+                        <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold hover:text-primary transition-colors truncate">{p.name}</Link>
                       </div>
                     </td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.assists > 0 && "font-medium")}>{p.assists}</td>
-                    <td className="text-center tabular-nums py-2 px-3 font-bold">{p.points}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.ptsPg}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", (p.gwg ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.gwg ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.ppg ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.shg ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.eng ?? 0}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", (p.hatTricks ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.pim}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{p.gp}</td>
+                    <td className={cn("text-center tabular-nums py-2 px-1 sm:px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
+                    <td className={cn("text-center tabular-nums py-2 px-1 sm:px-3", p.assists > 0 && "font-medium")}>{p.assists}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{p.points}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ptsPg}</td>
+                    <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (p.gwg ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.gwg ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ppg ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.shg ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.eng ?? 0}</td>
+                    <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (p.hatTricks ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{p.pim}</td>
                   </tr>
                 ))}
               </tbody>
@@ -103,41 +103,41 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
       {sortedGoalies.length > 0 && (
         <div>
           <div className="overflow-x-auto -mx-4 sm:mx-0 sm:px-0">
-            <table className="w-full min-w-[520px] text-[11px] table-fixed">
+            <table className="w-full sm:min-w-[520px] text-[11px] table-fixed">
               <thead>
                 <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                  <th className="text-left font-medium py-2.5 w-[22%] pl-4 sm:pl-0">Goalie</th>
+                  <th className="text-left font-medium py-2.5 w-[120px] sm:w-auto pl-4 sm:pl-0">Goalie</th>
                   <SortableTh label="GP" sortKey="gp" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
                   <SortableTh label="W" sortKey="wins" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
                   <SortableTh label="L" sortKey="losses" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
                   <SortableTh label="SV%" sortKey="savePercentage" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} bold />
                   <SortableTh label="GAA" sortKey="gaa" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
-                  <SortableTh label="SO" sortKey="shutouts" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
-                  <SortableTh label="SV" sortKey="saves" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
-                  <SortableTh label="GA" sortKey="goalsAgainst" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
-                  <SortableTh label="SA" sortKey="shotsAgainst" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
-                  <SortableTh label="A" sortKey="goalieAssists" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} />
+                  <SortableTh label="SO" sortKey="shutouts" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
+                  <SortableTh label="SV" sortKey="saves" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
+                  <SortableTh label="GA" sortKey="goalsAgainst" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
+                  <SortableTh label="SA" sortKey="shotsAgainst" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
+                  <SortableTh label="A" sortKey="goalieAssists" currentKey={goalieSort} dir={goalieDir} onToggle={toggleGoalieSort} className="hidden sm:table-cell" />
                 </tr>
               </thead>
               <tbody>
                 {sortedGoalies.map((g, i) => (
                   <tr key={g.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
-                    <td className="py-2 pr-2 pl-4 sm:pl-0 whitespace-nowrap">
-                      <div className="flex items-baseline gap-2">
+                    <td className="py-2 pr-1 pl-4 sm:pl-0 overflow-hidden">
+                      <div className="flex items-baseline gap-1.5 sm:gap-2">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{i + 1}</span>
-                        <Link href={`/player/${playerSlug(g.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{g.name}</Link>
+                        <Link href={`/player/${playerSlug(g.name)}`} className="text-xs font-semibold hover:text-primary transition-colors truncate">{g.name}</Link>
                       </div>
                     </td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.gp}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", (g.wins ?? 0) > 0 && "font-medium")}>{g.wins}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.losses}</td>
-                    <td className="text-center tabular-nums py-2 px-3 font-bold">{g.savePercentage}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.gaa}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", (g.shutouts ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{g.shutouts ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.saves ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.goalsAgainst ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shotsAgainst ?? 0}</td>
-                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.goalieAssists ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{g.gp}</td>
+                    <td className={cn("text-center tabular-nums py-2 px-1 sm:px-3", (g.wins ?? 0) > 0 && "font-medium")}>{g.wins}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{g.losses}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{g.savePercentage}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{g.gaa}</td>
+                    <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (g.shutouts ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{g.shutouts ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.saves ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.goalsAgainst ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.shotsAgainst ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.goalieAssists ?? 0}</td>
                   </tr>
                 ))}
               </tbody>
@@ -166,18 +166,18 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-lg",
+        "flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-lg",
         isFinal && "hover:bg-muted/50 transition-colors cursor-pointer"
       )}
       onClick={isFinal ? () => router.push(`/game/${g.id}`) : undefined}
     >
-      <span className="text-[10px] text-muted-foreground/60 font-medium w-20 shrink-0">
+      <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0 whitespace-nowrap">
         {formatGameDate(g.date)}
       </span>
       <span className="text-[10px] text-muted-foreground/40 w-6 shrink-0 text-center">
         {g.isHome ? "vs" : "@"}
       </span>
-      <span className="flex-1">
+      <span className="flex-1 min-w-0 truncate">
         <Link
           href={`/team/${g.opponentSlug}`}
           className="text-xs font-medium text-foreground hover:text-primary transition-colors"
@@ -187,7 +187,7 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
         </Link>
       </span>
       {isFinal ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           <span className="text-xs font-mono tabular-nums font-medium text-muted-foreground">
             {g.result}
           </span>

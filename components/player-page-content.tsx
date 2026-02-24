@@ -49,7 +49,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-inner">
                     <Trophy className="h-3 w-3 text-white drop-shadow-sm" strokeWidth={2.5} />
                   </span>
-                  <span className="text-[11px] font-bold tracking-tight text-amber-900/80">x {player.championships.length}</span>
+                  <span className="text-[11px] font-bold tracking-tight text-amber-900/80">BASH Champion{player.championships.length > 1 ? ` x ${player.championships.length}` : ""}</span>
                 </span>
               </TooltipTrigger>
               <TooltipContent sideOffset={4}>
@@ -61,27 +61,35 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
               </TooltipContent>
             </Tooltip>
           )}
-          {player.awards.length > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-b from-sky-100 to-sky-200/80 pl-1.5 pr-2.5 py-0.5 cursor-default ring-1 ring-sky-300/50 shadow-sm hover:shadow-md hover:ring-sky-400/60 transition-all duration-200">
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 shadow-inner">
-                    <Award className="h-3 w-3 text-white drop-shadow-sm" strokeWidth={2.5} />
-                  </span>
-                  <span className="text-[11px] font-bold tracking-tight text-sky-900/80">x {player.awards.length}</span>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4}>
-                <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto">
-                  {player.awards.map((a) => (
-                    <span key={`${a.awardType}-${a.seasonId}`} className="whitespace-nowrap">
-                      {a.seasonName} — {getAwardLabel(a.awardType)}
+          {player.awards.length > 0 && (() => {
+            const grouped = player.awards.reduce<Record<string, { count: number; seasons: string[] }>>((acc, a) => {
+              if (!acc[a.awardType]) acc[a.awardType] = { count: 0, seasons: [] }
+              acc[a.awardType].count++
+              acc[a.awardType].seasons.push(a.seasonName)
+              return acc
+            }, {})
+            return Object.entries(grouped).map(([awardType, { count, seasons }]) => (
+              <Tooltip key={awardType}>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-b from-sky-100 to-sky-200/80 pl-1.5 pr-2.5 py-0.5 cursor-default ring-1 ring-sky-300/50 shadow-sm hover:shadow-md hover:ring-sky-400/60 transition-all duration-200">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 shadow-inner">
+                      <Award className="h-3 w-3 text-white drop-shadow-sm" strokeWidth={2.5} />
                     </span>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          )}
+                    <span className="text-[11px] font-bold tracking-tight text-sky-900/80">
+                      {getAwardLabel(awardType)}{count > 1 ? ` x ${count}` : ""}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={4}>
+                  <div className="flex flex-col gap-0.5">
+                    {seasons.map((s) => (
+                      <span key={s} className="whitespace-nowrap">{s}</span>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ))
+          })()}
         </div>
         <Link href={`/team/${player.teamSlug}`} className="text-sm text-muted-foreground hover:text-primary transition-colors">
           {player.team}
