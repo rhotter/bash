@@ -215,15 +215,15 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                       <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.assists > 0 && "font-medium")}>{p.assists}</td>
+                    <td className="text-center tabular-nums py-2 px-3 font-bold">{p.goals}</td>
+                    <td className="text-center tabular-nums py-2 px-3 font-bold">{p.assists}</td>
                     <td className="text-center tabular-nums py-2 px-3 font-bold">{p.points}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.ptsPg}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.gwg > 0 && "font-medium")}>{p.gwg}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gwg}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.ppg}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.shg}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.eng}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.hatTricks > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.hatTricks}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.pim}</td>
                   </tr>
                 ))}
@@ -281,7 +281,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                       <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.wins > 0 && "font-medium")}>{p.wins}</td>
+                    <td className="text-center tabular-nums py-2 px-3 font-bold">{p.wins}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.losses}</td>
                     <td className="text-center tabular-nums py-2 px-3 font-bold">
                       {p.savePercentage !== undefined ? p.savePercentage.toFixed(3) : "-"}
@@ -289,7 +289,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">
                       {p.gaa !== undefined ? p.gaa.toFixed(2) : "-"}
                     </td>
-                    <td className={cn("text-center tabular-nums py-2 px-3", p.shutouts > 0 && "font-medium")}>{p.shutouts}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.shutouts}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.saves}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.goalsAgainst}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.shotsAgainst}</td>

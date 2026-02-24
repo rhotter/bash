@@ -81,15 +81,15 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                       </div>
                     </td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{p.gp}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-1 sm:px-3", p.goals > 0 && "font-medium")}>{p.goals}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-1 sm:px-3", p.assists > 0 && "font-medium")}>{p.assists}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{p.goals}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{p.assists}</td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{p.points}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ptsPg}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (p.gwg ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.gwg ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.gwg ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ppg ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.shg ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.eng ?? 0}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (p.hatTricks ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{p.hatTricks ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.hatTricks ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{p.pim}</td>
                   </tr>
                 ))}
@@ -129,11 +129,11 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
                       </div>
                     </td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{g.gp}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-1 sm:px-3", (g.wins ?? 0) > 0 && "font-medium")}>{g.wins}</td>
+                    <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{g.wins}</td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{g.losses}</td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 font-bold">{g.savePercentage}</td>
                     <td className="text-center tabular-nums py-2 px-1 sm:px-3 text-muted-foreground">{g.gaa}</td>
-                    <td className={cn("text-center tabular-nums py-2 px-3 hidden sm:table-cell", (g.shutouts ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{g.shutouts ?? 0}</td>
+                    <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.shutouts ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.saves ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.goalsAgainst ?? 0}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.shotsAgainst ?? 0}</td>

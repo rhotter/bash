@@ -219,7 +219,7 @@ function GameRow({ game }: { game: BashGame }) {
       <td className="py-2 pr-2 text-[10px] text-muted-foreground/50 whitespace-nowrap" style={{ width: "1%" }}>
         {game.time}
       </td>
-      <td className={cn("py-2 pr-1 text-right whitespace-nowrap w-[40%]", awayWon ? "font-bold" : "font-medium text-muted-foreground")}>
+      <td className={cn("py-2 pr-1 text-right whitespace-nowrap w-[40%]", awayWon ? "font-bold" : "text-muted-foreground")}>
         <Link href={`/team/${game.awaySlug}`} className="hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
           {game.awayTeam}
         </Link>
@@ -231,7 +231,7 @@ function GameRow({ game }: { game: BashGame }) {
       <td className={cn("py-2 px-2 text-center tabular-nums font-mono whitespace-nowrap", homeWon ? "font-bold" : "text-muted-foreground")} style={{ width: "1%" }}>
         {game.homeScore ?? "-"}
       </td>
-      <td className={cn("py-2 pl-1 whitespace-nowrap w-[40%]", homeWon ? "font-bold" : "font-medium text-muted-foreground")}>
+      <td className={cn("py-2 pl-1 whitespace-nowrap w-[40%]", homeWon ? "font-bold" : "text-muted-foreground")}>
         <Link href={`/team/${game.homeSlug}`} className="hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
           {game.homeTeam}
         </Link>

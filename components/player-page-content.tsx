@@ -208,9 +208,9 @@ function SkaterStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
                 <td className="text-left py-2 text-[10px] font-medium text-muted-foreground truncate pr-3">
                   <Link href={`/team/${s.teamSlug}?season=${s.seasonId}`} className="hover:text-primary transition-colors">{s.teamName}</Link>
                 </td>
-                <td className="text-center tabular-nums py-2 px-3 whitespace-nowrap">{s.stats.gp}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{s.stats.goals}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{s.stats.assists}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{s.stats.gp}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{s.stats.goals}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{s.stats.assists}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{s.stats.points}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.ptsPg}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.gwg}</td>
@@ -225,9 +225,9 @@ function SkaterStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               <tr className="border-t-2 border-border/40 hover:bg-muted/50 transition-colors">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time (Fall)</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
-                <td className="text-center tabular-nums py-2 px-3 whitespace-nowrap">{allTimeFallStats.gp}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{allTimeFallStats.goals}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{allTimeFallStats.assists}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeFallStats.gp}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeFallStats.goals}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeFallStats.assists}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeFallStats.points}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.ptsPg}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.gwg}</td>
@@ -242,9 +242,9 @@ function SkaterStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               <tr className="border-t border-border/20 hover:bg-muted/50 transition-colors">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
-                <td className="text-center tabular-nums py-2 px-3 whitespace-nowrap">{allTimeAllSeasonsStats.gp}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{allTimeAllSeasonsStats.goals}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{allTimeAllSeasonsStats.assists}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeAllSeasonsStats.gp}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeAllSeasonsStats.goals}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeAllSeasonsStats.assists}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeAllSeasonsStats.points}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.ptsPg}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.gwg}</td>
@@ -298,12 +298,12 @@ function GoalieStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
                 <td className="text-left py-2 text-[10px] font-medium text-muted-foreground truncate pr-3">
                   <Link href={`/team/${s.teamSlug}?season=${s.seasonId}`} className="hover:text-primary transition-colors">{s.teamName}</Link>
                 </td>
-                <td className="text-center tabular-nums py-2 px-3 whitespace-nowrap">{s.stats.gp}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{s.stats.wins}</td>
-                <td className="text-center tabular-nums py-2 px-3">{s.stats.losses}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{s.stats.gp}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{s.stats.wins}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.losses}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{s.stats.savePercentage}</td>
-                <td className="text-center tabular-nums py-2 px-3">{s.stats.gaa}</td>
-                <td className="text-center tabular-nums py-2 px-3">{s.stats.shutouts}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.gaa}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.shutouts}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.saves}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.goalsAgainst}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{s.stats.shotsAgainst}</td>
@@ -314,12 +314,12 @@ function GoalieStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               <tr className="border-t-2 border-border/40 hover:bg-muted/50 transition-colors">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time (Fall)</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
-                <td className="text-center tabular-nums py-2 px-3 whitespace-nowrap">{allTimeFallStats.gp}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{allTimeFallStats.wins}</td>
-                <td className="text-center tabular-nums py-2 px-3">{allTimeFallStats.losses}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeFallStats.gp}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeFallStats.wins}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.losses}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeFallStats.savePercentage}</td>
-                <td className="text-center tabular-nums py-2 px-3">{allTimeFallStats.gaa}</td>
-                <td className="text-center tabular-nums py-2 px-3">{allTimeFallStats.shutouts}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.gaa}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.shutouts}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.saves}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.goalsAgainst}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeFallStats.shotsAgainst}</td>
@@ -330,12 +330,12 @@ function GoalieStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               <tr className="border-t border-border/20 hover:bg-muted/50 transition-colors">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
-                <td className="text-center tabular-nums py-2 px-3 whitespace-nowrap">{allTimeAllSeasonsStats.gp}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{allTimeAllSeasonsStats.wins}</td>
-                <td className="text-center tabular-nums py-2 px-3">{allTimeAllSeasonsStats.losses}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeAllSeasonsStats.gp}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeAllSeasonsStats.wins}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.losses}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{allTimeAllSeasonsStats.savePercentage}</td>
-                <td className="text-center tabular-nums py-2 px-3">{allTimeAllSeasonsStats.gaa}</td>
-                <td className="text-center tabular-nums py-2 px-3">{allTimeAllSeasonsStats.shutouts}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.gaa}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.shutouts}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.saves}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.goalsAgainst}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{allTimeAllSeasonsStats.shotsAgainst}</td>
@@ -393,14 +393,14 @@ function SkaterGameLogTable({ title, games }: { title: string; games: SkaterGame
                     </Link>
                   ) : "-"}
                 </td>
-                <td className={cn("text-center tabular-nums py-2 px-3", g.goals > 0 && "font-medium")}>{g.goals}</td>
-                <td className={cn("text-center tabular-nums py-2 px-3", g.assists > 0 && "font-medium")}>{g.assists}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{g.goals}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{g.assists}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{g.points}</td>
-                <td className={cn("text-center tabular-nums py-2 px-3", (g.gwg ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{g.gwg ?? 0}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.gwg ?? 0}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.ppg ?? 0}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shg ?? 0}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.eng ?? 0}</td>
-                <td className={cn("text-center tabular-nums py-2 px-3", (g.hatTricks ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{g.hatTricks ?? 0}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.hatTricks ?? 0}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.pim}</td>
               </tr>
             ))}
@@ -452,12 +452,12 @@ function GoalieGameLogTable({ title, games }: { title: string; games: GoalieGame
                     </Link>
                   ) : "-"}
                 </td>
-                <td className="text-center tabular-nums py-2 px-3">{g.result ?? "-"}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.result ?? "-"}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shotsAgainst}</td>
-                <td className="text-center tabular-nums py-2 px-3 font-medium">{g.saves}</td>
+                <td className="text-center tabular-nums py-2 px-3 font-bold">{g.saves}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.goalsAgainst}</td>
                 <td className="text-center tabular-nums py-2 px-3 font-bold">{g.savePercentage}</td>
-                <td className={cn("text-center tabular-nums py-2 px-3", (g.shutouts ?? 0) > 0 ? "font-medium" : "text-muted-foreground")}>{g.shutouts ?? 0}</td>
+                <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shutouts ?? 0}</td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.goalieAssists ?? 0}</td>
               </tr>
             ))}
