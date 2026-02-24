@@ -57,5 +57,6 @@ Standings are computed from the games array (not stored): W=3pts, OTW=2pts, OTL=
 
 ## Environment
 
-- `DATABASE_URL` — Neon Postgres connection string (required)
+- `DATABASE_URL` — Neon Postgres connection string (required), stored in `.env.local`
+- To run scripts that need DB access: `export $(cat .env.local | grep -v '^#' | xargs) && npx tsx scripts/your-script.ts`
 - Deployed on Vercel

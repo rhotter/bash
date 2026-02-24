@@ -50,7 +50,7 @@ export function SortableTh<K extends string>({ label, sortKey, currentKey, dir, 
 }) {
   return (
     <th
-      className={cn("text-center font-medium py-2.5 w-10 cursor-pointer select-none", className)}
+      className={cn("text-center font-medium py-2.5 w-10 cursor-pointer select-none whitespace-nowrap", className)}
       onClick={() => onToggle(sortKey)}
     >
       <div className="flex items-center justify-center gap-0.5">

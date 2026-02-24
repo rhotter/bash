@@ -53,7 +53,7 @@ export function RefsTab() {
               className={statsRowClass(i)}
             >
               <td className="text-center py-2 text-muted-foreground/40 tabular-nums">{i + 1}</td>
-              <td className="py-2 pr-2">
+              <td className="py-2 pr-2 whitespace-nowrap">
                 <span className="text-xs font-semibold leading-tight text-foreground">{r.name}</span>
               </td>
               <td className="text-center tabular-nums py-2 px-3 font-bold">{r.games}</td>

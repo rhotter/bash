@@ -345,12 +345,25 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
     if (firstRowText.includes("goalie stats")) {
       let currentTeamSlug: string | null = null
       let statsInserted = false
+      // Detect column order from header row (older seasons have Saves before Shots)
+      let savesCol = 6
+      let shotsCol = 5
 
       for (let i = 1; i < trs.length; i++) {
         const cells = trs[i].match(/<td[^>]*>([\s\S]*?)<\/td>/gi)
         if (!cells || cells.length < 2) continue
 
         const cell0Text = stripHtml(cells[0])
+
+        // Detect header row to determine column order
+        if (cells.length >= 7 && /^(gp|games)$/i.test(stripHtml(cells[1]))) {
+          for (let c = 0; c < cells.length; c++) {
+            const hdr = stripHtml(cells[c]).toLowerCase()
+            if (hdr === "saves" || hdr === "svs") savesCol = c
+            if (hdr === "shots" || hdr === "sa") shotsCol = c
+          }
+          continue
+        }
 
         if (/\bGoalies$/i.test(cell0Text)) {
           const teamMatch = cell0Text.match(/^(.+?)\s+Goalies$/i)
@@ -376,8 +389,8 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
 
         const minutes = parseInt(stripHtml(cells[2])) || 0
         const ga = parseInt(stripHtml(cells[3])) || 0
-        const shotsAgainst = parseInt(stripHtml(cells[5])) || 0
-        const saves = parseInt(stripHtml(cells[6])) || 0
+        const shotsAgainst = parseInt(stripHtml(cells[shotsCol])) || 0
+        const saves = parseInt(stripHtml(cells[savesCol])) || 0
         const shutouts = cells.length > 8 ? parseInt(stripHtml(cells[8])) || 0 : 0
         const goalieAssists = cells.length > 9 ? parseInt(stripHtml(cells[9])) || 0 : 0
         const resultCell = cells.length > 13 ? stripHtml(cells[13]) : stripHtml(cells[cells.length - 1])

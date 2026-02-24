@@ -74,7 +74,7 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
               <tbody>
                 {sortedSkaters.map((p, i) => (
                   <tr key={p.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
-                    <td className="py-2 pr-2 pl-4 sm:pl-0">
+                    <td className="py-2 pr-2 pl-4 sm:pl-0 whitespace-nowrap">
                       <div className="flex items-baseline gap-2">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{i + 1}</span>
                         <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{p.name}</Link>
@@ -122,7 +122,7 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
               <tbody>
                 {sortedGoalies.map((g, i) => (
                   <tr key={g.id} className={cn("border-t border-border/20 hover:bg-muted/50", i % 2 === 0 && "bg-card/15")}>
-                    <td className="py-2 pr-2 pl-4 sm:pl-0">
+                    <td className="py-2 pr-2 pl-4 sm:pl-0 whitespace-nowrap">
                       <div className="flex items-baseline gap-2">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{i + 1}</span>
                         <Link href={`/player/${playerSlug(g.name)}`} className="text-xs font-semibold hover:text-primary transition-colors">{g.name}</Link>

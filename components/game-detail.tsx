@@ -190,7 +190,7 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
                 i % 2 === 0 && "bg-card/20"
               )}
             >
-              <td className="py-2 pr-2">
+              <td className="py-2 pr-2 whitespace-nowrap">
                 <Link href={`/player/${playerSlug(p.name)}`} className={cn("hover:text-primary transition-colors font-medium", p.points > 0 && "font-semibold text-foreground")}>
                   {p.name}
                 </Link>
@@ -238,7 +238,7 @@ function GoalieBoxScoreTable({ goalies }: { goalies: GoalieBoxScore[] }) {
                 i % 2 === 0 && "bg-card/20"
               )}
             >
-              <td className="py-2 pr-2">
+              <td className="py-2 pr-2 whitespace-nowrap">
                 <Link href={`/player/${playerSlug(g.name)}`} className="font-medium hover:text-primary transition-colors">{g.name}</Link>
               </td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.minutes}</td>
