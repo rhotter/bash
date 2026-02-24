@@ -72,9 +72,9 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
   if (!season) throw new Error(`Unknown season: ${seasonId}`)
 
   await sql`
-    INSERT INTO seasons (id, name, league_id, is_current)
-    VALUES (${season.id}, ${season.name}, ${season.leagueId}, false)
-    ON CONFLICT (id) DO NOTHING
+    INSERT INTO seasons (id, name, league_id, is_current, season_type)
+    VALUES (${season.id}, ${season.name}, ${season.leagueId}, false, ${season.seasonType})
+    ON CONFLICT (id) DO UPDATE SET season_type = EXCLUDED.season_type
   `
 
   // Parse table rows — each <tr> with GID= is a game
@@ -323,7 +323,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         await sql`
           INSERT INTO player_seasons (player_id, season_id, team_slug, is_goalie)
           VALUES (${playerId}, ${seasonId}, ${currentTeamSlug}, false)
-          ON CONFLICT (player_id, season_id) DO NOTHING
+          ON CONFLICT (player_id, season_id, team_slug) DO NOTHING
         `
 
         await sql`
@@ -393,7 +393,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         await sql`
           INSERT INTO player_seasons (player_id, season_id, team_slug, is_goalie)
           VALUES (${playerId}, ${seasonId}, ${currentTeamSlug}, true)
-          ON CONFLICT (player_id, season_id) DO NOTHING
+          ON CONFLICT (player_id, season_id, team_slug) DO NOTHING
         `
 
         await sql`

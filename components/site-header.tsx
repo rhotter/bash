@@ -22,12 +22,12 @@ function SiteHeaderInner({ activeTab }: { activeTab?: string }) {
       <div className="mx-auto flex h-12 max-w-6xl items-center gap-1.5 px-2 sm:gap-3 sm:px-4 md:h-14">
         <Link href={`/${seasonQuery}`} className="flex items-center gap-1.5 sm:gap-2 group shrink-0 min-w-0">
           <Image
-            src="/logo.gif"
+            src="/logo.png"
             alt="BASH logo"
             width={28}
             height={28}
             className="shrink-0 sm:w-8 sm:h-8 md:w-9 md:h-9"
-            unoptimized
+
           />
           <div className="hidden sm:flex flex-col">
             <span className="text-[13px] font-bold leading-tight tracking-tight text-foreground md:text-sm">

@@ -19,9 +19,9 @@ async function seed() {
 
   // Insert season
   await sql`
-    INSERT INTO seasons (id, name, league_id, is_current)
-    VALUES ('2025-2026', 'BASH 2025-2026', '50562', true)
-    ON CONFLICT (id) DO NOTHING
+    INSERT INTO seasons (id, name, league_id, is_current, season_type)
+    VALUES ('2025-2026', 'BASH 2025-2026', '50562', true, 'fall')
+    ON CONFLICT (id) DO UPDATE SET season_type = EXCLUDED.season_type
   `
 
   // Insert teams

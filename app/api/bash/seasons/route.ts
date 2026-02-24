@@ -7,6 +7,7 @@ export interface SeasonInfo {
   name: string
   isCurrent: boolean
   hasGames: boolean
+  hasStats: boolean
 }
 
 export interface SeasonsData {
@@ -15,15 +16,24 @@ export interface SeasonsData {
 
 export async function GET() {
   try {
-    // Check which seasons have games in the DB
-    const dbSeasons = await sql`
-      SELECT season_id, COUNT(*)::int as game_count
-      FROM games
-      GROUP BY season_id
-    `
+    // Check which seasons have games or stats in the DB
+    const [dbSeasons, dbStats] = await Promise.all([
+      sql`
+        SELECT season_id, COUNT(*)::int as game_count
+        FROM games
+        GROUP BY season_id
+      `,
+      sql`
+        SELECT DISTINCT season_id FROM player_season_stats
+      `,
+    ])
     const seasonGameCounts = new Map<string, number>()
     for (const row of dbSeasons) {
       seasonGameCounts.set(row.season_id, row.game_count)
+    }
+    const seasonsWithStats = new Set<string>()
+    for (const row of dbStats) {
+      seasonsWithStats.add(row.season_id)
     }
 
     const allSeasons = getAllSeasons() // newest first
@@ -32,6 +42,7 @@ export async function GET() {
       name: s.name,
       isCurrent: isCurrentSeason(s.id),
       hasGames: (seasonGameCounts.get(s.id) ?? 0) > 0,
+      hasStats: seasonsWithStats.has(s.id),
     }))
 
     return NextResponse.json({ seasons } satisfies SeasonsData, {

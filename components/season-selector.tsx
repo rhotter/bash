@@ -33,17 +33,17 @@ export function SeasonSelector() {
       <option value="">{seasons.find((s) => s.isCurrent)?.name ?? "2025-2026"}</option>
       <option value="all">All Time</option>
       {seasons
-        .filter((s) => !s.isCurrent && s.hasGames)
+        .filter((s) => !s.isCurrent && (s.hasGames || s.hasStats))
         .map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
           </option>
         ))}
-      {/* Seasons without games, grouped at end */}
-      {seasons.some((s) => !s.isCurrent && !s.hasGames) && (
+      {/* Seasons without games or stats, grouped at end */}
+      {seasons.some((s) => !s.isCurrent && !s.hasGames && !s.hasStats) && (
         <optgroup label="Not yet synced">
           {seasons
-            .filter((s) => !s.isCurrent && !s.hasGames)
+            .filter((s) => !s.isCurrent && !s.hasGames && !s.hasStats)
             .map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}

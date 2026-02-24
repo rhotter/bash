@@ -280,111 +280,83 @@ async function mergeDuplicates() {
 
   // --- Process each merge group ---
   let totalMerged = 0;
+  const CONCURRENCY = 20;
 
-  for (const ids of mergeGroups) {
-    const canonicalId = ids[0]; // lowest ID
+  async function mergeGroup(ids: number[]) {
+    const canonicalId = ids[0];
     const dupeIds = ids.slice(1);
     const names = ids.map((id) => playerMap.get(id)!);
     const bestName = pickBestName(names);
 
-    console.log(
-      `\nMerging group: ${names.map((n) => `"${n}"`).join(", ")} -> id=${canonicalId} name="${bestName}"`
-    );
-
     for (const dupeId of dupeIds) {
-      // --- player_seasons: move references, skip conflicts ---
-      // First, find which (season_id) entries the canonical player already has
-      const existingSeasons =
-        await sql`SELECT season_id FROM player_seasons WHERE player_id = ${canonicalId}`;
-      const existingSeasonIds = new Set(
-        existingSeasons.map((r: { season_id: string }) => r.season_id)
-      );
+      // --- player_seasons: delete conflicts, reassign rest in bulk ---
+      await sql`
+        DELETE FROM player_seasons
+        WHERE player_id = ${dupeId}
+          AND (season_id, team_slug) IN (
+            SELECT season_id, team_slug FROM player_seasons WHERE player_id = ${canonicalId}
+          )
+      `;
+      await sql`UPDATE player_seasons SET player_id = ${canonicalId} WHERE player_id = ${dupeId}`;
 
-      // Get the dupe's seasons
-      const dupeSeasons =
-        await sql`SELECT season_id, team_slug, is_goalie FROM player_seasons WHERE player_id = ${dupeId}`;
+      // --- player_game_stats: delete dupe conflicts (same game = same stats), reassign rest ---
+      await sql`
+        DELETE FROM player_game_stats
+        WHERE player_id = ${dupeId}
+          AND game_id IN (SELECT game_id FROM player_game_stats WHERE player_id = ${canonicalId})
+      `;
+      await sql`UPDATE player_game_stats SET player_id = ${canonicalId} WHERE player_id = ${dupeId}`;
 
-      for (const ds of dupeSeasons) {
-        if (existingSeasonIds.has(ds.season_id)) {
-          // Conflict: canonical already has this season, just delete the dupe's entry
-          await sql`DELETE FROM player_seasons WHERE player_id = ${dupeId} AND season_id = ${ds.season_id}`;
-        } else {
-          // No conflict: reassign to canonical
-          await sql`UPDATE player_seasons SET player_id = ${canonicalId} WHERE player_id = ${dupeId} AND season_id = ${ds.season_id}`;
-        }
-      }
+      // --- goalie_game_stats: on conflict keep the one with more minutes ---
+      // Delete dupe rows where canonical has same game with >= minutes
+      await sql`
+        DELETE FROM goalie_game_stats d
+        USING goalie_game_stats c
+        WHERE d.player_id = ${dupeId} AND c.player_id = ${canonicalId}
+          AND d.game_id = c.game_id AND c.minutes >= d.minutes
+      `;
+      // For remaining conflicts (dupe has more minutes), delete canonical's and reassign dupe's
+      await sql`
+        DELETE FROM goalie_game_stats
+        WHERE player_id = ${canonicalId}
+          AND game_id IN (SELECT game_id FROM goalie_game_stats WHERE player_id = ${dupeId})
+      `;
+      await sql`UPDATE goalie_game_stats SET player_id = ${canonicalId} WHERE player_id = ${dupeId}`;
 
-      // --- player_game_stats: move references, sum on conflict ---
-      const existingGameStats =
-        await sql`SELECT game_id FROM player_game_stats WHERE player_id = ${canonicalId}`;
-      const existingGameIds = new Set(
-        existingGameStats.map((r: { game_id: string }) => r.game_id)
-      );
+      // --- player_season_stats: delete dupe conflicts (same data), reassign rest ---
+      await sql`
+        DELETE FROM player_season_stats
+        WHERE player_id = ${dupeId}
+          AND (season_id, team_slug, is_playoff) IN (
+            SELECT season_id, team_slug, is_playoff FROM player_season_stats WHERE player_id = ${canonicalId}
+          )
+      `;
+      await sql`UPDATE player_season_stats SET player_id = ${canonicalId} WHERE player_id = ${dupeId}`;
 
-      const dupeGameStats =
-        await sql`SELECT * FROM player_game_stats WHERE player_id = ${dupeId}`;
-
-      for (const dgs of dupeGameStats) {
-        if (existingGameIds.has(dgs.game_id)) {
-          // Conflict: sum stats into canonical's entry
-          await sql`UPDATE player_game_stats SET
-            goals = goals + ${dgs.goals},
-            assists = assists + ${dgs.assists},
-            points = points + ${dgs.points},
-            gwg = gwg + ${dgs.gwg},
-            ppg = ppg + ${dgs.ppg},
-            shg = shg + ${dgs.shg},
-            eng = eng + ${dgs.eng},
-            hat_tricks = hat_tricks + ${dgs.hat_tricks},
-            pen = pen + ${dgs.pen},
-            pim = pim + ${dgs.pim}
-          WHERE player_id = ${canonicalId} AND game_id = ${dgs.game_id}`;
-          await sql`DELETE FROM player_game_stats WHERE player_id = ${dupeId} AND game_id = ${dgs.game_id}`;
-        } else {
-          // No conflict: reassign to canonical
-          await sql`UPDATE player_game_stats SET player_id = ${canonicalId} WHERE player_id = ${dupeId} AND game_id = ${dgs.game_id}`;
-        }
-      }
-
-      // --- goalie_game_stats: move references, keep the one with more minutes on conflict ---
-      const existingGoalieStats =
-        await sql`SELECT game_id, minutes FROM goalie_game_stats WHERE player_id = ${canonicalId}`;
-      const existingGoalieGameMap = new Map<string, number>();
-      for (const r of existingGoalieStats) {
-        existingGoalieGameMap.set(
-          r.game_id as string,
-          r.minutes as number
-        );
-      }
-
-      const dupeGoalieStats =
-        await sql`SELECT * FROM goalie_game_stats WHERE player_id = ${dupeId}`;
-
-      for (const dgg of dupeGoalieStats) {
-        if (existingGoalieGameMap.has(dgg.game_id)) {
-          const canonicalMinutes = existingGoalieGameMap.get(dgg.game_id)!;
-          if ((dgg.minutes as number) > canonicalMinutes) {
-            // Dupe has more minutes - replace canonical's entry
-            await sql`DELETE FROM goalie_game_stats WHERE player_id = ${canonicalId} AND game_id = ${dgg.game_id}`;
-            await sql`UPDATE goalie_game_stats SET player_id = ${canonicalId} WHERE player_id = ${dupeId} AND game_id = ${dgg.game_id}`;
-          } else {
-            // Canonical has more or equal minutes - just delete dupe's entry
-            await sql`DELETE FROM goalie_game_stats WHERE player_id = ${dupeId} AND game_id = ${dgg.game_id}`;
-          }
-        } else {
-          // No conflict: reassign to canonical
-          await sql`UPDATE goalie_game_stats SET player_id = ${canonicalId} WHERE player_id = ${dupeId} AND game_id = ${dgg.game_id}`;
-        }
-      }
+      // --- player_awards & hall_of_fame: reassign ---
+      await sql`UPDATE player_awards SET player_id = ${canonicalId} WHERE player_id = ${dupeId}`;
+      await sql`UPDATE hall_of_fame SET player_id = ${canonicalId} WHERE player_id = ${dupeId}`;
 
       // --- Delete the duplicate player row ---
       await sql`DELETE FROM players WHERE id = ${dupeId}`;
       totalMerged++;
     }
 
-    // --- Update canonical player's name ---
     await sql`UPDATE players SET name = ${bestName} WHERE id = ${canonicalId}`;
+    console.log(
+      `Merged: ${names.map((n) => `"${n}"`).join(", ")} -> id=${canonicalId} name="${bestName}"`
+    );
   }
+
+  // Process groups in parallel with concurrency limit
+  let i = 0;
+  async function worker() {
+    while (i < mergeGroups.length) {
+      const idx = i++;
+      await mergeGroup(mergeGroups[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
   console.log(
     `\nDone! Merged ${totalMerged} duplicate players into ${mergeGroups.length} canonical entries.`

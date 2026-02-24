@@ -18,14 +18,14 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
 
   const game = gameRows[0]
 
-  async function getPlayerStats(gameId: string, teamSlug: string): Promise<PlayerBoxScore[]> {
+  async function getPlayerStats(gameId: string, teamSlug: string, seasonId: string): Promise<PlayerBoxScore[]> {
     const rows = await sql`
       SELECT p.id, p.name,
         pgs.goals, pgs.assists, pgs.points,
         pgs.gwg, pgs.ppg, pgs.shg, pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim
       FROM player_game_stats pgs
       JOIN players p ON pgs.player_id = p.id
-      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = '2025-2026'
+      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       WHERE pgs.game_id = ${gameId} AND ps.team_slug = ${teamSlug}
       ORDER BY pgs.points DESC, pgs.goals DESC, p.name ASC
     `
@@ -37,14 +37,14 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     }))
   }
 
-  async function getGoalieStats(gameId: string, teamSlug: string): Promise<GoalieBoxScore[]> {
+  async function getGoalieStats(gameId: string, teamSlug: string, seasonId: string): Promise<GoalieBoxScore[]> {
     const rows = await sql`
       SELECT p.id, p.name,
         ggs.minutes, ggs.goals_against, ggs.shots_against, ggs.saves,
         ggs.shutouts, ggs.goalie_assists, ggs.result
       FROM goalie_game_stats ggs
       JOIN players p ON ggs.player_id = p.id
-      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = '2025-2026'
+      JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       WHERE ggs.game_id = ${gameId} AND ps.team_slug = ${teamSlug}
     `
     return rows.map((r) => ({
@@ -63,10 +63,10 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
   }
 
   const [homePlayers, awayPlayers, homeGoalies, awayGoalies, officialRows] = await Promise.all([
-    getPlayerStats(id, game.home_team),
-    getPlayerStats(id, game.away_team),
-    getGoalieStats(id, game.home_team),
-    getGoalieStats(id, game.away_team),
+    getPlayerStats(id, game.home_team, game.season_id),
+    getPlayerStats(id, game.away_team, game.season_id),
+    getGoalieStats(id, game.home_team, game.season_id),
+    getGoalieStats(id, game.away_team, game.season_id),
     sql`SELECT name, role FROM game_officials WHERE game_id = ${id} ORDER BY role, name`,
   ])
 

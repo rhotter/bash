@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS seasons (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   league_id TEXT NOT NULL,
-  is_current BOOLEAN NOT NULL DEFAULT false
+  is_current BOOLEAN NOT NULL DEFAULT false,
+  season_type TEXT NOT NULL DEFAULT 'fall'
 );
 
 -- Teams (shared across seasons)
@@ -48,7 +49,7 @@ CREATE TABLE IF NOT EXISTS player_seasons (
   season_id TEXT NOT NULL REFERENCES seasons(id),
   team_slug TEXT NOT NULL REFERENCES teams(slug),
   is_goalie BOOLEAN NOT NULL DEFAULT false,
-  PRIMARY KEY (player_id, season_id)
+  PRIMARY KEY (player_id, season_id, team_slug)
 );
 
 -- Per-game player stats (skaters)
@@ -118,6 +119,26 @@ CREATE TABLE IF NOT EXISTS hall_of_fame (
   UNIQUE (player_name, class_year)
 );
 
+-- Pre-Sportability aggregate season stats (no per-game data available)
+CREATE TABLE IF NOT EXISTS player_season_stats (
+  player_id INTEGER NOT NULL REFERENCES players(id),
+  season_id TEXT NOT NULL REFERENCES seasons(id),
+  team_slug TEXT NOT NULL REFERENCES teams(slug),
+  is_playoff BOOLEAN NOT NULL DEFAULT false,
+  gp INTEGER NOT NULL DEFAULT 0,
+  goals INTEGER NOT NULL DEFAULT 0,
+  assists INTEGER NOT NULL DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0,
+  gwg INTEGER NOT NULL DEFAULT 0,
+  ppg INTEGER NOT NULL DEFAULT 0,
+  shg INTEGER NOT NULL DEFAULT 0,
+  eng INTEGER NOT NULL DEFAULT 0,
+  hat_tricks INTEGER NOT NULL DEFAULT 0,
+  pen INTEGER NOT NULL DEFAULT 0,
+  pim INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (player_id, season_id, team_slug, is_playoff)
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_games_season ON games(season_id);
 CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
@@ -131,3 +152,5 @@ CREATE INDEX IF NOT EXISTS idx_game_officials_game ON game_officials(game_id);
 CREATE INDEX IF NOT EXISTS idx_player_awards_player ON player_awards(player_id);
 CREATE INDEX IF NOT EXISTS idx_player_awards_season ON player_awards(season_id);
 CREATE INDEX IF NOT EXISTS idx_hall_of_fame_player ON hall_of_fame(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_season_stats_season ON player_season_stats(season_id);
+CREATE INDEX IF NOT EXISTS idx_player_season_stats_player ON player_season_stats(player_id);
