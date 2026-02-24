@@ -201,11 +201,11 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                   <tr
                     key={p.id}
                     className={cn(
-                      "group border-t border-border/20 hover:bg-muted/50 transition-colors",
+                      "group border-t border-border/20 hover:bg-muted/50",
                       i % 2 === 0 && "bg-card/15"
                     )}
                   >
-                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 transition-colors pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
                       <div className="flex items-baseline gap-2 pr-4">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{(skaterPage - 1) * PER_PAGE + i + 1}</span>
                         <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
@@ -267,11 +267,11 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                   <tr
                     key={p.id}
                     className={cn(
-                      "group border-t border-border/20 hover:bg-muted/50 transition-colors",
+                      "group border-t border-border/20 hover:bg-muted/50",
                       i % 2 === 0 && "bg-card/15"
                     )}
                   >
-                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 transition-colors pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
                       <div className="flex items-baseline gap-2 pr-4">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{(goaliePage - 1) * PER_PAGE + i + 1}</span>
                         <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>

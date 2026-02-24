@@ -201,7 +201,7 @@ function SkaterStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
           </thead>
           <tbody>
             {perSeasonStats.map((s, i) => (
-              <tr key={`${s.seasonId}-${s.teamSlug}`} className={cn("border-t border-border/20 hover:bg-muted/50 transition-colors", i === 0 && "bg-card/15")}>
+              <tr key={`${s.seasonId}-${s.teamSlug}`} className={cn("border-t border-border/20 hover:bg-muted/50", i === 0 && "bg-card/15")}>
                 <td className="text-left py-2 text-[10px] font-medium text-muted-foreground whitespace-nowrap pr-3">
                   <Link href={`/standings?season=${s.seasonId}`} className="hover:text-primary transition-colors">{s.seasonName}</Link>
                 </td>
@@ -222,7 +222,7 @@ function SkaterStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               </tr>
             ))}
             {allTimeFallStats && perSeasonStats.length > 1 && (
-              <tr className="border-t-2 border-border/40 hover:bg-muted/50 transition-colors">
+              <tr className="border-t-2 border-border/40 hover:bg-muted/50">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time (Fall)</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeFallStats.gp}</td>
@@ -239,7 +239,7 @@ function SkaterStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               </tr>
             )}
             {allTimeAllSeasonsStats && perSeasonStats.length > 1 && (
-              <tr className="border-t border-border/20 hover:bg-muted/50 transition-colors">
+              <tr className="border-t border-border/20 hover:bg-muted/50">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeAllSeasonsStats.gp}</td>
@@ -291,7 +291,7 @@ function GoalieStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
           </thead>
           <tbody>
             {perSeasonStats.map((s, i) => (
-              <tr key={`${s.seasonId}-${s.teamSlug}`} className={cn("border-t border-border/20 hover:bg-muted/50 transition-colors", i === 0 && "bg-card/15")}>
+              <tr key={`${s.seasonId}-${s.teamSlug}`} className={cn("border-t border-border/20 hover:bg-muted/50", i === 0 && "bg-card/15")}>
                 <td className="text-left py-2 text-[10px] font-medium text-muted-foreground whitespace-nowrap pr-3">
                   <Link href={`/standings?season=${s.seasonId}`} className="hover:text-primary transition-colors">{s.seasonName}</Link>
                 </td>
@@ -311,7 +311,7 @@ function GoalieStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               </tr>
             ))}
             {allTimeFallStats && perSeasonStats.length > 1 && (
-              <tr className="border-t-2 border-border/40 hover:bg-muted/50 transition-colors">
+              <tr className="border-t-2 border-border/40 hover:bg-muted/50">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time (Fall)</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeFallStats.gp}</td>
@@ -327,7 +327,7 @@ function GoalieStatsTable({ title, perSeasonStats, allTimeFallStats, allTimeAllS
               </tr>
             )}
             {allTimeAllSeasonsStats && perSeasonStats.length > 1 && (
-              <tr className="border-t border-border/20 hover:bg-muted/50 transition-colors">
+              <tr className="border-t border-border/20 hover:bg-muted/50">
                 <td className="text-left py-2 text-[10px] font-bold text-muted-foreground whitespace-nowrap pr-3">All Time</td>
                 <td className="text-left py-2 text-[10px] text-muted-foreground whitespace-nowrap pr-3"></td>
                 <td className="text-center tabular-nums py-2 px-3 text-muted-foreground whitespace-nowrap">{allTimeAllSeasonsStats.gp}</td>

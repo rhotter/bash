@@ -186,7 +186,7 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
             <tr
               key={p.name}
               className={cn(
-                "border-t border-border/30 hover:bg-muted/50 transition-colors",
+                "border-t border-border/30 hover:bg-muted/50",
                 i % 2 === 0 && "bg-card/20"
               )}
             >
@@ -234,7 +234,7 @@ function GoalieBoxScoreTable({ goalies }: { goalies: GoalieBoxScore[] }) {
             <tr
               key={g.name}
               className={cn(
-                "border-t border-border/30 hover:bg-muted/50 transition-colors",
+                "border-t border-border/30 hover:bg-muted/50",
                 i % 2 === 0 && "bg-card/20"
               )}
             >

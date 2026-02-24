@@ -65,7 +65,7 @@ export function SortableTh<K extends string>({ label, sortKey, currentKey, dir, 
 
 export function statsRowClass(i: number) {
   return cn(
-    "border-t border-border/20 hover:bg-muted/50 transition-colors",
+    "border-t border-border/20 hover:bg-muted/50",
     i % 2 === 0 && "bg-card/15"
   )
 }

@@ -167,7 +167,7 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
     <div
       className={cn(
         "flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-lg",
-        isFinal && "hover:bg-muted/50 transition-colors cursor-pointer"
+        isFinal && "hover:bg-muted/50 cursor-pointer"
       )}
       onClick={isFinal ? () => router.push(`/game/${g.id}`) : undefined}
     >
