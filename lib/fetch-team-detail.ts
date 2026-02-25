@@ -66,7 +66,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
       WHERE g.season_id = ${seasonId}
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
-      ORDER BY g.date DESC, g.time DESC
+      ORDER BY g.date DESC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(regexp_replace(g.time, '([ap])$', ' \1m'), 'HH:MI AM')::time END DESC
     `,
   ])
 
