@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { Play, Pause, Plus, Minus, ChevronRight, X } from "lucide-react"
+import Link from "next/link"
 import type {
   LiveGameState, GoalEvent, PenaltyEvent, RosterPlayer, ShootoutAttempt,
   ActivePenalty, PowerPlayState,
@@ -681,9 +682,9 @@ export function ScorekeeperApp({
               <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">{scores.home}</div>
             </div>
           </div>
-          <a href={`/game/${gameId}`} className="text-xs text-foreground hover:underline">
+          <Link href={`/game/${gameId}`} className="text-xs text-foreground hover:underline">
             View game page
-          </a>
+          </Link>
         </div>
       </div>
     )
