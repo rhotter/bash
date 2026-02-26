@@ -885,7 +885,7 @@ export function ScorekeeperApp({
                   onMinus={() => adjustShots("away", -1)}
                 />
                 <TimeoutCounter
-                  label="T/O"
+                  label="Timeout"
                   used={state.awayTimeoutsUsed}
                   max={state.period >= 4 ? 1 : 2}
                   onAdd={() => useTimeout("away")}
@@ -907,7 +907,7 @@ export function ScorekeeperApp({
                   onMinus={() => adjustShots("home", -1)}
                 />
                 <TimeoutCounter
-                  label="T/O"
+                  label="Timeout"
                   used={state.homeTimeoutsUsed}
                   max={state.period >= 4 ? 1 : 2}
                   onAdd={() => useTimeout("home")}
@@ -1533,7 +1533,7 @@ function TimeoutCounter({
 }) {
   return (
     <div className="flex items-center justify-between rounded-md border bg-card px-3 py-2">
-      <span className="text-[11px] text-muted-foreground truncate mr-2">{label}</span>
+      <span className="text-[11px] text-muted-foreground shrink-0 mr-2">{label}</span>
       <div className="flex items-center gap-1.5">
         <Button size="icon-sm" variant="ghost" onClick={onRemove} disabled={used <= 0}>
           <Minus className="h-3.5 w-3.5" />
