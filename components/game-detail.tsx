@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useGameDetail, type BashGame, type BashGameDetail } from "@/lib/hockey-data"
+import { useGameDetail, useLiveGame, type BashGame, type BashGameDetail } from "@/lib/hockey-data"
 import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
@@ -9,6 +9,8 @@ import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import type { PlayerBoxScore, GoalieBoxScore } from "@/app/api/bash/game/[id]/route"
 import { useSort, SortableTh, SectionHeader } from "@/components/stats-table"
+import type { LiveGameState, GoalEvent, PenaltyEvent } from "@/lib/scorekeeper-types"
+import { periodLabel, formatClock, computeCurrentClock } from "@/lib/scorekeeper-types"
 
 type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen"
 
@@ -19,7 +21,16 @@ interface GameDetailProps {
 
 export function GameDetail({ game, initialDetail }: GameDetailProps) {
   const { detail, isLoading, isError } = useGameDetail(game.id, initialDetail)
+  const isLive = game.status === "live"
   const isFinal = game.status === "final"
+  // Fetch live data for both live and final games (to get goal/penalty event details)
+  const { liveData } = useLiveGame(isLive || isFinal ? game.id : null)
+
+  const liveState: LiveGameState | null = liveData?.state ?? null
+
+  // For live games, use live scores
+  const displayHomeScore = isLive && liveData ? liveData.homeScore : game.homeScore
+  const displayAwayScore = isLive && liveData ? liveData.awayScore : game.awayScore
 
   return (
     <div className="w-full">
@@ -53,19 +64,28 @@ export function GameDetail({ game, initialDetail }: GameDetailProps) {
             <div className="flex flex-col items-center gap-2 px-4">
               <div className="flex items-baseline gap-3">
                 <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
-                  {game.awayScore ?? "-"}
+                  {displayAwayScore ?? "-"}
                 </span>
                 <span className="text-2xl text-muted-foreground/40 font-light select-none">&ndash;</span>
                 <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
-                  {game.homeScore ?? "-"}
+                  {displayHomeScore ?? "-"}
                 </span>
               </div>
               <div className={cn(
                 "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full",
                 isFinal && "bg-secondary text-secondary-foreground",
+                isLive && "bg-foreground/10 text-foreground",
                 game.status === "upcoming" && "bg-secondary/40 text-muted-foreground"
               )}>
-                {isFinal ? (game.isOvertime ? "Final/OT" : "Final") : "Upcoming"}
+                {isLive ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground/40 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-foreground" />
+                    </span>
+                    {liveState ? `${periodLabel(liveState.period)} ${formatClock(computeCurrentClock(liveState))}` : "Live"}
+                  </span>
+                ) : isFinal ? (game.isOvertime ? "Final/OT" : "Final") : "Upcoming"}
               </div>
             </div>
 
@@ -81,16 +101,37 @@ export function GameDetail({ game, initialDetail }: GameDetailProps) {
         </div>
       </div>
 
+      {/* Live game content (period summary) */}
+      {isLive && liveState && (
+        <div className="pt-4">
+          <LivePeriodSummary state={liveState} homeSlug={game.homeSlug} awaySlug={game.awaySlug} homeTeam={game.homeTeam} awayTeam={game.awayTeam} />
+        </div>
+      )}
+
+      {/* Events (goals + penalties with details) — for both live and final games */}
+      {liveState && (liveState.goals.length > 0 || liveState.penalties.length > 0) && (
+        <div className="pt-4">
+          <EventLog
+            state={liveState}
+            homeSlug={game.homeSlug}
+            awaySlug={game.awaySlug}
+            homeTeam={game.homeTeam}
+            awayTeam={game.awayTeam}
+            playerNames={buildPlayerNameMap(detail)}
+          />
+        </div>
+      )}
+
       {/* Content */}
       <div className="pt-6">
-        {isLoading && (
+        {isLoading && !isLive && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             <span className="ml-2 text-xs text-muted-foreground">Loading box score&hellip;</span>
           </div>
         )}
 
-        {isError && (
+        {isError && !isLive && (
           <div className="text-center py-8">
             <p className="text-xs text-muted-foreground">Unable to load game details.</p>
           </div>
@@ -102,7 +143,7 @@ export function GameDetail({ game, initialDetail }: GameDetailProps) {
           </div>
         )}
 
-        {detail && (
+        {detail && !isLive && (
           <div className="flex flex-col gap-8">
             {/* Away team box score */}
             {detail.awayPlayers.length > 0 && (
@@ -144,9 +185,188 @@ export function GameDetail({ game, initialDetail }: GameDetailProps) {
                 </div>
               </div>
             )}
+
+            {/* Notes */}
+            {detail.notes && (
+              <div>
+                <SectionHeader>Notes</SectionHeader>
+                <p className="text-xs text-muted-foreground whitespace-pre-line">{detail.notes}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function buildPlayerNameMap(detail: BashGameDetail | null | undefined): Record<number, string> {
+  if (!detail) return {}
+  const map: Record<number, string> = {}
+  for (const p of [...detail.homePlayers, ...detail.awayPlayers, ...detail.homeGoalies, ...detail.awayGoalies]) {
+    map[p.id] = p.name
+  }
+  return map
+}
+
+function LivePeriodSummary({ state, homeSlug, awaySlug, homeTeam, awayTeam }: {
+  state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
+}) {
+  const totalHomeShots = state.homeShots.reduce((a, b) => a + b, 0)
+  const totalAwayShots = state.awayShots.reduce((a, b) => a + b, 0)
+
+  const periods = Math.max(state.period, 1)
+  const awayGoalsByPeriod: number[] = []
+  const homeGoalsByPeriod: number[] = []
+  for (let p = 1; p <= periods; p++) {
+    awayGoalsByPeriod.push(state.goals.filter((g) => g.team === awaySlug && g.period === p).length)
+    homeGoalsByPeriod.push(state.goals.filter((g) => g.team === homeSlug && g.period === p).length)
+  }
+
+  const periodHeaders = Array.from({ length: periods }, (_, i) => {
+    const p = i + 1
+    if (p <= 3) return `P${p}`
+    if (p === 4) return "OT"
+    return "SO"
+  })
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-[9px] uppercase tracking-wider text-muted-foreground/50">
+            <th className="text-left font-medium py-1.5 pr-2"></th>
+            {periodHeaders.map((h) => (
+              <th key={h} className="text-center font-medium py-1.5 px-2 w-10">{h}</th>
+            ))}
+            <th className="text-center font-medium py-1.5 px-2 w-10">T</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-t border-border/20">
+            <td className="py-1.5 pr-2 text-[9px] uppercase tracking-wider text-muted-foreground/50 font-medium">Goals</td>
+            <td colSpan={periodHeaders.length + 1}></td>
+          </tr>
+          <tr className="border-t border-border/20">
+            <td className="py-1.5 pr-2 text-muted-foreground">{awayTeam}</td>
+            {awayGoalsByPeriod.map((g, i) => (
+              <td key={i} className="text-center tabular-nums font-mono py-1.5 px-2 text-muted-foreground">{g}</td>
+            ))}
+            <td className="text-center tabular-nums font-mono py-1.5 px-2 font-bold">
+              {awayGoalsByPeriod.reduce((a, b) => a + b, 0)}
+            </td>
+          </tr>
+          <tr className="border-t border-border/20">
+            <td className="py-1.5 pr-2 text-muted-foreground">{homeTeam}</td>
+            {homeGoalsByPeriod.map((g, i) => (
+              <td key={i} className="text-center tabular-nums font-mono py-1.5 px-2 text-muted-foreground">{g}</td>
+            ))}
+            <td className="text-center tabular-nums font-mono py-1.5 px-2 font-bold">
+              {homeGoalsByPeriod.reduce((a, b) => a + b, 0)}
+            </td>
+          </tr>
+          <tr className="border-t border-border/20">
+            <td className="py-1.5 pr-2 text-[9px] uppercase tracking-wider text-muted-foreground/50 font-medium pt-3">Shots</td>
+            <td colSpan={periodHeaders.length + 1}></td>
+          </tr>
+          <tr className="border-t border-border/20">
+            <td className="py-1.5 pr-2 text-muted-foreground">{awayTeam}</td>
+            {state.awayShots.slice(0, periods).map((s, i) => (
+              <td key={i} className="text-center tabular-nums font-mono py-1.5 px-2 text-muted-foreground">{s}</td>
+            ))}
+            <td className="text-center tabular-nums font-mono py-1.5 px-2 font-bold">{totalAwayShots}</td>
+          </tr>
+          <tr className="border-t border-border/20">
+            <td className="py-1.5 pr-2 text-muted-foreground">{homeTeam}</td>
+            {state.homeShots.slice(0, periods).map((s, i) => (
+              <td key={i} className="text-center tabular-nums font-mono py-1.5 px-2 text-muted-foreground">{s}</td>
+            ))}
+            <td className="text-center tabular-nums font-mono py-1.5 px-2 font-bold">{totalHomeShots}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }: {
+  state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
+  playerNames: Record<number, string>
+}) {
+  const nameById = (id: number | null) => {
+    if (id == null) return null
+    return playerNames[id] ?? `#${id}`
+  }
+
+  const events = [
+    ...state.goals.map((g) => ({ type: "goal" as const, period: g.period, clock: g.clock, event: g })),
+    ...state.penalties.map((p) => ({ type: "penalty" as const, period: p.period, clock: p.clock, event: p })),
+  ].sort((a, b) => a.period - b.period || b.clock.localeCompare(a.clock))
+
+  // Group by period
+  const periods = [...new Set(events.map((e) => e.period))].sort()
+
+  return (
+    <div className="space-y-4">
+      <SectionHeader>Scoring</SectionHeader>
+      {periods.map((period) => {
+        const periodEvents = events.filter((e) => e.period === period)
+        return (
+          <div key={period}>
+            <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/50 mb-1">
+              {periodLabel(period)}
+            </div>
+            <div className="space-y-0">
+              {periodEvents.map((item) => {
+                if (item.type === "goal") {
+                  const g = item.event as GoalEvent
+                  const teamName = g.team === homeSlug ? homeTeam : awayTeam
+                  const scorer = nameById(g.scorerId)
+                  const a1 = nameById(g.assist1Id)
+                  const a2 = nameById(g.assist2Id)
+                  return (
+                    <div key={g.id} className="flex items-start gap-2 py-2 border-t border-border/20">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-foreground w-8 shrink-0 pt-0.5">GOAL</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px]">
+                          <span className="font-medium">{scorer}</span>
+                          {(a1 || a2) && (
+                            <span className="text-muted-foreground">
+                              {" "}({a1}{a2 ? `, ${a2}` : ""})
+                            </span>
+                          )}
+                        </div>
+                        {g.flags.length > 0 && (
+                          <span className="text-[9px] text-muted-foreground/60">{g.flags.join(", ")}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
+                      <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{g.clock}</span>
+                    </div>
+                  )
+                } else {
+                  const p = item.event as PenaltyEvent
+                  const teamName = p.team === homeSlug ? homeTeam : awayTeam
+                  const player = nameById(p.playerId)
+                  return (
+                    <div key={p.id} className="flex items-start gap-2 py-2 border-t border-border/20">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground w-8 shrink-0 pt-0.5">PEN</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px]">
+                          <span className="font-medium">{player}</span>
+                          <span className="text-muted-foreground"> {p.infraction} ({p.minutes}min)</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
+                      <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{p.clock}</span>
+                    </div>
+                  )
+                }
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

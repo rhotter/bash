@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS games (
   is_overtime BOOLEAN NOT NULL DEFAULT false,
   is_playoff BOOLEAN NOT NULL DEFAULT false,
   location TEXT DEFAULT 'James Lick Arena',
-  has_boxscore BOOLEAN NOT NULL DEFAULT false
+  has_boxscore BOOLEAN NOT NULL DEFAULT false,
+  notes TEXT
 );
 
 -- Players (global identity)
@@ -139,6 +140,15 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
   PRIMARY KEY (player_id, season_id, team_slug, is_playoff)
 );
 
+-- Live game state for real-time scorekeeping
+CREATE TABLE IF NOT EXISTS game_live (
+  game_id TEXT PRIMARY KEY REFERENCES games(id),
+  state JSONB NOT NULL DEFAULT '{}',
+  pin_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_games_season ON games(season_id);
 CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
@@ -154,3 +164,4 @@ CREATE INDEX IF NOT EXISTS idx_player_awards_season ON player_awards(season_id);
 CREATE INDEX IF NOT EXISTS idx_hall_of_fame_player ON hall_of_fame(player_id);
 CREATE INDEX IF NOT EXISTS idx_player_season_stats_season ON player_season_stats(season_id);
 CREATE INDEX IF NOT EXISTS idx_player_season_stats_player ON player_season_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_game_live_updated ON game_live(updated_at);

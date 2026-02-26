@@ -205,6 +205,8 @@ function DateSection({ date, games }: { date: string; games: BashGame[] }) {
 function GameRow({ game }: { game: BashGame }) {
   const router = useRouter()
   const isFinal = game.status === "final"
+  const isLive = game.status === "live"
+  const isClickable = true
   const awayWon = isFinal && game.awayScore != null && game.homeScore != null && game.awayScore > game.homeScore
   const homeWon = isFinal && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore
 
@@ -212,23 +214,31 @@ function GameRow({ game }: { game: BashGame }) {
     <tr
       className={cn(
         "border-t border-border/20 hover:bg-muted/50",
-        isFinal && "cursor-pointer"
+        isClickable && "cursor-pointer"
       )}
-      onClick={isFinal ? () => router.push(`/game/${game.id}`) : undefined}
+      onClick={isClickable ? () => router.push(`/game/${game.id}`) : undefined}
     >
       <td className="py-2 pr-2 text-[10px] text-muted-foreground/50 whitespace-nowrap" style={{ width: "1%" }}>
-        {game.time}
+        {isLive ? (
+          <span className="inline-flex items-center gap-1">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+            </span>
+            <span className="text-red-500 font-bold uppercase">Live</span>
+          </span>
+        ) : game.time}
       </td>
       <td className={cn("py-2 pr-1 text-right whitespace-nowrap w-[40%]", awayWon ? "font-bold" : "text-muted-foreground")}>
         <Link href={`/team/${game.awaySlug}`} className="hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
           {game.awayTeam}
         </Link>
       </td>
-      <td className={cn("py-2 px-2 text-center tabular-nums font-mono whitespace-nowrap", awayWon ? "font-bold" : "text-muted-foreground")} style={{ width: "1%" }}>
+      <td className={cn("py-2 px-2 text-center tabular-nums font-mono whitespace-nowrap", awayWon ? "font-bold" : isLive ? "font-bold text-foreground" : "text-muted-foreground")} style={{ width: "1%" }}>
         {game.awayScore ?? "-"}
       </td>
       <td className="py-2 text-center text-muted-foreground/30 text-[9px]" style={{ width: "1%" }}>@</td>
-      <td className={cn("py-2 px-2 text-center tabular-nums font-mono whitespace-nowrap", homeWon ? "font-bold" : "text-muted-foreground")} style={{ width: "1%" }}>
+      <td className={cn("py-2 px-2 text-center tabular-nums font-mono whitespace-nowrap", homeWon ? "font-bold" : isLive ? "font-bold text-foreground" : "text-muted-foreground")} style={{ width: "1%" }}>
         {game.homeScore ?? "-"}
       </td>
       <td className={cn("py-2 pl-1 whitespace-nowrap w-[40%]", homeWon ? "font-bold" : "text-muted-foreground")}>

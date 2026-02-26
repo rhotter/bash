@@ -15,7 +15,7 @@ export function GamePageContent({ initialDetail }: { initialDetail: BashGameDeta
     awaySlug: initialDetail.awaySlug,
     homeScore: initialDetail.homeScore,
     awayScore: initialDetail.awayScore,
-    status: initialDetail.status as "final" | "upcoming",
+    status: initialDetail.status as "final" | "upcoming" | "live",
     isOvertime: initialDetail.isOvertime,
     isPlayoff: false,
     location: initialDetail.location,

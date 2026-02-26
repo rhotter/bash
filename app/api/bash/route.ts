@@ -14,7 +14,7 @@ export interface BashGame {
   awaySlug: string
   homeScore: number | null
   awayScore: number | null
-  status: "final" | "upcoming"
+  status: "final" | "upcoming" | "live"
   isOvertime: boolean
   isPlayoff: boolean
   location: string
@@ -127,9 +127,9 @@ export async function GET(request: Request) {
       homeSlug: r.home_slug,
       awayTeam: r.away_team,
       awaySlug: r.away_slug,
-      homeScore: r.status === "final" ? r.home_score : null,
-      awayScore: r.status === "final" ? r.away_score : null,
-      status: r.status as "final" | "upcoming",
+      homeScore: r.status === "final" || r.status === "live" ? r.home_score : null,
+      awayScore: r.status === "final" || r.status === "live" ? r.away_score : null,
+      status: r.status as "final" | "upcoming" | "live",
       isOvertime: r.is_overtime,
       isPlayoff: r.is_playoff,
       location: r.location,

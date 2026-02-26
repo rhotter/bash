@@ -88,5 +88,6 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     homeGoalies,
     awayGoalies,
     officials: officialRows.map((r) => ({ name: r.name, role: r.role })),
+    notes: game.notes ?? null,
   }
 }

@@ -47,6 +47,7 @@ export interface BashGameDetail {
   homeGoalies: GoalieBoxScore[]
   awayGoalies: GoalieBoxScore[]
   officials: { name: string; role: string }[]
+  notes: string | null
 }
 
 export async function GET(
@@ -147,6 +148,7 @@ export async function GET(
       homeGoalies,
       awayGoalies,
       officials: officialRows.map((r) => ({ name: r.name, role: r.role })),
+      notes: game.notes ?? null,
     }
 
     return NextResponse.json(result, {

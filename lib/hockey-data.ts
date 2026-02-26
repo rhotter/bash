@@ -106,6 +106,20 @@ export function useSeasons() {
   }
 }
 
+export function useLiveGame(gameId: string | null) {
+  const { data, error, isLoading } = useSWR(
+    gameId ? `/api/bash/game/${gameId}/live` : null,
+    fetcher,
+    { refreshInterval: 10_000, revalidateOnFocus: true, dedupingInterval: 5_000 }
+  )
+
+  return {
+    liveData: data ?? null,
+    isLoading,
+    isError: !!error,
+  }
+}
+
 // Get unique dates from games (for grouping)
 export function getGameDates(games: BashGame[]): string[] {
   return [...new Set(games.map((g) => g.date))].sort().reverse()
