@@ -1242,11 +1242,6 @@ export function ScorekeeperApp({
             )}
             {state.period >= 3 && scores.home !== scores.away && (
               <Button className="flex-1 bg-foreground text-background hover:bg-foreground/90" onClick={() => setShowThreeStars(true)}>
-                Three Stars
-              </Button>
-            )}
-            {state.period >= 3 && scores.home !== scores.away && (
-              <Button variant="outline" className="flex-1 text-xs" onClick={() => setFinalizeOpen(true)}>
                 Finalize
               </Button>
             )}
@@ -1510,8 +1505,8 @@ export function ScorekeeperApp({
           </DialogHeader>
           <div className="space-y-2 text-xs text-muted-foreground">
             <p>Final score: {awayTeam} {scores.away} — {homeTeam} {scores.home}</p>
-            <p>{state.goals.length} goals, {state.penalties.length} penalties</p>
-            <p className="text-muted-foreground/70 text-[10px]">This will write stats to the database and cannot be undone.</p>
+
+
           </div>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setFinalizeOpen(false)} className="flex-1">
