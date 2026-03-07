@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import { SeasonSelector } from "@/components/season-selector"
+import { PlayerSearch } from "@/components/player-search"
 
 const NAV_ITEMS = [
   { label: "Scores", href: "/" },
@@ -43,6 +44,7 @@ function SiteHeaderInner({ activeTab }: { activeTab?: string }) {
         </Link>
         <SeasonSelector />
         <nav className="ml-auto flex items-center gap-0 sm:gap-1">
+          <PlayerSearch />
           {NAV_ITEMS.filter((item) => season !== "all" || item.label === "Stats").map((item) => {
             const isActive = activeTab === item.label.toLowerCase()
             return (
