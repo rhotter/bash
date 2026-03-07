@@ -29,21 +29,21 @@ export async function POST(
       return NextResponse.json({ error: "Game is already final" }, { status: 400 })
     }
 
+    // Check if game_live row already exists (scorekeeper re-auth)
+    const existingLive = await sql`
+      SELECT state FROM game_live WHERE game_id = ${id}
+    `
+    if (existingLive.length > 0) {
+      return NextResponse.json({ ok: true, state: existingLive[0].state })
+    }
+
     const initialState = createInitialState()
     const pinHash = process.env.SCOREKEEPER_PIN!
 
-    // Upsert game_live row
+    // Create game_live row (don't set game status to live yet — that happens when period 1 starts)
     await sql`
       INSERT INTO game_live (game_id, state, pin_hash)
       VALUES (${id}, ${JSON.stringify(initialState)}, ${pinHash})
-      ON CONFLICT (game_id) DO UPDATE SET
-        state = ${JSON.stringify(initialState)},
-        updated_at = NOW()
-    `
-
-    // Set game status to live
-    await sql`
-      UPDATE games SET status = 'live', home_score = 0, away_score = 0 WHERE id = ${id}
     `
 
     return NextResponse.json({ ok: true, state: initialState })

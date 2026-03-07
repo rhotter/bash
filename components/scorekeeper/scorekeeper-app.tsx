@@ -1080,20 +1080,6 @@ export function ScorekeeperApp({
           </div>
         )}
 
-        {/* ─── Period Summary (goals + shots by period) ───────────── */}
-        {!isPreGame && (
-          <div className="mt-5">
-            <SectionHeader>Stats by Period</SectionHeader>
-            <PeriodSummary
-              state={state}
-              homeSlug={homeSlug}
-              awaySlug={awaySlug}
-              homeTeam={homeTeam}
-              awayTeam={awayTeam}
-            />
-          </div>
-        )}
-
         {/* ─── Event Log ───────────────────────────────────────────── */}
         {!isPreGame && (
           <div className="mt-5">
@@ -1173,6 +1159,20 @@ export function ScorekeeperApp({
                   }
                 })}
             </div>
+          </div>
+        )}
+
+        {/* ─── Period Summary (goals + shots by period) ───────────── */}
+        {!isPreGame && (
+          <div className="mt-5">
+            <SectionHeader>Stats by Period</SectionHeader>
+            <PeriodSummary
+              state={state}
+              homeSlug={homeSlug}
+              awaySlug={awaySlug}
+              homeTeam={homeTeam}
+              awayTeam={awayTeam}
+            />
           </div>
         )}
 

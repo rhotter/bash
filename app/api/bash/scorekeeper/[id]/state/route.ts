@@ -52,16 +52,24 @@ export async function PUT(
       else if (awaySOGoals > homeSOGoals) awayScore++
     }
 
-    // Update game_live state and games scores
+    // Update game_live state
     await sql`
       UPDATE game_live SET state = ${JSON.stringify(state)}, updated_at = NOW()
       WHERE game_id = ${id}
     `
 
-    await sql`
-      UPDATE games SET home_score = ${homeScore}, away_score = ${awayScore}
-      WHERE id = ${id}
-    `
+    // Set game to live once play starts (period >= 1), update scores
+    if (state.period >= 1) {
+      await sql`
+        UPDATE games SET status = 'live', home_score = ${homeScore}, away_score = ${awayScore}
+        WHERE id = ${id} AND status != 'final'
+      `
+    } else {
+      await sql`
+        UPDATE games SET home_score = ${homeScore}, away_score = ${awayScore}
+        WHERE id = ${id}
+      `
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
