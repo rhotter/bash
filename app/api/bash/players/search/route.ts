@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema } from "@/lib/db"
+import { eq, asc } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
 import { playerSlug } from "@/lib/player-slug"
 
@@ -13,20 +14,29 @@ export interface PlayerSearchResult {
 export async function GET() {
   try {
     const season = getCurrentSeason()
-    const rows = await sql`
-      SELECT DISTINCT p.name, t.name AS team, t.slug AS team_slug
-      FROM players p
-      JOIN player_seasons ps ON ps.player_id = p.id
-      JOIN teams t ON t.slug = ps.team_slug
-      WHERE ps.season_id = ${season.id}
-      ORDER BY p.name
-    `
+    const rows = await db
+      .selectDistinct({
+        name: schema.players.name,
+        team: schema.teams.name,
+        teamSlug: schema.teams.slug,
+      })
+      .from(schema.players)
+      .innerJoin(
+        schema.playerSeasons,
+        eq(schema.playerSeasons.playerId, schema.players.id)
+      )
+      .innerJoin(
+        schema.teams,
+        eq(schema.teams.slug, schema.playerSeasons.teamSlug)
+      )
+      .where(eq(schema.playerSeasons.seasonId, season.id))
+      .orderBy(asc(schema.players.name))
 
     const players: PlayerSearchResult[] = rows.map((r) => ({
-      name: r.name as string,
-      slug: playerSlug(r.name as string),
-      team: r.team as string,
-      teamSlug: r.team_slug as string,
+      name: r.name,
+      slug: playerSlug(r.name),
+      team: r.team,
+      teamSlug: r.teamSlug,
     }))
 
     return NextResponse.json({ players }, {

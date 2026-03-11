@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 
 export async function GET(
   _request: Request,
@@ -8,7 +9,7 @@ export async function GET(
   const { id } = await params
 
   try {
-    const rows = await sql`
+    const rows = await rawSql(sql`
       SELECT gl.state, gl.updated_at,
         g.home_score, g.away_score, g.status,
         g.home_team, g.away_team,
@@ -18,7 +19,7 @@ export async function GET(
       JOIN teams ht ON g.home_team = ht.slug
       JOIN teams awt ON g.away_team = awt.slug
       WHERE gl.game_id = ${id}
-    `
+    `)
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "No live data" }, { status: 404 })
@@ -43,24 +44,24 @@ export async function GET(
     let goalieIds: number[] = []
     if (playerIds.size > 0) {
       const ids = [...playerIds]
-      const playerRows = await sql`SELECT id, name FROM players WHERE id = ANY(${ids})`
-      for (const r of playerRows) {
-        playerNames[r.id as number] = r.name as string
+      const playerResult = await rawSql(sql`SELECT id, name FROM players WHERE id IN ${ids}`)
+      for (const r of playerResult) {
+        playerNames[r.id] = r.name
       }
 
       // Use scorekeeper goalie overrides if set, otherwise fall back to player_seasons
-      const overrides = (state as Record<string, unknown>).goalieOverrides as Record<number, boolean> | undefined
+      const overrides = row.state?.goalieOverrides as Record<number, boolean> | undefined
       const allAttending = [...(state.homeAttendance ?? []), ...(state.awayAttendance ?? [])]
       const hasOverrides = overrides && allAttending.some((pid) => overrides[pid] === true)
 
       if (hasOverrides) {
         goalieIds = allAttending.filter((pid) => overrides[pid])
       } else {
-        const goalieRows = await sql`
+        const goalieResult = await rawSql(sql`
           SELECT DISTINCT player_id FROM player_seasons
-          WHERE player_id = ANY(${ids}) AND is_goalie = true
-        `
-        goalieIds = goalieRows.map((r) => r.player_id as number)
+          WHERE player_id IN ${ids} AND is_goalie = true
+        `)
+        goalieIds = goalieResult.map((r) => r.player_id)
       }
     }
 

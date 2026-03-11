@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema } from "@/lib/db"
+import { eq } from "drizzle-orm"
 import { createInitialState } from "@/lib/scorekeeper-types"
 
 function validatePin(request: Request): boolean {
@@ -19,16 +20,18 @@ export async function POST(
 
   try {
     // Verify game exists and is upcoming
-    const gameRows = await sql`
-      SELECT id, status FROM games WHERE id = ${id}
-    `
+    const gameRows = await db
+      .select({ id: schema.games.id, status: schema.games.status })
+      .from(schema.games)
+      .where(eq(schema.games.id, id))
     if (gameRows.length === 0) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 })
     }
     // Check if game_live row already exists (scorekeeper re-auth or editing finalized game)
-    const existingLive = await sql`
-      SELECT state FROM game_live WHERE game_id = ${id}
-    `
+    const existingLive = await db
+      .select({ state: schema.gameLive.state })
+      .from(schema.gameLive)
+      .where(eq(schema.gameLive.gameId, id))
     if (existingLive.length > 0) {
       return NextResponse.json({ ok: true, state: existingLive[0].state })
     }
@@ -37,10 +40,11 @@ export async function POST(
     const pinHash = process.env.SCOREKEEPER_PIN!
 
     // Create game_live row (don't set game status to live yet — that happens when period 1 starts)
-    await sql`
-      INSERT INTO game_live (game_id, state, pin_hash)
-      VALUES (${id}, ${JSON.stringify(initialState)}, ${pinHash})
-    `
+    await db.insert(schema.gameLive).values({
+      gameId: id,
+      state: initialState,
+      pinHash,
+    })
 
     return NextResponse.json({ ok: true, state: initialState })
   } catch (error) {

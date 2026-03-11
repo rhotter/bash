@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
 
 // ─── Shared output types ────────────────────────────────────────────────────
@@ -44,7 +45,6 @@ export interface BashApiData {
 function computeStandings(games: BashGame[]): Standing[] {
   const teamMap = new Map<string, Standing>()
 
-  // Only count non-playoff final games for standings
   const regularGames = games.filter((g) => !g.isPlayoff)
 
   for (const game of regularGames) {
@@ -105,8 +105,7 @@ export async function GET(request: Request) {
     const seasonParam = searchParams.get("season")
     const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
 
-    // "all" doesn't make sense for scores/standings — fall back to current
-    const rows = await sql`
+    const rows = await rawSql(sql`
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime, g.is_playoff, g.location, g.has_boxscore,
@@ -117,7 +116,7 @@ export async function GET(request: Request) {
       JOIN teams awt ON g.away_team = awt.slug
       WHERE g.season_id = ${seasonId}
       ORDER BY g.date ASC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END ASC
-    `
+    `)
 
     const games: BashGame[] = rows.map((r) => ({
       id: r.id,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema } from "@/lib/db"
+import { eq, and, ne, sql } from "drizzle-orm"
 import type { LiveGameState } from "@/lib/scorekeeper-types"
 
 function validatePin(request: Request): boolean {
@@ -27,15 +28,16 @@ export async function PUT(
     // Compute current scores from goals (excluding shootout goals in period 5)
     let homeScore = 0
     let awayScore = 0
-    const gameRows = await sql`
-      SELECT home_team, away_team FROM games WHERE id = ${id}
-    `
+    const gameRows = await db
+      .select({ homeTeam: schema.games.homeTeam, awayTeam: schema.games.awayTeam })
+      .from(schema.games)
+      .where(eq(schema.games.id, id))
     if (gameRows.length === 0) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 })
     }
 
-    const homeSlug = gameRows[0].home_team
-    const awaySlug = gameRows[0].away_team
+    const homeSlug = gameRows[0].homeTeam
+    const awaySlug = gameRows[0].awayTeam
 
     for (const goal of state.goals) {
       if (goal.period <= 4) {
@@ -53,22 +55,22 @@ export async function PUT(
     }
 
     // Update game_live state
-    await sql`
-      UPDATE game_live SET state = ${JSON.stringify(state)}, updated_at = NOW()
-      WHERE game_id = ${id}
-    `
+    await db
+      .update(schema.gameLive)
+      .set({ state, updatedAt: sql`NOW()` })
+      .where(eq(schema.gameLive.gameId, id))
 
     // Set game to live once play starts (period >= 1), update scores
     if (state.period >= 1) {
-      await sql`
-        UPDATE games SET status = 'live', home_score = ${homeScore}, away_score = ${awayScore}
-        WHERE id = ${id} AND status != 'final'
-      `
+      await db
+        .update(schema.games)
+        .set({ status: "live", homeScore, awayScore })
+        .where(and(eq(schema.games.id, id), ne(schema.games.status, "final")))
     } else {
-      await sql`
-        UPDATE games SET home_score = ${homeScore}, away_score = ${awayScore}
-        WHERE id = ${id}
-      `
+      await db
+        .update(schema.games)
+        .set({ homeScore, awayScore })
+        .where(eq(schema.games.id, id))
     }
 
     return NextResponse.json({ ok: true })

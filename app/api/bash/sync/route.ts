@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
-import { getCurrentSeason, getSeasonById, getAllSeasons } from "@/lib/seasons"
+import { db, schema, rawSql } from "@/lib/db"
+import { sql, eq, and, count } from "drizzle-orm"
+import { getCurrentSeason, getSeasonById } from "@/lib/seasons"
 
 const BASE_URL = "https://secure.sportability.com/spx/Leagues"
 const MAX_BOXSCORES_PER_SYNC = 8
@@ -46,19 +47,19 @@ async function syncScheduleScores(leagueId: string, seasonId: string) {
   }
 
   // Skip games managed by scorekeeper
-  const liveGames = await sql`SELECT game_id FROM game_live`
-  const liveGameIds = new Set(liveGames.map((r) => r.game_id))
+  const liveGames = await db.select({ gameId: schema.gameLive.gameId }).from(schema.gameLive)
+  const liveGameIds = new Set(liveGames.map((r) => r.gameId))
 
   let updated = 0
   for (const u of updates) {
     if (liveGameIds.has(u.id)) continue
-    await sql`
+    await rawSql(sql`
       UPDATE games
       SET home_score = ${u.homeScore}, away_score = ${u.awayScore},
           status = 'final', is_overtime = ${u.isOT}
       WHERE id = ${u.id} AND season_id = ${seasonId}
         AND (home_score IS NULL OR home_score != ${u.homeScore} OR away_score != ${u.awayScore})
-    `
+    `)
     updated++
   }
 
@@ -76,11 +77,19 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
   const season = getSeasonById(seasonId)
   if (!season) throw new Error(`Unknown season: ${seasonId}`)
 
-  await sql`
-    INSERT INTO seasons (id, name, league_id, is_current, season_type)
-    VALUES (${season.id}, ${season.name}, ${season.leagueId}, false, ${season.seasonType})
-    ON CONFLICT (id) DO UPDATE SET season_type = EXCLUDED.season_type
-  `
+  await db
+    .insert(schema.seasons)
+    .values({
+      id: season.id,
+      name: season.name,
+      leagueId: season.leagueId,
+      isCurrent: false,
+      seasonType: season.seasonType,
+    })
+    .onConflictDoUpdate({
+      target: schema.seasons.id,
+      set: { seasonType: sql`EXCLUDED.season_type` },
+    })
 
   // Parse table rows — each <tr> with GID= is a game
   const rowPattern = /<tr[^>]*class="tablecontent"[^>]*>([\s\S]*?)<\/tr>/gi
@@ -91,15 +100,15 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
   }
 
   // Build existing team lookup
-  const existingTeams = await sql`SELECT slug, name FROM teams`
+  const existingTeams = await db.select({ slug: schema.teams.slug, name: schema.teams.name }).from(schema.teams)
   const teamNameToSlug: Record<string, string> = {}
   for (const t of existingTeams) {
     teamNameToSlug[t.name.toLowerCase()] = t.slug
   }
 
   // Skip score updates for games managed by scorekeeper
-  const liveGames = await sql`SELECT game_id FROM game_live`
-  const liveGameIds = new Set(liveGames.map((r) => r.game_id))
+  const liveGames = await db.select({ gameId: schema.gameLive.gameId }).from(schema.gameLive)
+  const liveGameIds = new Set(liveGames.map((r) => r.gameId))
 
   let currentDate = ""
   let gamesCreated = 0
@@ -187,38 +196,68 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
     let awaySlug = teamNameToSlug[awayName.toLowerCase()]
     if (!awaySlug) {
       awaySlug = nameToSlug(awayName)
-      await sql`INSERT INTO teams (slug, name) VALUES (${awaySlug}, ${awayName}) ON CONFLICT (slug) DO NOTHING`
+      await db.insert(schema.teams).values({ slug: awaySlug, name: awayName }).onConflictDoNothing()
       teamNameToSlug[awayName.toLowerCase()] = awaySlug
     }
 
     let homeSlug = teamNameToSlug[homeName.toLowerCase()]
     if (!homeSlug) {
       homeSlug = nameToSlug(homeName)
-      await sql`INSERT INTO teams (slug, name) VALUES (${homeSlug}, ${homeName}) ON CONFLICT (slug) DO NOTHING`
+      await db.insert(schema.teams).values({ slug: homeSlug, name: homeName }).onConflictDoNothing()
       teamNameToSlug[homeName.toLowerCase()] = homeSlug
     }
 
     // Ensure season_teams entries
-    await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${awaySlug}) ON CONFLICT DO NOTHING`
-    await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${homeSlug}) ON CONFLICT DO NOTHING`
+    await db.insert(schema.seasonTeams).values({ seasonId, teamSlug: awaySlug }).onConflictDoNothing()
+    await db.insert(schema.seasonTeams).values({ seasonId, teamSlug: homeSlug }).onConflictDoNothing()
 
     // Upsert game (don't overwrite scores for scorekeeper-managed games)
     if (liveGameIds.has(gid)) {
-      await sql`
-        INSERT INTO games (id, season_id, date, time, away_team, home_team, away_score, home_score, status, is_overtime, is_playoff, location, has_boxscore)
-        VALUES (${gid}, ${seasonId}, ${currentDate}, ${time}, ${awaySlug}, ${homeSlug}, ${awayScore}, ${homeScore}, ${status}, ${isOT}, ${isPlayoff}, ${location}, false)
-        ON CONFLICT (id) DO NOTHING
-      `
+      await db
+        .insert(schema.games)
+        .values({
+          id: gid,
+          seasonId,
+          date: currentDate,
+          time,
+          awayTeam: awaySlug,
+          homeTeam: homeSlug,
+          awayScore,
+          homeScore,
+          status,
+          isOvertime: isOT,
+          isPlayoff,
+          location,
+          hasBoxscore: false,
+        })
+        .onConflictDoNothing()
     } else {
-      await sql`
-        INSERT INTO games (id, season_id, date, time, away_team, home_team, away_score, home_score, status, is_overtime, is_playoff, location, has_boxscore)
-        VALUES (${gid}, ${seasonId}, ${currentDate}, ${time}, ${awaySlug}, ${homeSlug}, ${awayScore}, ${homeScore}, ${status}, ${isOT}, ${isPlayoff}, ${location}, false)
-        ON CONFLICT (id) DO UPDATE SET
-          away_score = EXCLUDED.away_score,
-          home_score = EXCLUDED.home_score,
-          status = EXCLUDED.status,
-          is_overtime = EXCLUDED.is_overtime
-      `
+      await db
+        .insert(schema.games)
+        .values({
+          id: gid,
+          seasonId,
+          date: currentDate,
+          time,
+          awayTeam: awaySlug,
+          homeTeam: homeSlug,
+          awayScore,
+          homeScore,
+          status,
+          isOvertime: isOT,
+          isPlayoff,
+          location,
+          hasBoxscore: false,
+        })
+        .onConflictDoUpdate({
+          target: schema.games.id,
+          set: {
+            awayScore: sql`EXCLUDED.away_score`,
+            homeScore: sql`EXCLUDED.home_score`,
+            status: sql`EXCLUDED.status`,
+            isOvertime: sql`EXCLUDED.is_overtime`,
+          },
+        })
     }
     gamesCreated++
   }
@@ -228,7 +267,7 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
 
 async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) {
   // Skip games managed by scorekeeper
-  const liveCheck = await sql`SELECT 1 FROM game_live WHERE game_id = ${gameId}`
+  const liveCheck = await db.select({ gameId: schema.gameLive.gameId }).from(schema.gameLive).where(eq(schema.gameLive.gameId, gameId))
   if (liveCheck.length > 0) return
 
   const url = `${BASE_URL}/Game.asp?LgID=${leagueId}&GID=${gameId}`
@@ -238,7 +277,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
   let hasAnyStats = false
 
   // Build team name → slug lookup
-  const teamRows = await sql`SELECT slug, name FROM teams`
+  const teamRows = await db.select({ slug: schema.teams.slug, name: schema.teams.name }).from(schema.teams)
   const teamNameToSlug: Record<string, string> = {}
   for (const t of teamRows) {
     teamNameToSlug[t.name.toLowerCase()] = t.slug
@@ -261,12 +300,12 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
     if (name && name.length > 1 && name.length < 50) scorekeepers.push(name)
   }
 
-  await sql`DELETE FROM game_officials WHERE game_id = ${gameId}`
+  await db.delete(schema.gameOfficials).where(eq(schema.gameOfficials.gameId, gameId))
   for (const ref of refs) {
-    await sql`INSERT INTO game_officials (game_id, name, role) VALUES (${gameId}, ${ref}, 'ref')`
+    await db.insert(schema.gameOfficials).values({ gameId, name: ref, role: "ref" })
   }
   for (const sk of scorekeepers) {
-    await sql`INSERT INTO game_officials (game_id, name, role) VALUES (${gameId}, ${sk}, 'scorekeeper')`
+    await db.insert(schema.gameOfficials).values({ gameId, name: sk, role: "scorekeeper" })
   }
 
   // Find all tables
@@ -307,8 +346,8 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
             // Auto-create team if not found
             if (!currentTeamSlug) {
               const slug = nameToSlug(teamMatch[1].trim())
-              await sql`INSERT INTO teams (slug, name) VALUES (${slug}, ${teamMatch[1].trim()}) ON CONFLICT (slug) DO NOTHING`
-              await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${slug}) ON CONFLICT DO NOTHING`
+              await db.insert(schema.teams).values({ slug, name: teamMatch[1].trim() }).onConflictDoNothing()
+              await db.insert(schema.seasonTeams).values({ seasonId, teamSlug: slug }).onConflictDoNothing()
               teamNameToSlug[teamName] = slug
               currentTeamSlug = slug
             }
@@ -334,28 +373,39 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         const pen = cells.length > 13 ? parseInt(stripHtml(cells[13])) || 0 : 0
         const pim = cells.length > 14 ? parseInt(stripHtml(cells[14])) || 0 : 0
 
-        const playerRows = await sql`
-          INSERT INTO players (name) VALUES (${playerName})
-          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-          RETURNING id
-        `
+        const playerRows = await db
+          .insert(schema.players)
+          .values({ name: playerName })
+          .onConflictDoUpdate({
+            target: schema.players.name,
+            set: { name: sql`EXCLUDED.name` },
+          })
+          .returning({ id: schema.players.id })
         const playerId = playerRows[0].id
 
-        await sql`
-          INSERT INTO player_seasons (player_id, season_id, team_slug, is_goalie)
-          VALUES (${playerId}, ${seasonId}, ${currentTeamSlug}, false)
-          ON CONFLICT (player_id, season_id, team_slug) DO NOTHING
-        `
+        await db
+          .insert(schema.playerSeasons)
+          .values({ playerId, seasonId, teamSlug: currentTeamSlug, isGoalie: false })
+          .onConflictDoNothing()
 
-        await sql`
-          INSERT INTO player_game_stats (player_id, game_id, goals, assists, points, gwg, ppg, shg, eng, hat_tricks, pen, pim)
-          VALUES (${playerId}, ${gameId}, ${goals}, ${assists}, ${points}, ${gwg}, ${ppg}, ${shg}, ${eng}, ${hat}, ${pen}, ${pim})
-          ON CONFLICT (player_id, game_id) DO UPDATE SET
-            goals = EXCLUDED.goals, assists = EXCLUDED.assists, points = EXCLUDED.points,
-            gwg = EXCLUDED.gwg, ppg = EXCLUDED.ppg, shg = EXCLUDED.shg,
-            eng = EXCLUDED.eng, hat_tricks = EXCLUDED.hat_tricks,
-            pen = EXCLUDED.pen, pim = EXCLUDED.pim
-        `
+        await db
+          .insert(schema.playerGameStats)
+          .values({ playerId, gameId, goals, assists, points, gwg, ppg, shg, eng, hatTricks: hat, pen, pim })
+          .onConflictDoUpdate({
+            target: [schema.playerGameStats.playerId, schema.playerGameStats.gameId],
+            set: {
+              goals: sql`EXCLUDED.goals`,
+              assists: sql`EXCLUDED.assists`,
+              points: sql`EXCLUDED.points`,
+              gwg: sql`EXCLUDED.gwg`,
+              ppg: sql`EXCLUDED.ppg`,
+              shg: sql`EXCLUDED.shg`,
+              eng: sql`EXCLUDED.eng`,
+              hatTricks: sql`EXCLUDED.hat_tricks`,
+              pen: sql`EXCLUDED.pen`,
+              pim: sql`EXCLUDED.pim`,
+            },
+          })
         statsInserted = true
       }
 
@@ -393,8 +443,8 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
             currentTeamSlug = teamNameToSlug[teamName] || null
             if (!currentTeamSlug) {
               const slug = nameToSlug(teamMatch[1].trim())
-              await sql`INSERT INTO teams (slug, name) VALUES (${slug}, ${teamMatch[1].trim()}) ON CONFLICT (slug) DO NOTHING`
-              await sql`INSERT INTO season_teams (season_id, team_slug) VALUES (${seasonId}, ${slug}) ON CONFLICT DO NOTHING`
+              await db.insert(schema.teams).values({ slug, name: teamMatch[1].trim() }).onConflictDoNothing()
+              await db.insert(schema.seasonTeams).values({ seasonId, teamSlug: slug }).onConflictDoNothing()
               teamNameToSlug[teamName] = slug
               currentTeamSlug = slug
             }
@@ -417,28 +467,36 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         const resultCell = cells.length > 13 ? stripHtml(cells[13]) : stripHtml(cells[cells.length - 1])
         const result = resultCell === "W" || resultCell === "L" ? resultCell : null
 
-        const playerRows = await sql`
-          INSERT INTO players (name) VALUES (${playerName})
-          ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-          RETURNING id
-        `
+        const playerRows = await db
+          .insert(schema.players)
+          .values({ name: playerName })
+          .onConflictDoUpdate({
+            target: schema.players.name,
+            set: { name: sql`EXCLUDED.name` },
+          })
+          .returning({ id: schema.players.id })
         const playerId = playerRows[0].id
 
-        await sql`
-          INSERT INTO player_seasons (player_id, season_id, team_slug, is_goalie)
-          VALUES (${playerId}, ${seasonId}, ${currentTeamSlug}, true)
-          ON CONFLICT (player_id, season_id, team_slug) DO NOTHING
-        `
+        await db
+          .insert(schema.playerSeasons)
+          .values({ playerId, seasonId, teamSlug: currentTeamSlug, isGoalie: true })
+          .onConflictDoNothing()
 
-        await sql`
-          INSERT INTO goalie_game_stats (player_id, game_id, minutes, goals_against, shots_against, saves, shutouts, goalie_assists, result)
-          VALUES (${playerId}, ${gameId}, ${minutes}, ${ga}, ${shotsAgainst}, ${saves}, ${shutouts}, ${goalieAssists}, ${result})
-          ON CONFLICT (player_id, game_id) DO UPDATE SET
-            minutes = EXCLUDED.minutes, goals_against = EXCLUDED.goals_against,
-            shots_against = EXCLUDED.shots_against, saves = EXCLUDED.saves,
-            shutouts = EXCLUDED.shutouts, goalie_assists = EXCLUDED.goalie_assists,
-            result = EXCLUDED.result
-        `
+        await db
+          .insert(schema.goalieGameStats)
+          .values({ playerId, gameId, minutes, goalsAgainst: ga, shotsAgainst, saves, shutouts, goalieAssists, result })
+          .onConflictDoUpdate({
+            target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
+            set: {
+              minutes: sql`EXCLUDED.minutes`,
+              goalsAgainst: sql`EXCLUDED.goals_against`,
+              shotsAgainst: sql`EXCLUDED.shots_against`,
+              saves: sql`EXCLUDED.saves`,
+              shutouts: sql`EXCLUDED.shutouts`,
+              goalieAssists: sql`EXCLUDED.goalie_assists`,
+              result: sql`EXCLUDED.result`,
+            },
+          })
         statsInserted = true
       }
 
@@ -447,7 +505,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
   }
 
   if (hasAnyStats) {
-    await sql`UPDATE games SET has_boxscore = true WHERE id = ${gameId}`
+    await db.update(schema.games).set({ hasBoxscore: true }).where(eq(schema.games.id, gameId))
   }
 }
 
@@ -474,14 +532,14 @@ export async function GET(request: Request) {
       let boxscoresRemaining = 0
 
       if (limit > 0) {
-        const gamesNeedingBoxscore = await sql`
+        const gamesNeedingBoxscore = await rawSql(sql`
           SELECT id FROM games
           WHERE season_id = ${season.id}
             AND status = 'final'
             AND has_boxscore = false
           ORDER BY date ASC
           LIMIT ${limit}
-        `
+        `)
 
         for (const game of gamesNeedingBoxscore) {
           try {
@@ -493,10 +551,16 @@ export async function GET(request: Request) {
         }
       }
 
-      const remaining = await sql`
-        SELECT count(*)::int as count FROM games
-        WHERE season_id = ${season.id} AND status = 'final' AND has_boxscore = false
-      `
+      const remaining = await db
+        .select({ count: count() })
+        .from(schema.games)
+        .where(
+          and(
+            eq(schema.games.seasonId, season.id),
+            eq(schema.games.status, "final"),
+            eq(schema.games.hasBoxscore, false)
+          )
+        )
       boxscoresRemaining = remaining[0].count
 
       return NextResponse.json({
@@ -513,17 +577,17 @@ export async function GET(request: Request) {
     const current = getCurrentSeason()
     const scheduleResult = await syncScheduleScores(current.leagueId, current.id)
 
-    const gamesNeedingBoxscore = await sql`
+    const gamesNeedingBoxscore = await rawSql(sql`
       SELECT id FROM games
       WHERE season_id = ${current.id}
         AND status = 'final'
         AND has_boxscore = false
       ORDER BY date ASC
       LIMIT ${MAX_BOXSCORES_PER_SYNC}
-    `
+    `)
 
     const boxscoreResults = await Promise.allSettled(
-      gamesNeedingBoxscore.map((game: { id: string }) =>
+      gamesNeedingBoxscore.map((game) =>
         syncBoxscore(game.id, current.leagueId, current.id)
       )
     )
@@ -532,11 +596,13 @@ export async function GET(request: Request) {
       console.error(`Failed to sync boxscore for game ${gamesNeedingBoxscore[i].id}:`, (r as PromiseRejectedResult).reason)
     })
 
-    await sql`
-      INSERT INTO sync_metadata (key, value)
-      VALUES ('last_sync', ${new Date().toISOString()})
-      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-    `
+    await db
+      .insert(schema.syncMetadata)
+      .values({ key: "last_sync", value: new Date().toISOString() })
+      .onConflictDoUpdate({
+        target: schema.syncMetadata.key,
+        set: { value: sql`EXCLUDED.value` },
+      })
 
     return NextResponse.json({
       ok: true,

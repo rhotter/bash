@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless"
-import { readFileSync } from "fs"
-import { join } from "path"
+import { execSync } from "child_process"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -62,15 +61,8 @@ function parseIntSafe(val: string): number {
 }
 
 async function importHistoricalStats() {
-  console.log("Applying schema...")
-  const schema = readFileSync(join(__dirname, "../lib/db/schema.sql"), "utf-8")
-  const statements = schema
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-  for (const stmt of statements) {
-    await sql.query(stmt)
-  }
+  console.log("Pushing schema via drizzle-kit...")
+  execSync("npx drizzle-kit push", { stdio: "inherit" })
   console.log("Schema applied.")
 
   console.log("Fetching CSV from Google Sheets...")

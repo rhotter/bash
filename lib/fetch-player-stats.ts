@@ -1,4 +1,5 @@
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { getCurrentSeason, isStatsOnlySeason } from "@/lib/seasons"
 
 export interface SkaterStat {
@@ -53,22 +54,25 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
   const seasonId = !isAllTime ? (seasonParam || getCurrentSeason().id) : null
   const isPlayoff = playoff === true
 
-  let skaterRows
-  let goalieRows
-  let teamRows
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let skaterRows: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let goalieRows: any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let teamRows: any[]
   let hasPlayoffs = false
 
   // Check if the selected season has playoff games (only for season-specific, non-playoff views)
   if (!isAllTime && !isPlayoff && seasonId) {
-    const playoffCheck = await sql`
+    const playoffCheck = await rawSql(sql`
       SELECT EXISTS(SELECT 1 FROM games WHERE season_id = ${seasonId} AND is_playoff AND status = 'final') as has_playoffs
-    `
+    `)
     hasPlayoffs = playoffCheck[0]?.has_playoffs ?? false
   }
 
   if (isAllTime) {
     ;[skaterRows, goalieRows, teamRows] = await Promise.all([
-      sql`
+      rawSql(sql`
         WITH game_stats AS (
           SELECT
             pgs.player_id,
@@ -125,8 +129,8 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
         FROM combined c
         JOIN players p ON c.player_id = p.id
         ORDER BY c.points DESC, c.goals DESC, p.name ASC
-      `,
-      sql`
+      `),
+      rawSql(sql`
         SELECT
           p.id, p.name,
           (SELECT t2.name FROM player_seasons ps2 JOIN teams t2 ON ps2.team_slug = t2.slug
@@ -155,13 +159,13 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
         JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         GROUP BY p.id, p.name
         ORDER BY save_pct DESC
-      `,
-      sql`SELECT DISTINCT t.slug, t.name FROM teams t ORDER BY t.name`,
+      `),
+      rawSql(sql`SELECT DISTINCT t.slug, t.name FROM teams t ORDER BY t.name`),
     ])
   } else if (seasonId && isStatsOnlySeason(seasonId)) {
-    // Stats-only season: query player_season_stats directly
+    const playoffFragment = isPlayoff ? sql`pss.is_playoff` : sql`NOT pss.is_playoff`
     ;[skaterRows, goalieRows, teamRows] = await Promise.all([
-      sql`
+      rawSql(sql`
         SELECT
           p.id, p.name,
           t.name as team, pss.team_slug,
@@ -171,23 +175,22 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
         FROM player_season_stats pss
         JOIN players p ON pss.player_id = p.id
         JOIN teams t ON pss.team_slug = t.slug
-        WHERE pss.season_id = ${seasonId} AND ${isPlayoff ? sql`pss.is_playoff` : sql`NOT pss.is_playoff`}
+        WHERE pss.season_id = ${seasonId} AND ${playoffFragment}
         ORDER BY pss.points DESC, pss.goals DESC, p.name ASC
-      `,
-      // No goalie data for pre-Sportability seasons
+      `),
       Promise.resolve([]),
-      sql`
+      rawSql(sql`
         SELECT t.slug, t.name
         FROM season_teams st
         JOIN teams t ON st.team_slug = t.slug
         WHERE st.season_id = ${seasonId}
         ORDER BY t.name
-      `,
+      `),
     ])
   } else {
-    // Season-specific: join through games to properly scope stats
+    const playoffFragment = isPlayoff ? sql`g.is_playoff` : sql`NOT g.is_playoff`
     ;[skaterRows, goalieRows, teamRows] = await Promise.all([
-      sql`
+      rawSql(sql`
         SELECT
           p.id, p.name,
           (SELECT t2.name FROM player_seasons ps2 JOIN teams t2 ON ps2.team_slug = t2.slug
@@ -209,11 +212,11 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
           SUM(pgs.pim)::int as pim
         FROM players p
         JOIN player_game_stats pgs ON p.id = pgs.player_id
-        JOIN games g ON pgs.game_id = g.id AND g.season_id = ${seasonId} AND ${isPlayoff ? sql`g.is_playoff` : sql`NOT g.is_playoff`}
+        JOIN games g ON pgs.game_id = g.id AND g.season_id = ${seasonId} AND ${playoffFragment}
         GROUP BY p.id, p.name
         ORDER BY points DESC, goals DESC, p.name ASC
-      `,
-      sql`
+      `),
+      rawSql(sql`
         SELECT
           p.id, p.name,
           (SELECT t2.name FROM player_seasons ps2 JOIN teams t2 ON ps2.team_slug = t2.slug
@@ -239,17 +242,17 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
           COUNT(*) FILTER (WHERE ggs.result = 'L')::int as losses
         FROM players p
         JOIN goalie_game_stats ggs ON p.id = ggs.player_id
-        JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId} AND ${isPlayoff ? sql`g.is_playoff` : sql`NOT g.is_playoff`}
+        JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId} AND ${playoffFragment}
         GROUP BY p.id, p.name
         ORDER BY save_pct DESC
-      `,
-      sql`
+      `),
+      rawSql(sql`
         SELECT t.slug, t.name
         FROM season_teams st
         JOIN teams t ON st.team_slug = t.slug
         WHERE st.season_id = ${seasonId}
         ORDER BY t.name
-      `,
+      `),
     ])
   }
 

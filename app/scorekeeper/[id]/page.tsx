@@ -1,4 +1,5 @@
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { SiteHeader } from "@/components/site-header"
 import { ScorekeeperApp } from "@/components/scorekeeper/scorekeeper-app"
 import type { RosterPlayer } from "@/lib/scorekeeper-types"
@@ -9,7 +10,7 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
   const { id } = await params
 
   // Get game info
-  const gameRows = await sql`
+  const gameRows = await rawSql(sql`
     SELECT g.id, g.date, g.time, g.status, g.season_id,
       g.home_team, g.away_team,
       ht.name as home_team_name, awt.name as away_team_name
@@ -17,7 +18,7 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
     JOIN teams ht ON g.home_team = ht.slug
     JOIN teams awt ON g.away_team = awt.slug
     WHERE g.id = ${id}
-  `
+  `)
 
   if (gameRows.length === 0) {
     return (
@@ -31,13 +32,13 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
 
   // Get rosters for both teams from player_seasons
   async function getRoster(teamSlug: string, seasonId: string): Promise<RosterPlayer[]> {
-    const rows = await sql`
+    const rows = await rawSql(sql`
       SELECT p.id, p.name, ps.is_goalie
       FROM player_seasons ps
       JOIN players p ON ps.player_id = p.id
       WHERE ps.season_id = ${seasonId} AND ps.team_slug = ${teamSlug}
       ORDER BY ps.is_goalie ASC, p.name ASC
-    `
+    `)
     return rows.map((r) => ({ id: r.id, name: r.name, isGoalie: r.is_goalie }))
   }
 
@@ -47,9 +48,9 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
   ])
 
   // Check if there's existing live state
-  const liveRows = await sql`
+  const liveRows = await rawSql(sql`
     SELECT state FROM game_live WHERE game_id = ${id}
-  `
+  `)
 
   return (
     <>

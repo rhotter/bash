@@ -380,6 +380,10 @@ export function ScorekeeperApp({
       while (awayShots.length < (nextPeriod <= 3 ? nextPeriod : 4)) awayShots.push(0)
       const homeAttendance = prev.homeAttendance.length > 0 ? prev.homeAttendance : homeRoster.map((p) => p.id)
       const awayAttendance = prev.awayAttendance.length > 0 ? prev.awayAttendance : awayRoster.map((p) => p.id)
+      // Auto-return any pulled goalies at period end (clock = 0:00)
+      const goaliePulls = (prev.goaliePulls ?? []).map((p) =>
+        p.returnedAt === null ? { ...p, returnedAt: "0:00" } : p
+      )
       return {
         ...prev,
         period: nextPeriod,
@@ -390,6 +394,7 @@ export function ScorekeeperApp({
         awayShots,
         homeAttendance,
         awayAttendance,
+        goaliePulls,
       }
     })
   }

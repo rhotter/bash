@@ -1,4 +1,5 @@
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
 import type { BashGame, Standing, BashApiData } from "@/app/api/bash/route"
 
@@ -64,7 +65,7 @@ function computeStandings(games: BashGame[]): Standing[] {
 export async function fetchBashData(seasonParam?: string | null): Promise<BashApiData> {
   const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
 
-  const rows = await sql`
+  const rows = await rawSql(sql`
     SELECT
       g.id, g.date, g.time, g.home_score, g.away_score,
       g.status, g.is_overtime, g.is_playoff, g.location, g.has_boxscore,
@@ -75,7 +76,7 @@ export async function fetchBashData(seasonParam?: string | null): Promise<BashAp
     JOIN teams awt ON g.away_team = awt.slug
     WHERE g.season_id = ${seasonId}
     ORDER BY g.date ASC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END ASC
-  `
+  `)
 
   const games: BashGame[] = rows.map((r) => ({
     id: r.id,

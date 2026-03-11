@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema } from "@/lib/db"
+import { eq, count, sum, asc, desc, countDistinct } from "drizzle-orm"
 
 export interface RefStat {
   name: string
@@ -17,31 +18,37 @@ export interface RefStatsData {
 export async function GET() {
   try {
     // Get all refs and their game counts
-    const refRows = await sql`
-      SELECT
-        go.name,
-        COUNT(DISTINCT go.game_id)::int as games
-      FROM game_officials go
-      WHERE go.role = 'ref'
-      GROUP BY go.name
-      ORDER BY games DESC, go.name ASC
-    `
+    const refRows = await db
+      .select({
+        name: schema.gameOfficials.name,
+        games: countDistinct(schema.gameOfficials.gameId).mapWith(Number),
+      })
+      .from(schema.gameOfficials)
+      .where(eq(schema.gameOfficials.role, "ref"))
+      .groupBy(schema.gameOfficials.name)
+      .orderBy(
+        desc(countDistinct(schema.gameOfficials.gameId)),
+        asc(schema.gameOfficials.name)
+      )
 
     // Get penalty totals per game (to attribute to refs)
-    const penaltyRows = await sql`
-      SELECT
-        go.name as ref_name,
-        SUM(pgs.pen)::int as total_pen,
-        SUM(pgs.pim)::int as total_pim
-      FROM game_officials go
-      JOIN player_game_stats pgs ON go.game_id = pgs.game_id
-      WHERE go.role = 'ref'
-      GROUP BY go.name
-    `
+    const penaltyRows = await db
+      .select({
+        refName: schema.gameOfficials.name,
+        totalPen: sum(schema.playerGameStats.pen).mapWith(Number),
+        totalPim: sum(schema.playerGameStats.pim).mapWith(Number),
+      })
+      .from(schema.gameOfficials)
+      .innerJoin(
+        schema.playerGameStats,
+        eq(schema.gameOfficials.gameId, schema.playerGameStats.gameId)
+      )
+      .where(eq(schema.gameOfficials.role, "ref"))
+      .groupBy(schema.gameOfficials.name)
 
     const penMap = new Map<string, { totalPen: number; totalPim: number }>()
     for (const r of penaltyRows) {
-      penMap.set(r.ref_name, { totalPen: r.total_pen, totalPim: r.total_pim })
+      penMap.set(r.refName, { totalPen: r.totalPen, totalPim: r.totalPim })
     }
 
     const refs: RefStat[] = refRows.map((r) => {

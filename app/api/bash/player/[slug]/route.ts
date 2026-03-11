@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema, rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { getCurrentSeason, getSeasonById } from "@/lib/seasons"
 import { playerSlug } from "@/lib/player-slug"
 
@@ -133,7 +134,7 @@ export async function GET(
 
   try {
     // Look up player by slug (derived from name)
-    const allPlayers = await sql`SELECT id, name FROM players`
+    const allPlayers = await db.select({ id: schema.players.id, name: schema.players.name }).from(schema.players)
     const matchedPlayer = allPlayers.find(
       (p) => playerSlug(p.name) === slug
     )
@@ -145,7 +146,7 @@ export async function GET(
     // Look up the player — use requested season or fall back to most recent
     let playerRows
     if (isAllTime) {
-      playerRows = await sql`
+      playerRows = await rawSql(sql`
         SELECT p.id, p.name, ps.team_slug, ps.is_goalie, t.name as team_name
         FROM players p
         JOIN player_seasons ps ON p.id = ps.player_id
@@ -153,9 +154,9 @@ export async function GET(
         WHERE p.id = ${playerId}
         ORDER BY ps.season_id DESC
         LIMIT 1
-      `
+      `)
     } else {
-      playerRows = await sql`
+      playerRows = await rawSql(sql`
         SELECT p.id, p.name, ps.team_slug, ps.is_goalie, t.name as team_name
         FROM players p
         JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
@@ -163,10 +164,10 @@ export async function GET(
         WHERE p.id = ${playerId}
         ORDER BY ps.season_id DESC
         LIMIT 1
-      `
+      `)
       // Fall back to most recent season if not found in requested season
       if (playerRows.length === 0) {
-        playerRows = await sql`
+        playerRows = await rawSql(sql`
           SELECT p.id, p.name, ps.team_slug, ps.is_goalie, t.name as team_name
           FROM players p
           JOIN player_seasons ps ON p.id = ps.player_id
@@ -174,7 +175,7 @@ export async function GET(
           WHERE p.id = ${playerId}
           ORDER BY ps.season_id DESC
           LIMIT 1
-        `
+        `)
       }
     }
 
@@ -237,7 +238,7 @@ export async function GET(
       hofRows,
     ] = await Promise.all([
       // Skater season stats (regular season)
-      sql`
+      rawSql(sql`
         SELECT
           COUNT(*)::int as gp,
           SUM(pgs.goals)::int as goals, SUM(pgs.assists)::int as assists, SUM(pgs.points)::int as points,
@@ -247,9 +248,9 @@ export async function GET(
         FROM player_game_stats pgs
         JOIN games g ON pgs.game_id = g.id AND g.season_id = ${gameLogSeasonId} AND NOT g.is_playoff
         WHERE pgs.player_id = ${player.id}
-      `,
+      `),
       // Skater all-time stats (regular season, fall only)
-      sql`
+      rawSql(sql`
         SELECT
           COUNT(*)::int as gp,
           SUM(pgs.goals)::int as goals, SUM(pgs.assists)::int as assists, SUM(pgs.points)::int as points,
@@ -260,9 +261,9 @@ export async function GET(
         JOIN games g ON pgs.game_id = g.id AND NOT g.is_playoff
         JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE pgs.player_id = ${player.id}
-      `,
+      `),
       // Skater per-season stats (regular season)
-      sql`
+      rawSql(sql`
         SELECT
           g.season_id, ps.team_slug, t.name as team_name,
           COUNT(*)::int as gp,
@@ -277,9 +278,9 @@ export async function GET(
         WHERE pgs.player_id = ${player.id}
         GROUP BY g.season_id, ps.team_slug, t.name
         ORDER BY g.season_id DESC
-      `,
+      `),
       // Skater game log (regular season)
-      sql`
+      rawSql(sql`
         SELECT
           pgs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score, g.is_overtime,
           ht.name as home_name, awt.name as away_name,
@@ -291,9 +292,9 @@ export async function GET(
         JOIN teams awt ON g.away_team = awt.slug
         WHERE pgs.player_id = ${player.id}
         ORDER BY g.date DESC
-      `,
+      `),
       // Goalie season stats (regular season)
-      sql`
+      rawSql(sql`
         SELECT
           COUNT(*)::int as gp,
           SUM(goals_against)::int as ga, SUM(saves)::int as saves,
@@ -304,9 +305,9 @@ export async function GET(
         FROM goalie_game_stats ggs
         JOIN games g ON ggs.game_id = g.id AND g.season_id = ${gameLogSeasonId} AND NOT g.is_playoff
         WHERE ggs.player_id = ${player.id}
-      `,
+      `),
       // Goalie all-time stats (regular season, fall only)
-      sql`
+      rawSql(sql`
         SELECT
           COUNT(*)::int as gp,
           SUM(goals_against)::int as ga, SUM(saves)::int as saves,
@@ -318,9 +319,9 @@ export async function GET(
         JOIN games g ON ggs.game_id = g.id AND NOT g.is_playoff
         JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE ggs.player_id = ${player.id}
-      `,
+      `),
       // Goalie per-season stats (regular season)
-      sql`
+      rawSql(sql`
         SELECT
           g.season_id, ps.team_slug, t.name as team_name,
           COUNT(*)::int as gp,
@@ -336,9 +337,9 @@ export async function GET(
         WHERE ggs.player_id = ${player.id}
         GROUP BY g.season_id, ps.team_slug, t.name
         ORDER BY g.season_id DESC
-      `,
+      `),
       // Goalie game log (regular season)
-      sql`
+      rawSql(sql`
         SELECT
           ggs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score,
           ht.name as home_name, awt.name as away_name,
@@ -350,9 +351,9 @@ export async function GET(
         JOIN teams awt ON g.away_team = awt.slug
         WHERE ggs.player_id = ${player.id}
         ORDER BY g.date DESC
-      `,
+      `),
       // Playoff skater all-time stats (fall only)
-      sql`
+      rawSql(sql`
         SELECT
           COUNT(*)::int as gp,
           SUM(pgs.goals)::int as goals, SUM(pgs.assists)::int as assists, SUM(pgs.points)::int as points,
@@ -363,9 +364,9 @@ export async function GET(
         JOIN games g ON pgs.game_id = g.id AND g.is_playoff
         JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE pgs.player_id = ${player.id}
-      `,
+      `),
       // Playoff skater per-season stats
-      sql`
+      rawSql(sql`
         SELECT
           g.season_id, ps.team_slug, t.name as team_name,
           COUNT(*)::int as gp,
@@ -380,9 +381,9 @@ export async function GET(
         WHERE pgs.player_id = ${player.id}
         GROUP BY g.season_id, ps.team_slug, t.name
         ORDER BY g.season_id DESC
-      `,
+      `),
       // Playoff skater game log
-      sql`
+      rawSql(sql`
         SELECT
           pgs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score, g.is_overtime,
           ht.name as home_name, awt.name as away_name,
@@ -394,9 +395,9 @@ export async function GET(
         JOIN teams awt ON g.away_team = awt.slug
         WHERE pgs.player_id = ${player.id}
         ORDER BY g.date DESC
-      `,
+      `),
       // Playoff goalie all-time stats (fall only)
-      sql`
+      rawSql(sql`
         SELECT
           COUNT(*)::int as gp,
           SUM(goals_against)::int as ga, SUM(saves)::int as saves,
@@ -408,9 +409,9 @@ export async function GET(
         JOIN games g ON ggs.game_id = g.id AND g.is_playoff
         JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
         WHERE ggs.player_id = ${player.id}
-      `,
+      `),
       // Playoff goalie per-season stats
-      sql`
+      rawSql(sql`
         SELECT
           g.season_id, ps.team_slug, t.name as team_name,
           COUNT(*)::int as gp,
@@ -426,9 +427,9 @@ export async function GET(
         WHERE ggs.player_id = ${player.id}
         GROUP BY g.season_id, ps.team_slug, t.name
         ORDER BY g.season_id DESC
-      `,
+      `),
       // Playoff goalie game log
-      sql`
+      rawSql(sql`
         SELECT
           ggs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score,
           ht.name as home_name, awt.name as away_name,
@@ -440,9 +441,9 @@ export async function GET(
         JOIN teams awt ON g.away_team = awt.slug
         WHERE ggs.player_id = ${player.id}
         ORDER BY g.date DESC
-      `,
-      // Championships: find seasons where this player was on the team that won the final playoff game
-      sql`
+      `),
+      // Championships
+      rawSql(sql`
         SELECT DISTINCT g.season_id
         FROM games g
         JOIN player_seasons ps ON ps.player_id = ${player.id} AND ps.season_id = g.season_id
@@ -456,19 +457,19 @@ export async function GET(
             WHERE g2.season_id = g.season_id AND g2.is_playoff AND g2.status = 'final'
             ORDER BY g2.date DESC, g2.id DESC LIMIT 1
           )
-      `,
+      `),
       // Player awards
-      sql`
+      rawSql(sql`
         SELECT award_type, season_id FROM player_awards
         WHERE player_id = ${player.id}
         ORDER BY season_id DESC
-      `,
+      `),
       // Hall of Fame
-      sql`
+      rawSql(sql`
         SELECT class_year, wing, years_active, achievements FROM hall_of_fame
         WHERE player_id = ${player.id}
         LIMIT 1
-      `,
+      `),
     ])
 
     // Populate skater stats if data exists

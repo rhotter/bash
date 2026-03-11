@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema } from "@/lib/db"
+import { eq, and, sql } from "drizzle-orm"
 import type { LiveGameState, GoalEvent, PenaltyEvent } from "@/lib/scorekeeper-types"
 import { computePulledSeconds } from "@/lib/scorekeeper-types"
 
@@ -20,26 +21,33 @@ export async function POST(
 
   try {
     // 1. Read game_live state
-    const liveRows = await sql`
-      SELECT state FROM game_live WHERE game_id = ${id}
-    `
+    const liveRows = await db
+      .select({ state: schema.gameLive.state })
+      .from(schema.gameLive)
+      .where(eq(schema.gameLive.gameId, id))
     if (liveRows.length === 0) {
       return NextResponse.json({ error: "No live game data found" }, { status: 404 })
     }
 
-    const state: LiveGameState = liveRows[0].state
+    const state: LiveGameState = liveRows[0].state as LiveGameState
 
     // 2. Get game info
-    const gameRows = await sql`
-      SELECT id, season_id, home_team, away_team FROM games WHERE id = ${id}
-    `
+    const gameRows = await db
+      .select({
+        id: schema.games.id,
+        seasonId: schema.games.seasonId,
+        homeTeam: schema.games.homeTeam,
+        awayTeam: schema.games.awayTeam,
+      })
+      .from(schema.games)
+      .where(eq(schema.games.id, id))
     if (gameRows.length === 0) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 })
     }
 
     const game = gameRows[0]
-    const homeSlug = game.home_team
-    const awaySlug = game.away_team
+    const homeSlug = game.homeTeam
+    const awaySlug = game.awayTeam
 
     // 3. Compute scores from goals (excluding period 5 shootout)
     let homeScore = 0
@@ -149,11 +157,16 @@ export async function POST(
         if (overrides[pid]) goalieIds.add(pid)
       }
     } else {
-      const goalieRows = await sql`
-        SELECT player_id FROM player_seasons
-        WHERE season_id = ${game.season_id} AND is_goalie = true
-      `
-      for (const r of goalieRows) goalieIds.add(r.player_id)
+      const goalieRows = await db
+        .select({ playerId: schema.playerSeasons.playerId })
+        .from(schema.playerSeasons)
+        .where(
+          and(
+            eq(schema.playerSeasons.seasonId, game.seasonId),
+            eq(schema.playerSeasons.isGoalie, true)
+          )
+        )
+      for (const r of goalieRows) goalieIds.add(r.playerId)
     }
 
     // 9. Upsert player_game_stats for attending skaters
@@ -163,14 +176,37 @@ export async function POST(
       const hatTricks = (goalCounts.get(playerId) || 0) >= 3 ? 1 : 0
       const gwg = playerId === gwgScorerId ? 1 : 0
 
-      await sql`
-        INSERT INTO player_game_stats (player_id, game_id, goals, assists, points, gwg, ppg, shg, eng, hat_tricks, pen, pim)
-        VALUES (${playerId}, ${id}, ${stats.goals}, ${stats.assists}, ${stats.points}, ${gwg}, ${stats.ppg}, ${stats.shg}, ${stats.eng}, ${hatTricks}, ${stats.pen}, ${stats.pim})
-        ON CONFLICT (player_id, game_id) DO UPDATE SET
-          goals = ${stats.goals}, assists = ${stats.assists}, points = ${stats.points},
-          gwg = ${gwg}, ppg = ${stats.ppg}, shg = ${stats.shg}, eng = ${stats.eng},
-          hat_tricks = ${hatTricks}, pen = ${stats.pen}, pim = ${stats.pim}
-      `
+      await db
+        .insert(schema.playerGameStats)
+        .values({
+          playerId,
+          gameId: id,
+          goals: stats.goals,
+          assists: stats.assists,
+          points: stats.points,
+          gwg,
+          ppg: stats.ppg,
+          shg: stats.shg,
+          eng: stats.eng,
+          hatTricks,
+          pen: stats.pen,
+          pim: stats.pim,
+        })
+        .onConflictDoUpdate({
+          target: [schema.playerGameStats.playerId, schema.playerGameStats.gameId],
+          set: {
+            goals: stats.goals,
+            assists: stats.assists,
+            points: stats.points,
+            gwg,
+            ppg: stats.ppg,
+            shg: stats.shg,
+            eng: stats.eng,
+            hatTricks,
+            pen: stats.pen,
+            pim: stats.pim,
+          },
+        })
     }
 
     // 10. Compute goalie stats
@@ -201,13 +237,30 @@ export async function POST(
       const so = ga === 0 ? 1 : 0
       const result = homeWon ? "W" : "L"
 
-      await sql`
-        INSERT INTO goalie_game_stats (player_id, game_id, minutes, goals_against, shots_against, saves, shutouts, goalie_assists, result)
-        VALUES (${goalieId}, ${id}, ${homeGoalieMinutes}, ${ga}, ${sa}, ${sv}, ${so}, 0, ${result})
-        ON CONFLICT (player_id, game_id) DO UPDATE SET
-          minutes = ${homeGoalieMinutes}, goals_against = ${ga}, shots_against = ${sa}, saves = ${sv},
-          shutouts = ${so}, result = ${result}
-      `
+      await db
+        .insert(schema.goalieGameStats)
+        .values({
+          playerId: goalieId,
+          gameId: id,
+          minutes: homeGoalieMinutes,
+          goalsAgainst: ga,
+          shotsAgainst: sa,
+          saves: sv,
+          shutouts: so,
+          goalieAssists: 0,
+          result,
+        })
+        .onConflictDoUpdate({
+          target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
+          set: {
+            minutes: homeGoalieMinutes,
+            goalsAgainst: ga,
+            shotsAgainst: sa,
+            saves: sv,
+            shutouts: so,
+            result,
+          },
+        })
     }
 
     for (const goalieId of awayGoalies) {
@@ -217,39 +270,57 @@ export async function POST(
       const so = ga === 0 ? 1 : 0
       const result = homeWon ? "L" : "W"
 
-      await sql`
-        INSERT INTO goalie_game_stats (player_id, game_id, minutes, goals_against, shots_against, saves, shutouts, goalie_assists, result)
-        VALUES (${goalieId}, ${id}, ${awayGoalieMinutes}, ${ga}, ${sa}, ${sv}, ${so}, 0, ${result})
-        ON CONFLICT (player_id, game_id) DO UPDATE SET
-          minutes = ${awayGoalieMinutes}, goals_against = ${ga}, shots_against = ${sa}, saves = ${sv},
-          shutouts = ${so}, result = ${result}
-      `
+      await db
+        .insert(schema.goalieGameStats)
+        .values({
+          playerId: goalieId,
+          gameId: id,
+          minutes: awayGoalieMinutes,
+          goalsAgainst: ga,
+          shotsAgainst: sa,
+          saves: sv,
+          shutouts: so,
+          goalieAssists: 0,
+          result,
+        })
+        .onConflictDoUpdate({
+          target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
+          set: {
+            minutes: awayGoalieMinutes,
+            goalsAgainst: ga,
+            shotsAgainst: sa,
+            saves: sv,
+            shutouts: so,
+            result,
+          },
+        })
     }
 
     // 11. Create game_officials rows
-    await sql`DELETE FROM game_officials WHERE game_id = ${id}`
+    await db.delete(schema.gameOfficials).where(eq(schema.gameOfficials.gameId, id))
     if (state.officials.ref1) {
-      await sql`INSERT INTO game_officials (game_id, name, role) VALUES (${id}, ${state.officials.ref1}, 'ref')`
+      await db.insert(schema.gameOfficials).values({ gameId: id, name: state.officials.ref1, role: "ref" })
     }
     if (state.officials.ref2) {
-      await sql`INSERT INTO game_officials (game_id, name, role) VALUES (${id}, ${state.officials.ref2}, 'ref')`
+      await db.insert(schema.gameOfficials).values({ gameId: id, name: state.officials.ref2, role: "ref" })
     }
     if (state.officials.scorekeeper) {
-      await sql`INSERT INTO game_officials (game_id, name, role) VALUES (${id}, ${state.officials.scorekeeper}, 'scorekeeper')`
+      await db.insert(schema.gameOfficials).values({ gameId: id, name: state.officials.scorekeeper, role: "scorekeeper" })
     }
 
     // 12. Set game to final
     const notes = state.notes?.trim() || null
-    await sql`
-      UPDATE games SET
-        status = 'final',
-        home_score = ${homeScore},
-        away_score = ${awayScore},
-        is_overtime = ${isOvertime},
-        has_boxscore = true,
-        notes = ${notes}
-      WHERE id = ${id}
-    `
+    await db
+      .update(schema.games)
+      .set({
+        status: "final",
+        homeScore,
+        awayScore,
+        isOvertime,
+        hasBoxscore: true,
+        notes,
+      })
+      .where(eq(schema.games.id, id))
 
     return NextResponse.json({ ok: true, homeScore, awayScore, isOvertime })
   } catch (error) {

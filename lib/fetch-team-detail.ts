@@ -1,4 +1,5 @@
-import { sql } from "@/lib/db"
+import { db, schema, rawSql } from "@/lib/db"
+import { sql, eq } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
 import type { TeamDetail, TeamRecord, SkaterRoster, GoalieRoster } from "@/app/api/bash/team/[slug]/route"
 
@@ -7,12 +8,12 @@ export type { TeamDetail, TeamRecord, SkaterRoster, GoalieRoster }
 export async function fetchTeamDetail(slug: string, seasonParam?: string | null): Promise<TeamDetail | null> {
   const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
 
-  const teamRows = await sql`SELECT slug, name FROM teams WHERE slug = ${slug}`
+  const teamRows = await db.select().from(schema.teams).where(eq(schema.teams.slug, slug))
   if (teamRows.length === 0) return null
   const team = teamRows[0]
 
   const [skaterRows, goalieRows, gameRows] = await Promise.all([
-    sql`
+    rawSql(sql`
       SELECT
         p.id, p.name,
         COUNT(*)::int as gp,
@@ -33,8 +34,8 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
       WHERE ps.team_slug = ${slug}
       GROUP BY p.id, p.name
       ORDER BY points DESC, goals DESC, p.name ASC
-    `,
-    sql`
+    `),
+    rawSql(sql`
       SELECT
         p.id, p.name,
         COUNT(*)::int as gp,
@@ -53,8 +54,8 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
       WHERE ps.team_slug = ${slug}
       GROUP BY p.id, p.name
       ORDER BY gp DESC, p.name ASC
-    `,
-    sql`
+    `),
+    rawSql(sql`
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime,
@@ -67,7 +68,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
       ORDER BY g.date DESC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END DESC
-    `,
+    `),
   ])
 
   const skaters: SkaterRoster[] = skaterRows.map((r) => ({
@@ -149,7 +150,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
   }
 
   const [allTeamResults, totalTeams] = await Promise.all([
-    sql`
+    rawSql(sql`
       SELECT
         t.team_slug,
         SUM(CASE
@@ -172,12 +173,12 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
       WHERE t.season_id = ${seasonId}
       GROUP BY t.team_slug
       ORDER BY pts DESC, (SUM(CASE WHEN g.home_team = t.team_slug THEN g.home_score ELSE g.away_score END) - SUM(CASE WHEN g.home_team = t.team_slug THEN g.away_score ELSE g.home_score END)) DESC
-    `,
-    sql`SELECT COUNT(*)::int as count FROM season_teams WHERE season_id = ${seasonId}`,
+    `),
+    rawSql(sql`SELECT COUNT(*)::int as count FROM season_teams WHERE season_id = ${seasonId}`),
   ])
 
   record.totalTeams = totalTeams[0].count
-  const rankIdx = allTeamResults.findIndex(r => r.team_slug === slug)
+  const rankIdx = allTeamResults.findIndex((r) => r.team_slug === slug)
   record.rank = rankIdx >= 0 ? rankIdx + 1 : 0
 
   return { slug: team.slug, name: team.name, record, skaters, goalies, games }

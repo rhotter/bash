@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { db, schema } from "@/lib/db"
+import { count } from "drizzle-orm"
 import { getAllSeasons, isCurrentSeason } from "@/lib/seasons"
 
 export interface SeasonInfo {
@@ -18,22 +19,25 @@ export async function GET() {
   try {
     // Check which seasons have games or stats in the DB
     const [dbSeasons, dbStats] = await Promise.all([
-      sql`
-        SELECT season_id, COUNT(*)::int as game_count
-        FROM games
-        GROUP BY season_id
-      `,
-      sql`
-        SELECT DISTINCT season_id FROM player_season_stats
-      `,
+      db
+        .select({
+          seasonId: schema.games.seasonId,
+          gameCount: count().mapWith(Number).as("game_count"),
+        })
+        .from(schema.games)
+        .groupBy(schema.games.seasonId),
+      db
+        .selectDistinct({ seasonId: schema.playerSeasonStats.seasonId })
+        .from(schema.playerSeasonStats),
     ])
+
     const seasonGameCounts = new Map<string, number>()
     for (const row of dbSeasons) {
-      seasonGameCounts.set(row.season_id, row.game_count)
+      seasonGameCounts.set(row.seasonId, row.gameCount)
     }
     const seasonsWithStats = new Set<string>()
     for (const row of dbStats) {
-      seasonsWithStats.add(row.season_id)
+      seasonsWithStats.add(row.seasonId)
     }
 
     const allSeasons = getAllSeasons() // newest first

@@ -1,10 +1,11 @@
-import { sql } from "@/lib/db"
+import { db, schema, rawSql } from "@/lib/db"
+import { sql, eq, asc } from "drizzle-orm"
 import type { BashGameDetail, PlayerBoxScore, GoalieBoxScore } from "@/app/api/bash/game/[id]/route"
 
 export type { BashGameDetail, PlayerBoxScore, GoalieBoxScore }
 
 export async function fetchGameDetail(id: string): Promise<BashGameDetail | null> {
-  const gameRows = await sql`
+  const gameResult = await rawSql(sql`
     SELECT g.*,
       ht.name as home_team_name,
       awt.name as away_team_name
@@ -12,14 +13,14 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     JOIN teams ht ON g.home_team = ht.slug
     JOIN teams awt ON g.away_team = awt.slug
     WHERE g.id = ${id}
-  `
+  `)
 
-  if (gameRows.length === 0) return null
+  if (gameResult.length === 0) return null
 
-  const game = gameRows[0]
+  const game = gameResult[0]
 
   async function getPlayerStats(gameId: string, teamSlug: string, seasonId: string): Promise<PlayerBoxScore[]> {
-    const rows = await sql`
+    const result = await rawSql(sql`
       SELECT p.id, p.name,
         pgs.goals, pgs.assists, pgs.points,
         pgs.gwg, pgs.ppg, pgs.shg, pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim
@@ -28,8 +29,8 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
       JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       WHERE pgs.game_id = ${gameId} AND ps.team_slug = ${teamSlug}
       ORDER BY pgs.points DESC, pgs.goals DESC, p.name ASC
-    `
-    return rows.map((r) => ({
+    `)
+    return result.map((r) => ({
       id: r.id, name: r.name,
       goals: r.goals, assists: r.assists, points: r.points,
       gwg: r.gwg, ppg: r.ppg, shg: r.shg, eng: r.eng,
@@ -38,7 +39,7 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
   }
 
   async function getGoalieStats(gameId: string, teamSlug: string, seasonId: string): Promise<GoalieBoxScore[]> {
-    const rows = await sql`
+    const result = await rawSql(sql`
       SELECT p.id, p.name,
         ggs.minutes, ggs.goals_against, ggs.shots_against, ggs.saves,
         ggs.shutouts, ggs.goalie_assists, ggs.result
@@ -46,8 +47,8 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
       JOIN players p ON ggs.player_id = p.id
       JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       WHERE ggs.game_id = ${gameId} AND ps.team_slug = ${teamSlug}
-    `
-    return rows.map((r) => ({
+    `)
+    return result.map((r) => ({
       id: r.id, name: r.name,
       minutes: r.minutes,
       goalsAgainst: r.goals_against,
@@ -62,12 +63,19 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     }))
   }
 
+  // Officials — simple query using Drizzle query builder
+  const officialsPromise = db
+    .select({ name: schema.gameOfficials.name, role: schema.gameOfficials.role })
+    .from(schema.gameOfficials)
+    .where(eq(schema.gameOfficials.gameId, id))
+    .orderBy(asc(schema.gameOfficials.role), asc(schema.gameOfficials.name))
+
   const [homePlayers, awayPlayers, homeGoalies, awayGoalies, officialRows] = await Promise.all([
     getPlayerStats(id, game.home_team, game.season_id),
     getPlayerStats(id, game.away_team, game.season_id),
     getGoalieStats(id, game.home_team, game.season_id),
     getGoalieStats(id, game.away_team, game.season_id),
-    sql`SELECT name, role FROM game_officials WHERE game_id = ${id} ORDER BY role, name`,
+    officialsPromise,
   ])
 
   return {

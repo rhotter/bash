@@ -16,7 +16,7 @@ Bay Area Street Hockey (BASH) league stats website. Displays scores, standings, 
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router) with React 19
-- **Database:** Neon Postgres via `@neondatabase/serverless` — raw SQL, no ORM
+- **Database:** Neon Postgres via Drizzle ORM (`drizzle-orm/neon-http`) + `rawSql()` helper for complex queries
 - **Styling:** Tailwind CSS v4 with oklch() color variables
 - **UI:** shadcn/ui (Radix UI primitives) in `components/ui/`
 - **Client Data:** SWR hooks with server-side fallback data
@@ -39,7 +39,7 @@ Each page follows: async Server Component (data fetch + `generateMetadata`) → 
 - `app/api/bash/` — REST API routes with Cache-Control headers
 - `lib/fetch-*.ts` — Server-side data fetching functions (raw SQL queries)
 - `lib/hockey-data.ts` — SWR hooks for client-side data
-- `lib/db/schema.sql` — Postgres schema (9 tables)
+- `lib/db/schema.ts` — Drizzle ORM schema (14 tables)
 - `lib/seasons.ts` — Hardcoded season definitions with Sportability league IDs; current season: "2025-2026"
 - `components/` — Page-level components (scores-tab, standings-tab, stats-tab, etc.)
 - `scripts/` — DB seeding and data maintenance utilities

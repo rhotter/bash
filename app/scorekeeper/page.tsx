@@ -1,4 +1,5 @@
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
 import { formatGameDate } from "@/lib/format-time"
 import { SiteHeader } from "@/components/site-header"
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic"
 export default async function ScorekeeperIndexPage() {
   const season = getCurrentSeason()
 
-  const games = await sql`
+  const games = await rawSql(sql`
     SELECT g.id, g.date, g.time, g.status,
       g.home_score, g.away_score,
       ht.name as home_team_name,
@@ -19,7 +20,7 @@ export default async function ScorekeeperIndexPage() {
     JOIN teams awt ON g.away_team = awt.slug
     WHERE g.season_id = ${season.id}
     ORDER BY g.date ASC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END ASC
-  `
+  `)
 
   // Group by date
   const grouped: Record<string, typeof games> = {}

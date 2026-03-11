@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
 
 export interface GoalieRoster {
@@ -81,14 +82,14 @@ export async function GET(
 
   try {
     // Check team exists
-    const teamRows = await sql`SELECT slug, name FROM teams WHERE slug = ${slug}`
+    const teamRows = await rawSql(sql`SELECT slug, name FROM teams WHERE slug = ${slug}`)
     if (teamRows.length === 0) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 })
     }
     const team = teamRows[0]
 
     // Skaters with aggregated stats — join through games to scope by season (bug fix)
-    const skaterRows = await sql`
+    const skaterRows = await rawSql(sql`
       SELECT
         p.id, p.name,
         COUNT(*)::int as gp,
@@ -109,7 +110,7 @@ export async function GET(
       WHERE ps.team_slug = ${slug}
       GROUP BY p.id, p.name
       ORDER BY points DESC, goals DESC, p.name ASC
-    `
+    `)
 
     const skaters: SkaterRoster[] = skaterRows.map((r) => ({
       id: r.id,
@@ -130,7 +131,7 @@ export async function GET(
     }))
 
     // Goalies with aggregated stats — join through games to scope by season (bug fix)
-    const goalieRows = await sql`
+    const goalieRows = await rawSql(sql`
       SELECT
         p.id, p.name,
         COUNT(*)::int as gp,
@@ -149,7 +150,7 @@ export async function GET(
       WHERE ps.team_slug = ${slug}
       GROUP BY p.id, p.name
       ORDER BY gp DESC, p.name ASC
-    `
+    `)
 
     const goalies: GoalieRoster[] = goalieRows.map((r) => {
       const svPct = r.sa > 0 ? (r.saves / r.sa) : 0
@@ -172,7 +173,7 @@ export async function GET(
     })
 
     // Team games
-    const gameRows = await sql`
+    const gameRows = await rawSql(sql`
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime,
@@ -185,7 +186,7 @@ export async function GET(
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
       ORDER BY g.date DESC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END DESC
-    `
+    `)
 
     const games = gameRows.map((r) => {
       const isHome = r.home_team === slug
@@ -229,7 +230,7 @@ export async function GET(
     }
 
     // Compute standings rank from all teams' results
-    const allTeamResults = await sql`
+    const allTeamResults = await rawSql(sql`
       SELECT
         t.team_slug,
         SUM(CASE
@@ -252,8 +253,8 @@ export async function GET(
       WHERE t.season_id = ${seasonId}
       GROUP BY t.team_slug
       ORDER BY pts DESC, (SUM(CASE WHEN g.home_team = t.team_slug THEN g.home_score ELSE g.away_score END) - SUM(CASE WHEN g.home_team = t.team_slug THEN g.away_score ELSE g.home_score END)) DESC
-    `
-    const totalTeams = await sql`SELECT COUNT(*)::int as count FROM season_teams WHERE season_id = ${seasonId}`
+    `)
+    const totalTeams = await rawSql(sql`SELECT COUNT(*)::int as count FROM season_teams WHERE season_id = ${seasonId}`)
     record.totalTeams = totalTeams[0].count
     const rankIdx = allTeamResults.findIndex(r => r.team_slug === slug)
     record.rank = rankIdx >= 0 ? rankIdx + 1 : 0
