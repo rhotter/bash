@@ -428,7 +428,23 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         const cell0Text = stripHtml(cells[0])
 
         // Detect header row to determine column order
+        // Note: team name ("Reign Goalies") and column headers (GP, Min, ...) are in the same row
         if (cells.length >= 7 && /^(gp|games)$/i.test(stripHtml(cells[1]))) {
+          // Extract team name from this combined header row
+          if (/\bGoalies$/i.test(cell0Text)) {
+            const teamMatch = cell0Text.match(/^(.+?)\s+Goalies$/i)
+            if (teamMatch) {
+              const teamName = teamMatch[1].trim().toLowerCase()
+              currentTeamSlug = teamNameToSlug[teamName] || null
+              if (!currentTeamSlug) {
+                const slug = nameToSlug(teamMatch[1].trim())
+                await db.insert(schema.teams).values({ slug, name: teamMatch[1].trim() }).onConflictDoNothing()
+                await db.insert(schema.seasonTeams).values({ seasonId, teamSlug: slug }).onConflictDoNothing()
+                teamNameToSlug[teamName] = slug
+                currentTeamSlug = slug
+              }
+            }
+          }
           for (let c = 0; c < cells.length; c++) {
             const hdr = stripHtml(cells[c]).toLowerCase()
             if (hdr === "saves" || hdr === "svs") savesCol = c
@@ -459,7 +475,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         const playerName = cell0Text
         if (!playerName || /total/i.test(playerName) || /^(&nbsp;|\s*)$/.test(playerName)) continue
 
-        const minutes = parseInt(stripHtml(cells[2])) || 0
+        const seconds = (parseInt(stripHtml(cells[2])) || 0) * 60
         const ga = parseInt(stripHtml(cells[3])) || 0
         const shotsAgainst = parseInt(stripHtml(cells[shotsCol])) || 0
         const saves = parseInt(stripHtml(cells[savesCol])) || 0
@@ -485,11 +501,11 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
 
         await db
           .insert(schema.goalieGameStats)
-          .values({ playerId, gameId, minutes, goalsAgainst: ga, shotsAgainst, saves, shutouts, goalieAssists, result })
+          .values({ playerId, gameId, seconds, goalsAgainst: ga, shotsAgainst, saves, shutouts, goalieAssists, result })
           .onConflictDoUpdate({
             target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
             set: {
-              minutes: sql`EXCLUDED.minutes`,
+              seconds: sql`EXCLUDED.seconds`,
               goalsAgainst: sql`EXCLUDED.goals_against`,
               shotsAgainst: sql`EXCLUDED.shots_against`,
               saves: sql`EXCLUDED.saves`,

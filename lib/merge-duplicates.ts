@@ -284,7 +284,7 @@ export async function mergeDuplicatePlayers() {
         DELETE FROM goalie_game_stats d
         USING goalie_game_stats c
         WHERE d.player_id = ${dupeId} AND c.player_id = ${canonicalId}
-          AND d.game_id = c.game_id AND c.minutes >= d.minutes
+          AND d.game_id = c.game_id AND c.seconds >= d.seconds
       `)
       await rawSql(sql`
         DELETE FROM goalie_game_stats

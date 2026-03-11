@@ -41,7 +41,7 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
   async function getGoalieStats(gameId: string, teamSlug: string, seasonId: string): Promise<GoalieBoxScore[]> {
     const result = await rawSql(sql`
       SELECT p.id, p.name,
-        ggs.minutes, ggs.goals_against, ggs.shots_against, ggs.saves,
+        ggs.seconds, ggs.goals_against, ggs.shots_against, ggs.saves,
         ggs.shutouts, ggs.goalie_assists, ggs.result
       FROM goalie_game_stats ggs
       JOIN players p ON ggs.player_id = p.id
@@ -50,7 +50,7 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     `)
     return result.map((r) => ({
       id: r.id, name: r.name,
-      minutes: r.minutes,
+      seconds: r.seconds,
       goalsAgainst: r.goals_against,
       shotsAgainst: r.shots_against,
       saves: r.saves,

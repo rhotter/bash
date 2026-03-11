@@ -240,11 +240,11 @@ export async function POST(
       // If no mid-game changes, all goalies split evenly (original behavior)
       if (teamChanges.length === 0) {
         const pulledSecs = computePulledSeconds(pulls, teamSlug)
-        const minutes = Math.max(0, Math.round((totalGameSecs - pulledSecs) / 60))
+        const seconds = Math.max(0, totalGameSecs - pulledSecs)
         const ga = goalsAgainstEvents.length
         return teamGoalies.map((goalieId) => ({
           goalieId,
-          minutes,
+          seconds,
           goalsAgainst: ga,
           shotsAgainst: totalShots,
           saves: totalShots - ga,
@@ -329,7 +329,7 @@ export async function POST(
         const ga = stats.goalsAgainst
         return {
           goalieId,
-          minutes: Math.max(0, Math.round(stats.totalSecs / 60)),
+          seconds: Math.max(0, stats.totalSecs),
           goalsAgainst: ga,
           shotsAgainst: sa,
           saves: sa - ga,
@@ -356,7 +356,7 @@ export async function POST(
         .values({
           playerId: gs.goalieId,
           gameId: id,
-          minutes: gs.minutes,
+          seconds: gs.seconds,
           goalsAgainst: gs.goalsAgainst,
           shotsAgainst: gs.shotsAgainst,
           saves: gs.saves,
@@ -367,7 +367,7 @@ export async function POST(
         .onConflictDoUpdate({
           target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
           set: {
-            minutes: gs.minutes,
+            seconds: gs.seconds,
             goalsAgainst: gs.goalsAgainst,
             shotsAgainst: gs.shotsAgainst,
             saves: gs.saves,

@@ -138,7 +138,7 @@ export async function GET(
         SUM(ggs.goals_against)::int as ga,
         SUM(ggs.saves)::int as saves,
         SUM(ggs.shots_against)::int as sa,
-        SUM(ggs.minutes)::int as minutes,
+        SUM(ggs.seconds)::int as seconds,
         SUM(ggs.shutouts)::int as shutouts,
         SUM(ggs.goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE ggs.result = 'W')::int as wins,
@@ -154,7 +154,7 @@ export async function GET(
 
     const goalies: GoalieRoster[] = goalieRows.map((r) => {
       const svPct = r.sa > 0 ? (r.saves / r.sa) : 0
-      const gaa = r.minutes > 0 ? (r.ga / r.minutes) * 60 : 0
+      const gaa = r.seconds > 0 ? (r.ga / r.seconds) * 3600 : 0
       return {
         id: r.id,
         name: r.name,

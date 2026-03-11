@@ -145,7 +145,7 @@ export const goalieGameStats = pgTable(
     gameId: text("game_id")
       .notNull()
       .references(() => games.id),
-    minutes: integer("minutes").notNull().default(0),
+    seconds: integer("seconds").notNull().default(0),
     goalsAgainst: integer("goals_against").notNull().default(0),
     shotsAgainst: integer("shots_against").notNull().default(0),
     saves: integer("saves").notNull().default(0),

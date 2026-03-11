@@ -127,7 +127,7 @@ describe("Schema matches database", () => {
     const cols = rows.map((r) => r.column_name)
     expect(cols).toContain("player_id")
     expect(cols).toContain("game_id")
-    expect(cols).toContain("minutes")
+    expect(cols).toContain("seconds")
     expect(cols).toContain("goals_against")
     expect(cols).toContain("shots_against")
     expect(cols).toContain("saves")

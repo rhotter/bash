@@ -205,7 +205,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         const playerName = cell0Text
         if (!playerName || /total/i.test(playerName) || /^(&nbsp;|\s*)$/.test(playerName)) continue
 
-        const minutes = parseInt(stripHtml(cells[2])) || 0
+        const seconds = (parseInt(stripHtml(cells[2])) || 0) * 60
         const ga = parseInt(stripHtml(cells[3])) || 0
         const shotsAgainst = parseInt(stripHtml(cells[5])) || 0
         const saves = parseInt(stripHtml(cells[6])) || 0
@@ -228,10 +228,10 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
         `)
 
         await rawSql(sql`
-          INSERT INTO goalie_game_stats (player_id, game_id, minutes, goals_against, shots_against, saves, shutouts, goalie_assists, result)
-          VALUES (${playerId}, ${gameId}, ${minutes}, ${ga}, ${shotsAgainst}, ${saves}, ${shutouts}, ${goalieAssists}, ${result})
+          INSERT INTO goalie_game_stats (player_id, game_id, seconds, goals_against, shots_against, saves, shutouts, goalie_assists, result)
+          VALUES (${playerId}, ${gameId}, ${seconds}, ${ga}, ${shotsAgainst}, ${saves}, ${shutouts}, ${goalieAssists}, ${result})
           ON CONFLICT (player_id, game_id) DO UPDATE SET
-            minutes = EXCLUDED.minutes, goals_against = EXCLUDED.goals_against,
+            seconds = EXCLUDED.seconds, goals_against = EXCLUDED.goals_against,
             shots_against = EXCLUDED.shots_against, saves = EXCLUDED.saves,
             shutouts = EXCLUDED.shutouts, goalie_assists = EXCLUDED.goalie_assists,
             result = EXCLUDED.result

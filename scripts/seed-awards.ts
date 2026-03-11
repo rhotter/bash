@@ -511,12 +511,12 @@ async function computePostSeasonAwards(): Promise<{ awardType: string; seasonId:
     const bestGoalie = await rawSql(sql`
       SELECT p.id, p.name,
         COUNT(*)::int as gp,
-        SUM(ggs.goals_against)::float / NULLIF(SUM(ggs.minutes), 0) * 60 as gaa
+        SUM(ggs.goals_against)::float / NULLIF(SUM(ggs.seconds), 0) * 3600 as gaa
       FROM goalie_game_stats ggs
       JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId} AND NOT g.is_playoff AND g.status = 'final'
       JOIN players p ON ggs.player_id = p.id
       GROUP BY p.id, p.name
-      HAVING COUNT(*) >= ${MIN_GOALIE_GAMES} AND SUM(ggs.minutes) > 0
+      HAVING COUNT(*) >= ${MIN_GOALIE_GAMES} AND SUM(ggs.seconds) > 0
       ORDER BY gaa ASC
       LIMIT 1
     `)

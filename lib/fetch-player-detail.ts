@@ -80,12 +80,12 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function buildGoalieStats(s: any): GoalieStats {
     const svPct = s.sa > 0 ? (s.saves / s.sa) : 0
-    const gaa = s.minutes > 0 ? (s.ga / s.minutes) * 60 : 0
+    const gaa = s.seconds > 0 ? (s.ga / s.seconds) * 3600 : 0
     return {
       gp: s.gp, wins: s.wins, losses: s.losses,
       gaa: gaa.toFixed(2), savePercentage: svPct.toFixed(3),
       saves: s.saves, goalsAgainst: s.ga, shotsAgainst: s.sa,
-      shutouts: s.shutouts, goalieAssists: s.goalie_assists, minutes: s.minutes,
+      shutouts: s.shutouts, goalieAssists: s.goalie_assists, seconds: s.seconds,
     }
   }
 
@@ -200,7 +200,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -213,7 +213,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -228,7 +228,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
         g.season_id, ps.team_slug, t.name as team_name,
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -245,7 +245,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         ggs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score,
         ht.name as home_name, awt.name as away_name,
-        ggs.minutes, ggs.goals_against, ggs.shots_against, ggs.saves,
+        ggs.seconds, ggs.goals_against, ggs.shots_against, ggs.saves,
         ggs.shutouts, ggs.goalie_assists, ggs.result
       FROM goalie_game_stats ggs
       JOIN games g ON ggs.game_id = g.id AND g.season_id = ${playerSeasonId} AND NOT g.is_playoff
@@ -339,7 +339,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -354,7 +354,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
         g.season_id, ps.team_slug, t.name as team_name,
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -371,7 +371,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         ggs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score,
         ht.name as home_name, awt.name as away_name,
-        ggs.minutes, ggs.goals_against, ggs.shots_against, ggs.saves,
+        ggs.seconds, ggs.goals_against, ggs.shots_against, ggs.saves,
         ggs.shutouts, ggs.goalie_assists, ggs.result
       FROM goalie_game_stats ggs
       JOIN games g ON ggs.game_id = g.id AND g.season_id = ${playerSeasonId} AND g.is_playoff
@@ -448,7 +448,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -497,7 +497,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       SELECT
         COUNT(*)::int as gp,
         SUM(goals_against)::int as ga, SUM(saves)::int as saves,
-        SUM(shots_against)::int as sa, SUM(minutes)::int as minutes,
+        SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses
@@ -576,7 +576,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       isHome,
       teamScore: isHome ? r.home_score : r.away_score,
       opponentScore: isHome ? r.away_score : r.home_score,
-      minutes: r.minutes, goalsAgainst: r.goals_against,
+      seconds: r.seconds, goalsAgainst: r.goals_against,
       shotsAgainst: r.shots_against, saves: r.saves,
       savePercentage: r.shots_against > 0 ? (r.saves / r.shots_against).toFixed(3) : "0.000",
       shutouts: r.shutouts, goalieAssists: r.goalie_assists,
@@ -645,7 +645,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
       isHome,
       teamScore: isHome ? r.home_score : r.away_score,
       opponentScore: isHome ? r.away_score : r.home_score,
-      minutes: r.minutes, goalsAgainst: r.goals_against,
+      seconds: r.seconds, goalsAgainst: r.goals_against,
       shotsAgainst: r.shots_against, saves: r.saves,
       savePercentage: r.shots_against > 0 ? (r.saves / r.shots_against).toFixed(3) : "0.000",
       shutouts: r.shutouts, goalieAssists: r.goalie_assists,
