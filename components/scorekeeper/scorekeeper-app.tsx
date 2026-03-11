@@ -17,7 +17,7 @@ import { Play, Pause, Plus, Minus, ChevronRight, X, AlertTriangle } from "lucide
 import Link from "next/link"
 import type {
   LiveGameState, GoalEvent, PenaltyEvent, TimeoutEvent, RosterPlayer, ShootoutAttempt,
-  ActivePenalty, PowerPlayState, GoaliePullEvent,
+  ActivePenalty, PowerPlayState, GoaliePullEvent, GoalieChangeEvent,
 } from "@/lib/scorekeeper-types"
 import {
   createInitialState, periodLabel, formatClock, computeCurrentClock,
@@ -122,7 +122,12 @@ export function ScorekeeperApp({
   const [editingTimeoutId, setEditingTimeoutId] = useState<string | null>(null)
 
   // Undo confirmation
-  const [confirmUndo, setConfirmUndo] = useState<{ id: string; type: "goal" | "penalty" | "timeout" } | null>(null)
+  const [confirmUndo, setConfirmUndo] = useState<{ id: string; type: "goal" | "penalty" | "timeout" | "goalieChange" } | null>(null)
+
+  // Goalie change prompt (mid-game vs correction)
+  const [goalieChangePrompt, setGoalieChangePrompt] = useState<{
+    team: string; newGoalieId: string; oldGoalieId: string
+  } | null>(null)
 
   // Timeout countdown
   const [activeTimeout, setActiveTimeout] = useState<{ team: string; startedAt: number } | null>(null)
@@ -502,6 +507,20 @@ export function ScorekeeperApp({
   }
 
   function setGoalie(team: string, playerId: string) {
+    const oldGoalieId = currentGoalieId(team)
+    const isLive = state.period >= 1
+    const isActualChange = oldGoalieId !== playerId && oldGoalieId !== "none" && playerId !== "none"
+
+    // If mid-game and switching from one goalie to another, prompt the user
+    if (isLive && isActualChange) {
+      setGoalieChangePrompt({ team, newGoalieId: playerId, oldGoalieId })
+      return
+    }
+
+    applyGoalieChange(team, playerId)
+  }
+
+  function applyGoalieChange(team: string, playerId: string) {
     updateState((prev) => {
       const teamRoster = team === homeSlug ? homeRoster : awayRoster
       const next = { ...(prev.goalieOverrides ?? {}) }
@@ -512,6 +531,28 @@ export function ScorekeeperApp({
         next[Number(playerId)] = true
       }
       return { ...prev, goalieOverrides: next }
+    })
+  }
+
+  function handleGoalieSubstitution(team: string, outGoalieId: string, inGoalieId: string) {
+    const clock = currentClockString()
+    updateState((prev) => {
+      const teamRoster = team === homeSlug ? homeRoster : awayRoster
+      const next = { ...(prev.goalieOverrides ?? {}) }
+      for (const p of teamRoster) {
+        next[p.id] = false
+      }
+      next[Number(inGoalieId)] = true
+      const changes = prev.goalieChanges ?? []
+      const event: GoalieChangeEvent = {
+        id: crypto.randomUUID(),
+        team,
+        period: prev.period,
+        clock,
+        outGoalieId: Number(outGoalieId),
+        inGoalieId: Number(inGoalieId),
+      }
+      return { ...prev, goalieOverrides: next, goalieChanges: [...changes, event] }
     })
   }
 
@@ -1220,7 +1261,7 @@ export function ScorekeeperApp({
         {!isPreGame && (
           <div className="mt-5">
             <SectionHeader>Events</SectionHeader>
-            {state.goals.length === 0 && state.penalties.length === 0 && (state.timeouts ?? []).length === 0 && (
+            {state.goals.length === 0 && state.penalties.length === 0 && (state.timeouts ?? []).length === 0 && (state.goalieChanges ?? []).length === 0 && (
               <p className="text-[11px] text-muted-foreground/40 text-center py-6">No events yet</p>
             )}
             <div className="space-y-0">
@@ -1228,6 +1269,7 @@ export function ScorekeeperApp({
                 ...state.goals.map((g) => ({ type: "goal" as const, event: g, period: g.period, clock: g.clock })),
                 ...state.penalties.map((p) => ({ type: "penalty" as const, event: p, period: p.period, clock: p.clock })),
                 ...(state.timeouts ?? []).map((t) => ({ type: "timeout" as const, event: t, period: t.period, clock: t.clock })),
+                ...(state.goalieChanges ?? []).map((c) => ({ type: "goalieChange" as const, event: c, period: c.period, clock: c.clock })),
               ]
                 .sort((a, b) => a.period - b.period || parseClockString(b.clock) - parseClockString(a.clock))
                 .map((item) => {
@@ -1274,7 +1316,7 @@ export function ScorekeeperApp({
                         </button>
                       </div>
                     )
-                  } else {
+                  } else if (item.type === "timeout") {
                     const t = item.event as TimeoutEvent
                     const teamName = t.team === homeSlug ? homeTeam : awayTeam
                     return (
@@ -1286,6 +1328,27 @@ export function ScorekeeperApp({
                         <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(t.period)} {clockToElapsedDisplay(t.clock, t.period)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: t.id, type: "timeout" }) }}
+                          className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )
+                  } else {
+                    const c = item.event as GoalieChangeEvent
+                    const teamName = c.team === homeSlug ? homeTeam : awayTeam
+                    return (
+                      <div key={c.id} className="flex items-center gap-2 py-2 border-t border-border/20">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-400/60 w-8 shrink-0">SUB</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[11px] text-muted-foreground">{nameById(c.outGoalieId)}</span>
+                          <span className="text-[10px] text-muted-foreground/50"> → </span>
+                          <span className="text-[11px] font-medium">{nameById(c.inGoalieId)}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(c.period)} {clockToElapsedDisplay(c.clock, c.period)}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: c.id, type: "goalieChange" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
                         >
                           <X className="h-3 w-3" />
@@ -1726,11 +1789,48 @@ export function ScorekeeperApp({
         </DrawerContent>
       </Drawer>
 
+      {/* ─── Goalie Change Prompt ──────────────────────────────── */}
+      <Dialog open={!!goalieChangePrompt} onOpenChange={(open) => { if (!open) setGoalieChangePrompt(null) }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Goalie Change</DialogTitle>
+          </DialogHeader>
+          {goalieChangePrompt && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Switching from <span className="font-medium text-foreground">{nameById(Number(goalieChangePrompt.oldGoalieId))}</span> to <span className="font-medium text-foreground">{nameById(Number(goalieChangePrompt.newGoalieId))}</span>
+              </p>
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full bg-foreground text-background hover:bg-foreground/90"
+                  onClick={() => {
+                    handleGoalieSubstitution(goalieChangePrompt.team, goalieChangePrompt.oldGoalieId, goalieChangePrompt.newGoalieId)
+                    setGoalieChangePrompt(null)
+                  }}
+                >
+                  Substitution — replacing now
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    applyGoalieChange(goalieChangePrompt.team, goalieChangePrompt.newGoalieId)
+                    setGoalieChangePrompt(null)
+                  }}
+                >
+                  Correction — been in net all game
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Undo Confirmation ──────────────────────────────────── */}
       <Dialog open={!!confirmUndo} onOpenChange={(open) => { if (!open) setConfirmUndo(null) }}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Remove {confirmUndo?.type === "goal" ? "goal" : confirmUndo?.type === "penalty" ? "penalty" : "timeout"}?</DialogTitle>
+            <DialogTitle>Remove {confirmUndo?.type === "goal" ? "goal" : confirmUndo?.type === "penalty" ? "penalty" : confirmUndo?.type === "goalieChange" ? "goalie change" : "timeout"}?</DialogTitle>
           </DialogHeader>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setConfirmUndo(null)} className="flex-1">
@@ -1741,6 +1841,7 @@ export function ScorekeeperApp({
               onClick={() => {
                 if (confirmUndo?.type === "goal") undoGoal(confirmUndo.id)
                 else if (confirmUndo?.type === "penalty") undoPenalty(confirmUndo.id)
+                else if (confirmUndo?.type === "goalieChange") updateState((prev) => ({ ...prev, goalieChanges: (prev.goalieChanges ?? []).filter((x) => x.id !== confirmUndo.id) }))
                 else if (confirmUndo?.type === "timeout") updateState((prev) => ({ ...prev, timeouts: (prev.timeouts ?? []).filter((x) => x.id !== confirmUndo.id) }))
                 setConfirmUndo(null)
               }}

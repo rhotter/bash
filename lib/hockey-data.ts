@@ -106,11 +106,11 @@ export function useSeasons() {
   }
 }
 
-export function useLiveGame(gameId: string | null) {
+export function useLiveGame(gameId: string | null, fallbackData?: unknown) {
   const { data, error, isLoading } = useSWR(
     gameId ? `/api/bash/game/${gameId}/live` : null,
     fetcher,
-    { refreshInterval: 10_000, revalidateOnFocus: true, dedupingInterval: 5_000 }
+    { refreshInterval: 10_000, revalidateOnFocus: true, dedupingInterval: 5_000, fallbackData }
   )
 
   return {

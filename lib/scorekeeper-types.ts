@@ -47,6 +47,15 @@ export interface GoaliePullEvent {
   returnedAt: string | null // "M:SS" clock when returned, null if still pulled
 }
 
+export interface GoalieChangeEvent {
+  id: string
+  team: string
+  period: number
+  clock: string // "M:SS" countdown clock when change happened
+  outGoalieId: number // goalie leaving the net
+  inGoalieId: number // goalie entering the net
+}
+
 export interface LiveGameState {
   period: number // 0=pre-game, 1-3=regulation, 4=OT, 5=shootout
   clockSeconds: number // countdown seconds remaining
@@ -62,6 +71,7 @@ export interface LiveGameState {
   penalties: PenaltyEvent[]
   timeouts: TimeoutEvent[]
   goaliePulls: GoaliePullEvent[]
+  goalieChanges: GoalieChangeEvent[]
   shootout: ShootoutState | null
   threeStars: number[] | null // [1st, 2nd, 3rd] player IDs
   goalieOverrides: Record<number, boolean> // player ID → is goalie (set by scorekeeper)
@@ -92,6 +102,7 @@ export function createInitialState(): LiveGameState {
     penalties: [],
     timeouts: [],
     goaliePulls: [],
+    goalieChanges: [],
     shootout: null,
     threeStars: null,
     goalieOverrides: {},

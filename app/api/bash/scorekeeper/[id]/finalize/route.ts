@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
 import { eq, and, sql } from "drizzle-orm"
-import type { LiveGameState, GoalEvent, PenaltyEvent } from "@/lib/scorekeeper-types"
-import { computePulledSeconds } from "@/lib/scorekeeper-types"
+import type { LiveGameState, GoalEvent, PenaltyEvent, GoalieChangeEvent } from "@/lib/scorekeeper-types"
+import { computePulledSeconds, clockToElapsed, parseClockString } from "@/lib/scorekeeper-types"
 
 function validatePin(request: Request): boolean {
   const pin = request.headers.get("x-pin")
@@ -215,89 +215,164 @@ export async function POST(
     const totalHomeShots = state.homeShots.reduce((a, b) => a + b, 0)
     const totalAwayShots = state.awayShots.reduce((a, b) => a + b, 0)
 
-    const homeGoalsAgainst = state.goals.filter((g) => g.team === awaySlug && g.period <= 4).length
-    const awayGoalsAgainst = state.goals.filter((g) => g.team === homeSlug && g.period <= 4).length
-
-    // Home goalies face away shots
-    const homeGoalies = state.homeAttendance.filter((pid) => goalieIds.has(pid))
-    const awayGoalies = state.awayAttendance.filter((pid) => goalieIds.has(pid))
-
     const homeWon = homeScore > awayScore
-
-    // Compute goalie minutes: regulation (60) + OT (5 if played) minus pulled time
     const totalGameSecs = isOvertime ? 3900 : 3600
     const pulls = state.goaliePulls ?? []
-    const homePulledSecs = computePulledSeconds(pulls, homeSlug)
-    const awayPulledSecs = computePulledSeconds(pulls, awaySlug)
-    const homeGoalieMinutes = Math.max(0, Math.round((totalGameSecs - homePulledSecs) / 60))
-    const awayGoalieMinutes = Math.max(0, Math.round((totalGameSecs - awayPulledSecs) / 60))
+    const goalieChanges = state.goalieChanges ?? []
 
-    // Delete old goalie stats for this game before inserting (prevents duplicates
-    // when scorekeeper finalizes with different goalies than sync imported)
+    // Delete old goalie stats for this game before inserting
     await db.delete(schema.goalieGameStats).where(eq(schema.goalieGameStats.gameId, id))
 
-    for (const goalieId of homeGoalies) {
-      const sa = totalAwayShots
-      const ga = homeGoalsAgainst
-      const sv = sa - ga
-      const so = ga === 0 ? 1 : 0
-      const result = homeWon ? "W" : "L"
+    // Helper: compute per-goalie stats for a team
+    function computeTeamGoalieStats(
+      teamSlug: string,
+      teamAttendance: number[],
+      goalsAgainstEvents: GoalEvent[], // goals scored by the opposing team
+      totalShots: number, // total shots by the opposing team
+      isHome: boolean
+    ) {
+      const teamGoalies = teamAttendance.filter((pid) => goalieIds.has(pid))
+      if (teamGoalies.length === 0) return []
 
-      await db
-        .insert(schema.goalieGameStats)
-        .values({
-          playerId: goalieId,
-          gameId: id,
-          minutes: homeGoalieMinutes,
+      const teamChanges = goalieChanges.filter((c) => c.team === teamSlug)
+        .sort((a, b) => clockToElapsed(a.period, parseClockString(a.clock)) - clockToElapsed(b.period, parseClockString(b.clock)))
+
+      // If no mid-game changes, all goalies split evenly (original behavior)
+      if (teamChanges.length === 0) {
+        const pulledSecs = computePulledSeconds(pulls, teamSlug)
+        const minutes = Math.max(0, Math.round((totalGameSecs - pulledSecs) / 60))
+        const ga = goalsAgainstEvents.length
+        return teamGoalies.map((goalieId) => ({
+          goalieId,
+          minutes,
+          goalsAgainst: ga,
+          shotsAgainst: totalShots,
+          saves: totalShots - ga,
+          shutouts: ga === 0 && teamGoalies.length === 1 ? 1 : 0,
+          result: isHome ? (homeWon ? "W" : "L") : (homeWon ? "L" : "W"),
+        }))
+      }
+
+      // Build goalie time segments from change events
+      // First goalie is the outGoalieId from the first change (they started)
+      interface GoalieSegment { goalieId: number; startElapsed: number; endElapsed: number }
+      const segments: GoalieSegment[] = []
+
+      // Starting goalie
+      const firstChange = teamChanges[0]
+      segments.push({
+        goalieId: firstChange.outGoalieId,
+        startElapsed: 0,
+        endElapsed: clockToElapsed(firstChange.period, parseClockString(firstChange.clock)),
+      })
+
+      // Middle segments (between changes)
+      for (let i = 0; i < teamChanges.length; i++) {
+        const change = teamChanges[i]
+        const nextChange = teamChanges[i + 1]
+        segments.push({
+          goalieId: change.inGoalieId,
+          startElapsed: clockToElapsed(change.period, parseClockString(change.clock)),
+          endElapsed: nextChange
+            ? clockToElapsed(nextChange.period, parseClockString(nextChange.clock))
+            : totalGameSecs,
+        })
+      }
+
+      // Merge segments for the same goalie (if a goalie comes back in)
+      const goalieStatsMap = new Map<number, { totalSecs: number; goalsAgainst: number }>()
+      for (const seg of segments) {
+        const existing = goalieStatsMap.get(seg.goalieId) ?? { totalSecs: 0, goalsAgainst: 0 }
+        existing.totalSecs += seg.endElapsed - seg.startElapsed
+        goalieStatsMap.set(seg.goalieId, existing)
+      }
+
+      // Subtract pulled time per goalie segment
+      for (const pull of pulls) {
+        if (pull.team !== teamSlug) continue
+        const pullStart = clockToElapsed(pull.period, parseClockString(pull.pulledAt))
+        const pullEnd = pull.returnedAt
+          ? clockToElapsed(pull.period, parseClockString(pull.returnedAt))
+          : clockToElapsed(pull.period, 0)
+        // Find which goalie was in net during this pull
+        for (const seg of segments) {
+          if (pullStart >= seg.startElapsed && pullStart < seg.endElapsed) {
+            const overlap = Math.min(pullEnd, seg.endElapsed) - Math.max(pullStart, seg.startElapsed)
+            const existing = goalieStatsMap.get(seg.goalieId)
+            if (existing) existing.totalSecs -= overlap
+            break
+          }
+        }
+      }
+
+      // Attribute goals against to the goalie who was in net at the time
+      for (const goal of goalsAgainstEvents) {
+        const goalElapsed = clockToElapsed(goal.period, parseClockString(goal.clock))
+        // Find the segment containing this goal (last segment whose start <= goalElapsed)
+        let assignedGoalie = segments[segments.length - 1].goalieId
+        for (const seg of segments) {
+          if (goalElapsed >= seg.startElapsed && goalElapsed < seg.endElapsed) {
+            assignedGoalie = seg.goalieId
+            break
+          }
+        }
+        const existing = goalieStatsMap.get(assignedGoalie)
+        if (existing) existing.goalsAgainst++
+      }
+
+      // Split shots proportionally by time played
+      const totalTimePlayed = Array.from(goalieStatsMap.values()).reduce((sum, g) => sum + Math.max(0, g.totalSecs), 0)
+
+      return Array.from(goalieStatsMap.entries()).map(([goalieId, stats]) => {
+        const timeFraction = totalTimePlayed > 0 ? Math.max(0, stats.totalSecs) / totalTimePlayed : 0
+        const sa = Math.round(totalShots * timeFraction)
+        const ga = stats.goalsAgainst
+        return {
+          goalieId,
+          minutes: Math.max(0, Math.round(stats.totalSecs / 60)),
           goalsAgainst: ga,
           shotsAgainst: sa,
-          saves: sv,
-          shutouts: so,
-          goalieAssists: 0,
-          result,
-        })
-        .onConflictDoUpdate({
-          target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
-          set: {
-            minutes: homeGoalieMinutes,
-            goalsAgainst: ga,
-            shotsAgainst: sa,
-            saves: sv,
-            shutouts: so,
-            result,
-          },
-        })
+          saves: sa - ga,
+          shutouts: ga === 0 && goalieStatsMap.size === 1 ? 1 : 0,
+          result: isHome ? (homeWon ? "W" : "L") : (homeWon ? "L" : "W"),
+        }
+      })
     }
 
-    for (const goalieId of awayGoalies) {
-      const sa = totalHomeShots
-      const ga = awayGoalsAgainst
-      const sv = sa - ga
-      const so = ga === 0 ? 1 : 0
-      const result = homeWon ? "L" : "W"
+    const homeGoalieStats = computeTeamGoalieStats(
+      homeSlug, state.homeAttendance,
+      state.goals.filter((g) => g.team === awaySlug && g.period <= 4),
+      totalAwayShots, true
+    )
+    const awayGoalieStats = computeTeamGoalieStats(
+      awaySlug, state.awayAttendance,
+      state.goals.filter((g) => g.team === homeSlug && g.period <= 4),
+      totalHomeShots, false
+    )
 
+    for (const gs of [...homeGoalieStats, ...awayGoalieStats]) {
       await db
         .insert(schema.goalieGameStats)
         .values({
-          playerId: goalieId,
+          playerId: gs.goalieId,
           gameId: id,
-          minutes: awayGoalieMinutes,
-          goalsAgainst: ga,
-          shotsAgainst: sa,
-          saves: sv,
-          shutouts: so,
+          minutes: gs.minutes,
+          goalsAgainst: gs.goalsAgainst,
+          shotsAgainst: gs.shotsAgainst,
+          saves: gs.saves,
+          shutouts: gs.shutouts,
           goalieAssists: 0,
-          result,
+          result: gs.result,
         })
         .onConflictDoUpdate({
           target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
           set: {
-            minutes: awayGoalieMinutes,
-            goalsAgainst: ga,
-            shotsAgainst: sa,
-            saves: sv,
-            shutouts: so,
-            result,
+            minutes: gs.minutes,
+            goalsAgainst: gs.goalsAgainst,
+            shotsAgainst: gs.shotsAgainst,
+            saves: gs.saves,
+            shutouts: gs.shutouts,
+            result: gs.result,
           },
         })
     }

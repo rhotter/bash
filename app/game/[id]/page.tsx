@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { SiteHeader } from "@/components/site-header"
 import { GamePageContent } from "@/components/game-page-content"
 import { fetchGameDetail } from "@/lib/fetch-game-detail"
+import { fetchLiveGameData } from "@/lib/fetch-live-game"
 import Link from "next/link"
 
 export const revalidate = 30
@@ -25,7 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const detail = await fetchGameDetail(id)
+  const [detail, liveData] = await Promise.all([
+    fetchGameDetail(id),
+    fetchLiveGameData(id).catch(() => null),
+  ])
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -42,7 +46,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
             </Link>
           </div>
         )}
-        {detail && <GamePageContent initialDetail={detail} />}
+        {detail && <GamePageContent initialDetail={detail} initialLiveData={liveData} />}
       </main>
     </div>
   )
