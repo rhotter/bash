@@ -1,16 +1,21 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useGameDetail, useLiveGame, type BashGame, type BashGameDetail } from "@/lib/hockey-data"
 import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
-import { Loader2, Star } from "lucide-react"
+import { Loader2, Star, Pencil } from "lucide-react"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import type { PlayerBoxScore, GoalieBoxScore } from "@/app/api/bash/game/[id]/route"
 import { useSort, SortableTh, SectionHeader } from "@/components/stats-table"
-import type { LiveGameState, GoalEvent, PenaltyEvent } from "@/lib/scorekeeper-types"
+import type { LiveGameState, GoalEvent, PenaltyEvent, RosterPlayer } from "@/lib/scorekeeper-types"
 import { periodLabel, formatClock, computeCurrentClock, parseClockString, clockToElapsedDisplay } from "@/lib/scorekeeper-types"
+import { AdminGameEditor } from "@/components/admin-editor/admin-game-editor"
+import { useAdmin } from "@/lib/admin-context"
+import { TeamLogo } from "@/components/team-logo"
+import { mutate } from "swr"
 
 type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen"
 
@@ -18,9 +23,11 @@ interface GameDetailProps {
   game: BashGame
   initialDetail?: BashGameDetail
   initialLiveData?: { state: unknown; homeScore: number | null; awayScore: number | null; playerNames: Record<number, string>; goalieIds: number[] }
+  homeRoster?: RosterPlayer[]
+  awayRoster?: RosterPlayer[]
 }
 
-export function GameDetail({ game, initialDetail, initialLiveData }: GameDetailProps) {
+export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, awayRoster }: GameDetailProps) {
   const { detail, isLoading, isError } = useGameDetail(game.id, initialDetail)
   const isLive = game.status === "live"
   const isFinal = game.status === "final"
@@ -28,6 +35,29 @@ export function GameDetail({ game, initialDetail, initialLiveData }: GameDetailP
   const { liveData } = useLiveGame(isLive || isFinal ? game.id : null, initialLiveData)
 
   const liveState: LiveGameState | null = liveData?.state ?? null
+
+  // Admin edit mode
+  const { isAdmin, pin: adminPin } = useAdmin()
+  const [editMode, setEditMode] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // Show edit button only for admin + scorekeeper games (those with liveState) that are final
+  const canEdit = isAdmin && isFinal && liveState && homeRoster && awayRoster
+
+  // Auto-enter edit mode when ?edit=1 is in the URL and conditions are met
+  useEffect(() => {
+    if (searchParams.get("edit") === "1" && canEdit && !editMode) {
+      setEditMode(true)
+    }
+  }, [searchParams, canEdit, editMode])
+
+  // Exit edit mode when admin mode is turned off
+  useEffect(() => {
+    if (!isAdmin && editMode) {
+      setEditMode(false)
+    }
+  }, [isAdmin, editMode])
 
   // For live games, use live scores
   const displayHomeScore = isLive && liveData ? liveData.homeScore : game.homeScore
@@ -53,13 +83,12 @@ export function GameDetail({ game, initialDetail, initialLiveData }: GameDetailP
         <div className="relative px-6 py-8 sm:py-10">
           <div className="flex items-center justify-between gap-2">
             {/* Away team */}
-            <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-              <div className="text-center">
-                <Link href={`/team/${game.awaySlug}`} className="text-sm font-bold text-foreground leading-tight hover:text-primary transition-colors">
-                  {game.awayTeam}
-                </Link>
-              </div>
-            </div>
+            <Link href={`/team/${game.awaySlug}`} className="flex flex-col items-center gap-2 flex-1 min-w-0 group/away">
+              <TeamLogo slug={game.awaySlug} name={game.awayTeam} size={56} />
+              <span className="text-sm font-bold text-foreground leading-tight group-hover/away:text-primary transition-colors text-center">
+                {game.awayTeam}
+              </span>
+            </Link>
 
             {/* Score block */}
             <div className="flex flex-col items-center gap-2 px-4">
@@ -91,48 +120,93 @@ export function GameDetail({ game, initialDetail, initialLiveData }: GameDetailP
             </div>
 
             {/* Home team */}
-            <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-              <div className="text-center">
-                <Link href={`/team/${game.homeSlug}`} className="text-sm font-bold text-foreground leading-tight hover:text-primary transition-colors">
-                  {game.homeTeam}
-                </Link>
-              </div>
-            </div>
+            <Link href={`/team/${game.homeSlug}`} className="flex flex-col items-center gap-2 flex-1 min-w-0 group/home">
+              <TeamLogo slug={game.homeSlug} name={game.homeTeam} size={56} />
+              <span className="text-sm font-bold text-foreground leading-tight group-hover/home:text-primary transition-colors text-center">
+                {game.homeTeam}
+              </span>
+            </Link>
           </div>
+          {/* Edit button — only for admin + scorekeeper games */}
+          {canEdit && !editMode && (
+            <button
+              onClick={() => setEditMode(true)}
+              className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/90 text-amber-950 text-[10px] font-bold uppercase tracking-wider hover:bg-amber-500 transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Three Stars */}
-      {liveState?.threeStars && liveState.threeStars.some(id => id > 0) && (
-        <ThreeStars
-          stars={liveState.threeStars}
-          playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
-        />
-      )}
-
-      {/* Period summary (goals + shots by period) */}
-      {(isLive || isFinal) && liveState && (
+      {/* Admin Editor (replaces normal content) */}
+      {editMode && canEdit && (
         <div className="pt-4">
-          <LivePeriodSummary state={liveState} homeSlug={game.homeSlug} awaySlug={game.awaySlug} homeTeam={game.homeTeam} awayTeam={game.awayTeam} />
-        </div>
-      )}
-
-      {/* Events (goals + penalties with details) — for both live and final games */}
-      {liveState && (liveState.goals.length > 0 || liveState.penalties.length > 0) && (
-        <div className="pt-4">
-          <EventLog
+          <AdminGameEditor
+            gameId={game.id}
             state={liveState}
+            pin={adminPin}
             homeSlug={game.homeSlug}
             awaySlug={game.awaySlug}
             homeTeam={game.homeTeam}
             awayTeam={game.awayTeam}
+            homeRoster={homeRoster}
+            awayRoster={awayRoster}
             playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+            onClose={() => {
+              setEditMode(false)
+              if (searchParams.get("edit")) router.replace(`/game/${game.id}`)
+              window.scrollTo(0, 0)
+            }}
+            onSaved={() => {
+              setEditMode(false)
+              if (searchParams.get("edit")) router.replace(`/game/${game.id}`)
+              window.scrollTo(0, 0)
+              // Revalidate SWR caches so boxscore/live data refreshes
+              mutate(`/api/bash/game/${game.id}`)
+              mutate(`/api/bash/game/${game.id}/live`)
+            }}
           />
         </div>
       )}
 
+      {/* Normal read-only content — hidden when in edit mode */}
+      {!editMode && (
+        <>
+          {/* Three Stars */}
+          {liveState?.threeStars && liveState.threeStars.some(id => id > 0) && (
+            <ThreeStars
+              stars={liveState.threeStars}
+              playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+            />
+          )}
+
+          {/* Period summary (goals + shots by period) */}
+          {(isLive || isFinal) && liveState && (
+            <div className="pt-4">
+              <LivePeriodSummary state={liveState} homeSlug={game.homeSlug} awaySlug={game.awaySlug} homeTeam={game.homeTeam} awayTeam={game.awayTeam} />
+            </div>
+          )}
+
+          {/* Events (goals + penalties with details) — for both live and final games */}
+          {liveState && (liveState.goals.length > 0 || liveState.penalties.length > 0) && (
+            <div className="pt-4">
+              <EventLog
+                state={liveState}
+                homeSlug={game.homeSlug}
+                awaySlug={game.awaySlug}
+                homeTeam={game.homeTeam}
+                awayTeam={game.awayTeam}
+                playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+              />
+            </div>
+          )}
+        </>
+      )}
+
       {/* Content */}
-      <div className="pt-6">
+      {!editMode && <div className="pt-6">
         {isLoading && !isLive && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -216,7 +290,7 @@ export function GameDetail({ game, initialDetail, initialLiveData }: GameDetailP
             )}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

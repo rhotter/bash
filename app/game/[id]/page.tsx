@@ -3,7 +3,10 @@ import { SiteHeader } from "@/components/site-header"
 import { GamePageContent } from "@/components/game-page-content"
 import { fetchGameDetail } from "@/lib/fetch-game-detail"
 import { fetchLiveGameData } from "@/lib/fetch-live-game"
+import { rawSql } from "@/lib/db"
+import { sql } from "drizzle-orm"
 import Link from "next/link"
+import type { RosterPlayer } from "@/lib/scorekeeper-types"
 
 export const revalidate = 30
 
@@ -24,12 +27,44 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title, description }
 }
 
+async function getRoster(teamSlug: string, seasonId: string): Promise<RosterPlayer[]> {
+  const rows = await rawSql(sql`
+    SELECT p.id, p.name, ps.is_goalie
+    FROM player_seasons ps
+    JOIN players p ON ps.player_id = p.id
+    WHERE ps.season_id = ${seasonId} AND ps.team_slug = ${teamSlug}
+    ORDER BY ps.is_goalie ASC, p.name ASC
+  `)
+  return rows.map((r) => ({ id: r.id, name: r.name, isGoalie: r.is_goalie }))
+}
+
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const [detail, liveData] = await Promise.all([
     fetchGameDetail(id),
     fetchLiveGameData(id).catch(() => null),
   ])
+
+  // Fetch rosters only for scorekeeper games (those with live data)
+  let homeRoster: RosterPlayer[] | undefined
+  let awayRoster: RosterPlayer[] | undefined
+  let seasonId: string | undefined
+
+  if (detail && liveData) {
+    // Get the season_id for this game
+    const gameRows = await rawSql(sql`
+      SELECT season_id FROM games WHERE id = ${id}
+    `)
+    if (gameRows.length > 0) {
+      seasonId = gameRows[0].season_id
+      const [hr, ar] = await Promise.all([
+        getRoster(detail.homeSlug, seasonId),
+        getRoster(detail.awaySlug, seasonId),
+      ])
+      homeRoster = hr
+      awayRoster = ar
+    }
+  }
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -46,7 +81,14 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
             </Link>
           </div>
         )}
-        {detail && <GamePageContent initialDetail={detail} initialLiveData={liveData} />}
+        {detail && (
+          <GamePageContent
+            initialDetail={detail}
+            initialLiveData={liveData}
+            homeRoster={homeRoster}
+            awayRoster={awayRoster}
+          />
+        )}
       </main>
     </div>
   )

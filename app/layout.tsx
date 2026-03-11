@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { AdminProvider } from '@/lib/admin-context'
+import { SiteFooter } from '@/components/site-footer'
 import './globals.css'
 
 const inter = Inter({
@@ -43,12 +45,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} bg-background`}>
       <body className="font-sans antialiased">
-        {children}
-        <footer className="py-6 px-4 text-right">
-          <a href="/scorekeeper" className="text-xs text-muted-foreground/30">
-            scorekeeper
-          </a>
-        </footer>
+        <AdminProvider>
+          {children}
+          <SiteFooter />
+        </AdminProvider>
         <Analytics />
       </body>
     </html>

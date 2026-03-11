@@ -4,9 +4,11 @@ import { useState, useMemo } from "react"
 import { getGameDates, type BashGame } from "@/lib/hockey-data"
 import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
-import { ChevronUp, ChevronDown, Loader2 } from "lucide-react"
+import { ChevronUp, ChevronDown, Loader2, Pencil } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useAdmin } from "@/lib/admin-context"
+import { TeamLogo } from "@/components/team-logo"
 
 function getWeekKey(dateStr: string) {
   const d = new Date(dateStr + "T12:00:00")
@@ -200,74 +202,100 @@ function DateSection({ date, games }: { date: string; games: BashGame[] }) {
 
 function GameCard({ game }: { game: BashGame }) {
   const router = useRouter()
+  const { isAdmin } = useAdmin()
   const isFinal = game.status === "final"
   const isLive = game.status === "live"
   const awayWon = isFinal && game.awayScore != null && game.homeScore != null && game.awayScore > game.homeScore
   const homeWon = isFinal && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore
 
+  const showAdminEdit = isAdmin && isFinal && game.hasLiveStats
+
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/40 bg-card hover:bg-muted/50 transition-colors cursor-pointer",
-        isLive && "border-red-500/30"
+        "rounded-lg border border-border/40 bg-card select-none overflow-hidden",
+        isLive && "border-red-500/30",
+        showAdminEdit && "border-amber-500/30"
       )}
-      onClick={() => router.push(`/game/${game.id}`)}
     >
-      {/* Status bar */}
-      <div className="px-3 pt-2 pb-1 border-b border-border/20 flex items-center justify-between">
-        <span className="text-[10px] text-muted-foreground/50">{game.time}</span>
-        {isLive ? (
-          <span className="inline-flex items-center gap-1">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+      {/* Card body — clickable to game page */}
+      <div
+        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => router.push(`/game/${game.id}`)}
+      >
+        {/* Status bar */}
+        <div className="px-3 pt-2 pb-1 border-b border-border/20 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground/50">{game.time}</span>
+          {isLive ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+              </span>
+              <span className="text-[9px] text-red-500 font-bold uppercase">Live</span>
             </span>
-            <span className="text-[9px] text-red-500 font-bold uppercase">Live</span>
-          </span>
-        ) : isFinal ? (
-          <span className="text-[9px] text-muted-foreground/50 font-medium uppercase">Final{game.isOvertime ? "/OT" : ""}</span>
-        ) : null}
+          ) : isFinal ? (
+            <span className="text-[9px] text-muted-foreground/50 font-medium uppercase">Final{game.isOvertime ? "/OT" : ""}</span>
+          ) : null}
+        </div>
+
+        {/* Teams and scores */}
+        <div className="px-3 py-2 flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              href={`/team/${game.awaySlug}`}
+              className="flex items-center gap-1.5 min-w-0 group/away"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <TeamLogo slug={game.awaySlug} name={game.awayTeam} size={24} className="shrink-0" />
+              <span className={cn(
+                "text-xs truncate transition-colors group-hover/away:text-foreground",
+                awayWon ? "font-semibold" : "text-muted-foreground",
+              )}>
+                {game.awayTeam}
+              </span>
+            </Link>
+            <span className={cn(
+              "text-sm tabular-nums font-mono w-6 text-right shrink-0",
+              awayWon ? "font-bold" : isLive ? "font-bold" : "text-muted-foreground"
+            )}>
+              {game.awayScore ?? "-"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <Link
+              href={`/team/${game.homeSlug}`}
+              className="flex items-center gap-1.5 min-w-0 group/home"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <TeamLogo slug={game.homeSlug} name={game.homeTeam} size={24} className="shrink-0" />
+              <span className={cn(
+                "text-xs truncate transition-colors group-hover/home:text-foreground",
+                homeWon ? "font-semibold" : "text-muted-foreground",
+              )}>
+                {game.homeTeam}
+              </span>
+            </Link>
+            <span className={cn(
+              "text-sm tabular-nums font-mono w-6 text-right shrink-0",
+              homeWon ? "font-bold" : isLive ? "font-bold" : "text-muted-foreground"
+            )}>
+              {game.homeScore ?? "-"}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Teams and scores */}
-      <div className="px-3 py-2 flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-2">
-          <Link
-            href={`/team/${game.awaySlug}`}
-            className={cn(
-              "text-xs truncate hover:text-foreground transition-colors",
-              awayWon ? "font-semibold" : "text-muted-foreground"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {game.awayTeam}
-          </Link>
-          <span className={cn(
-            "text-sm tabular-nums font-mono w-6 text-right shrink-0",
-            awayWon ? "font-bold" : isLive ? "font-bold" : "text-muted-foreground"
-          )}>
-            {game.awayScore ?? "-"}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <Link
-            href={`/team/${game.homeSlug}`}
-            className={cn(
-              "text-xs truncate hover:text-foreground transition-colors",
-              homeWon ? "font-semibold" : "text-muted-foreground"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {game.homeTeam}
-          </Link>
-          <span className={cn(
-            "text-sm tabular-nums font-mono w-6 text-right shrink-0",
-            homeWon ? "font-bold" : isLive ? "font-bold" : "text-muted-foreground"
-          )}>
-            {game.homeScore ?? "-"}
-          </span>
-        </div>
-      </div>
+      {/* Admin edit bar — separate hover zone */}
+      {showAdminEdit && (
+        <button
+          className="w-full border-t border-amber-500/20 bg-amber-500/10 px-3 py-1.5 flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition-colors cursor-pointer"
+          onClick={() => router.push(`/game/${game.id}?edit=1`)}
+        >
+          <Pencil className="h-3 w-3 text-amber-600" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Edit</span>
+        </button>
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { playerSlug } from "@/lib/player-slug"
 import { useRouter } from "next/navigation"
 import type { TeamDetail } from "@/app/api/bash/team/[slug]/route"
 import { useSort, SortableTh, statsRowClass, SectionHeader } from "@/components/stats-table"
+import { TeamLogo } from "@/components/team-logo"
 
 type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gp" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen" | "ptsPg"
 type GoalieSortKey = "savePercentage" | "gaa" | "wins" | "losses" | "gp" | "shutouts" | "saves" | "goalsAgainst" | "shotsAgainst" | "goalieAssists"
@@ -37,7 +38,10 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-black tracking-tight">{team.name}</h1>
+        <div className="flex items-center gap-3">
+          <TeamLogo slug={team.slug} name={team.name} size={56} />
+          <h1 className="text-2xl font-black tracking-tight">{team.name}</h1>
+        </div>
         {team.record && (
           <p className="text-xs text-muted-foreground mt-1">
             {team.record.rank > 0 && <><span className="font-medium">{team.record.rank}{team.record.rank === 1 ? "st" : team.record.rank === 2 ? "nd" : team.record.rank === 3 ? "rd" : "th"}</span> of {team.record.totalTeams}<span className="text-muted-foreground/40 mx-1.5">|</span></>}

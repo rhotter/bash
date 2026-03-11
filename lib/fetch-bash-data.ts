@@ -70,10 +70,12 @@ export async function fetchBashData(seasonParam?: string | null): Promise<BashAp
       g.id, g.date, g.time, g.home_score, g.away_score,
       g.status, g.is_overtime, g.is_playoff, g.location, g.has_boxscore,
       ht.name as home_team, ht.slug as home_slug,
-      awt.name as away_team, awt.slug as away_slug
+      awt.name as away_team, awt.slug as away_slug,
+      (gl.game_id IS NOT NULL) as has_live_stats
     FROM games g
     JOIN teams ht ON g.home_team = ht.slug
     JOIN teams awt ON g.away_team = awt.slug
+    LEFT JOIN game_live gl ON gl.game_id = g.id
     WHERE g.season_id = ${seasonId}
     ORDER BY g.date ASC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END ASC
   `)
@@ -93,6 +95,7 @@ export async function fetchBashData(seasonParam?: string | null): Promise<BashAp
     isPlayoff: r.is_playoff,
     location: r.location,
     hasBoxscore: r.has_boxscore,
+    hasLiveStats: r.has_live_stats,
   }))
 
   const standings = computeStandings(games)

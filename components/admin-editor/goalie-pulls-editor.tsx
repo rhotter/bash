@@ -1,0 +1,205 @@
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
+import { Pencil, Trash2, Plus } from "lucide-react"
+import type { LiveGameState, GoaliePullEvent } from "@/lib/scorekeeper-types"
+import { periodLabel } from "@/lib/scorekeeper-types"
+import { FieldLabel } from "@/components/scorekeeper/shared/field-label"
+
+function generateId() {
+  return Math.random().toString(36).substring(2, 10)
+}
+
+function safeMin(s: string): string {
+  const n = parseInt(s)
+  return isNaN(n) ? "0" : String(n)
+}
+
+function safeSec(s: string): string {
+  const n = parseInt(s)
+  return isNaN(n) ? "00" : String(n).padStart(2, "0")
+}
+
+export function GoaliePullsEditor({ state, onChange, homeSlug, awaySlug, homeTeam, awayTeam }: {
+  state: LiveGameState
+  onChange: (pulls: GoaliePullEvent[]) => void
+  homeSlug: string; awaySlug: string
+  homeTeam: string; awayTeam: string
+}) {
+  const pulls = state.goaliePulls ?? []
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingPull, setEditingPull] = useState<GoaliePullEvent | null>(null)
+
+  const [team, setTeam] = useState(homeSlug)
+  const [period, setPeriod] = useState("3")
+  const [pullMin, setPullMin] = useState("2")
+  const [pullSec, setPullSec] = useState("00")
+  const [returnMin, setReturnMin] = useState("")
+  const [returnSec, setReturnSec] = useState("")
+
+  function openAdd() {
+    setEditingPull(null)
+    setTeam(homeSlug)
+    setPeriod("3")
+    setPullMin("2")
+    setPullSec("00")
+    setReturnMin("")
+    setReturnSec("")
+    setDialogOpen(true)
+  }
+
+  function openEdit(pull: GoaliePullEvent) {
+    setEditingPull(pull)
+    setTeam(pull.team)
+    setPeriod(String(pull.period))
+    const pParts = pull.pulledAt.split(":")
+    setPullMin(safeMin(pParts[0]))
+    setPullSec(safeSec(pParts[1]))
+    if (pull.returnedAt) {
+      const rParts = pull.returnedAt.split(":")
+      setReturnMin(safeMin(rParts[0]))
+      setReturnSec(safeSec(rParts[1]))
+    } else {
+      setReturnMin("")
+      setReturnSec("")
+    }
+    setDialogOpen(true)
+  }
+
+  function handleSave() {
+    const pull: GoaliePullEvent = {
+      id: editingPull?.id ?? generateId(),
+      team,
+      period: parseInt(period),
+      pulledAt: `${safeMin(pullMin)}:${safeSec(pullSec)}`,
+      returnedAt: (returnMin || returnSec) ? `${safeMin(returnMin)}:${safeSec(returnSec)}` : null,
+    }
+
+    if (editingPull) {
+      onChange(pulls.map((p) => p.id === editingPull.id ? pull : p))
+    } else {
+      onChange([...pulls, pull])
+    }
+    setDialogOpen(false)
+  }
+
+  function handleDelete(id: string) {
+    onChange(pulls.filter((p) => p.id !== id))
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Goalie Pulls</h3>
+        <Button size="sm" variant="outline" onClick={openAdd} className="h-7 text-[11px]">
+          <Plus className="h-3 w-3 mr-1" /> Add Pull
+        </Button>
+      </div>
+
+      {pulls.length === 0 ? (
+        <p className="text-xs text-muted-foreground/50 py-2">No goalie pulls recorded.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="text-[9px] uppercase tracking-wider text-muted-foreground/50">
+                <th className="text-left font-medium py-1.5 pr-2">Team</th>
+                <th className="text-left font-medium py-1.5 px-2">Per</th>
+                <th className="text-left font-medium py-1.5 px-2">Pulled At</th>
+                <th className="text-left font-medium py-1.5 px-2">Returned At</th>
+                <th className="text-right font-medium py-1.5 pl-2 w-16 hidden sm:table-cell"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pulls.map((p) => (
+                <tr key={p.id} className="border-t border-border/20 hover:bg-muted/50 cursor-pointer sm:cursor-default" onClick={() => openEdit(p)}>
+                  <td className="py-1.5 pr-2">{p.team === homeSlug ? homeTeam : awayTeam}</td>
+                  <td className="py-1.5 px-2">{periodLabel(p.period)}</td>
+                  <td className="py-1.5 px-2 tabular-nums font-mono">{p.pulledAt}</td>
+                  <td className="py-1.5 px-2 tabular-nums font-mono">{p.returnedAt ?? "-"}</td>
+                  <td className="py-1.5 pl-2 text-right hidden sm:table-cell" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => openEdit(p)} className="p-1 hover:text-primary transition-colors">
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button onClick={() => handleDelete(p.id)} className="p-1 hover:text-destructive transition-colors">
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm">{editingPull ? "Edit Goalie Pull" : "Add Goalie Pull"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <FieldLabel label="Team">
+                <Select value={team} onValueChange={setTeam}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={awaySlug}>{awayTeam}</SelectItem>
+                    <SelectItem value={homeSlug}>{homeTeam}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldLabel>
+              <FieldLabel label="Period">
+                <Select value={period} onValueChange={setPeriod}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">P1</SelectItem>
+                    <SelectItem value="2">P2</SelectItem>
+                    <SelectItem value="3">P3</SelectItem>
+                    <SelectItem value="4">OT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldLabel>
+            </div>
+            <FieldLabel label="Pulled At (clock remaining)">
+              <div className="flex items-center gap-1">
+                <Input type="number" min={0} max={20} value={pullMin} onChange={(e) => setPullMin(e.target.value)} className="h-8 text-xs w-16 text-center" />
+                <span className="text-muted-foreground">:</span>
+                <Input type="number" min={0} max={59} value={pullSec} onChange={(e) => setPullSec(e.target.value)} className="h-8 text-xs w-16 text-center" />
+              </div>
+            </FieldLabel>
+            <FieldLabel label="Returned At (leave blank if not returned)">
+              <div className="flex items-center gap-1">
+                <Input type="number" min={0} max={20} value={returnMin} onChange={(e) => setReturnMin(e.target.value)} className="h-8 text-xs w-16 text-center" placeholder="-" />
+                <span className="text-muted-foreground">:</span>
+                <Input type="number" min={0} max={59} value={returnSec} onChange={(e) => setReturnSec(e.target.value)} className="h-8 text-xs w-16 text-center" placeholder="-" />
+              </div>
+            </FieldLabel>
+          </div>
+          <DialogFooter className="flex-row justify-between sm:justify-end">
+            {editingPull && (
+              <Button variant="ghost" onClick={() => { handleDelete(editingPull.id); setDialogOpen(false) }} className="text-xs text-destructive hover:text-destructive">
+                Delete
+              </Button>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="text-xs">Cancel</Button>
+              <Button onClick={handleSave} className="text-xs">
+                {editingPull ? "Update" : "Add"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
