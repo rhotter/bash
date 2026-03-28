@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { usePlayerStats, type PlayerStatsData } from "@/lib/hockey-data"
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
+import { Loader2, SearchIcon } from "lucide-react"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import { useSort, SortableTh, statsRowClass } from "@/components/stats-table"
@@ -36,29 +36,34 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
     router.replace(qs ? `?${qs}` : "/stats", { scroll: false })
   }, [searchParams, router])
 
+  const [nameFilter, setNameFilter] = useState("")
   const [teamFilter, setTeamFilter] = useState<string>("all")
   const { sortKey, sortDir, toggleSort } = useSort<SortKey>("points")
   const { sortKey: goalieSortKey, sortDir: goalieSortDir, toggleSort: toggleGoalieSort } = useSort<GoalieSortKey>("savePercentage", "desc", goalieAscKeys)
   const [skaterPage, setSkaterPage] = useState(1)
   const [goaliePage, setGoaliePage] = useState(1)
 
+  const nameLower = nameFilter.toLowerCase()
+
   const filteredSkaters = useMemo(() => {
-    const list = teamFilter === "all" ? skaters : skaters.filter((p) => p.teamSlug === teamFilter)
+    let list = teamFilter === "all" ? skaters : skaters.filter((p) => p.teamSlug === teamFilter)
+    if (nameLower) list = list.filter((p) => p.name.toLowerCase().includes(nameLower))
     return [...list].sort((a, b) => {
       const av = (a[sortKey] ?? 0) as number
       const bv = (b[sortKey] ?? 0) as number
       return sortDir === "desc" ? bv - av : av - bv
     })
-  }, [skaters, teamFilter, sortKey, sortDir])
+  }, [skaters, teamFilter, nameLower, sortKey, sortDir])
 
   const filteredGoalies = useMemo(() => {
-    const list = teamFilter === "all" ? goalies : goalies.filter((p) => p.teamSlug === teamFilter)
+    let list = teamFilter === "all" ? goalies : goalies.filter((p) => p.teamSlug === teamFilter)
+    if (nameLower) list = list.filter((p) => p.name.toLowerCase().includes(nameLower))
     return [...list].sort((a, b) => {
       const av = (a[goalieSortKey] ?? 0) as number
       const bv = (b[goalieSortKey] ?? 0) as number
       return goalieSortDir === "desc" ? bv - av : av - bv
     })
-  }, [goalies, teamFilter, goalieSortKey, goalieSortDir])
+  }, [goalies, teamFilter, nameLower, goalieSortKey, goalieSortDir])
 
   const skaterTotalPages = Math.max(1, Math.ceil(filteredSkaters.length / PER_PAGE))
   const goalieTotalPages = Math.max(1, Math.ceil(filteredGoalies.length / PER_PAGE))
@@ -173,6 +178,18 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
           ))}
         </div>
       )}
+
+      {/* Player name search */}
+      <div className="relative">
+        <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+        <input
+          type="text"
+          value={nameFilter}
+          onChange={(e) => { setNameFilter(e.target.value); setSkaterPage(1); setGoaliePage(1) }}
+          placeholder="Search players..."
+          className="w-full rounded-md bg-card border border-border/40 pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 min-h-[44px] sm:min-h-0"
+        />
+      </div>
 
       {/* Skaters Table */}
       {tab === "skaters" && (

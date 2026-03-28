@@ -21,6 +21,10 @@ export interface BashGame {
   location: string
   hasBoxscore: boolean
   hasLiveStats: boolean
+  livePeriod: number | null
+  liveClockSeconds: number | null
+  liveClockRunning: boolean | null
+  liveClockStartedAt: number | null
 }
 
 export interface Standing {
@@ -112,7 +116,8 @@ export async function GET(request: Request) {
         g.status, g.is_overtime, g.is_playoff, g.location, g.has_boxscore,
         ht.name as home_team, ht.slug as home_slug,
         awt.name as away_team, awt.slug as away_slug,
-        (gl.game_id IS NOT NULL) as has_live_stats
+        (gl.game_id IS NOT NULL) as has_live_stats,
+        gl.state as live_state
       FROM games g
       JOIN teams ht ON g.home_team = ht.slug
       JOIN teams awt ON g.away_team = awt.slug
@@ -138,6 +143,10 @@ export async function GET(request: Request) {
       location: r.location,
       hasBoxscore: r.has_boxscore,
       hasLiveStats: r.has_live_stats,
+      livePeriod: r.live_state?.period ?? null,
+      liveClockSeconds: r.live_state?.clockSeconds ?? null,
+      liveClockRunning: r.live_state?.clockRunning ?? null,
+      liveClockStartedAt: r.live_state?.clockStartedAt ?? null,
     }))
 
     const standings = computeStandings(games)

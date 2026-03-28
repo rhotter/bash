@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { getGameDates, type BashGame } from "@/lib/hockey-data"
 import { formatGameDate } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import { ChevronUp, ChevronDown, Loader2, Pencil } from "lucide-react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAdmin } from "@/lib/admin-context"
 import { TeamLogo } from "@/components/team-logo"
+import { periodLabel, formatClock } from "@/lib/scorekeeper-types"
 
 function getWeekKey(dateStr: string) {
   const d = new Date(dateStr + "T12:00:00")
@@ -200,6 +200,26 @@ function DateSection({ date, games }: { date: string; games: BashGame[] }) {
   )
 }
 
+function useLiveClock(game: BashGame) {
+  const isLive = game.status === "live"
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    if (!isLive || !game.liveClockRunning) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [isLive, game.liveClockRunning])
+
+  if (!isLive || game.livePeriod == null || game.liveClockSeconds == null) return null
+
+  let seconds = game.liveClockSeconds
+  if (game.liveClockRunning && game.liveClockStartedAt) {
+    seconds = Math.max(0, seconds - (now - game.liveClockStartedAt) / 1000)
+  }
+
+  return { period: game.livePeriod, clock: formatClock(seconds) }
+}
+
 function GameCard({ game }: { game: BashGame }) {
   const router = useRouter()
   const { isAdmin } = useAdmin()
@@ -207,6 +227,7 @@ function GameCard({ game }: { game: BashGame }) {
   const isLive = game.status === "live"
   const awayWon = isFinal && game.awayScore != null && game.homeScore != null && game.awayScore > game.homeScore
   const homeWon = isFinal && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore
+  const liveClock = useLiveClock(game)
 
   const showAdminEdit = isAdmin && isFinal && game.hasLiveStats
 
@@ -214,7 +235,6 @@ function GameCard({ game }: { game: BashGame }) {
     <div
       className={cn(
         "rounded-lg border border-border/40 bg-card select-none overflow-hidden",
-        isLive && "border-red-500/30",
         showAdminEdit && "border-amber-500/30"
       )}
     >
@@ -225,7 +245,13 @@ function GameCard({ game }: { game: BashGame }) {
       >
         {/* Status bar */}
         <div className="px-3 pt-2 pb-1 border-b border-border/20 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground/50">{game.time}</span>
+          {isLive && liveClock ? (
+            <span className="text-[10px] tabular-nums font-mono text-muted-foreground/70">
+              {periodLabel(liveClock.period)} {liveClock.clock}
+            </span>
+          ) : (
+            <span className="text-[10px] text-muted-foreground/50">{game.time}</span>
+          )}
           {isLive ? (
             <span className="inline-flex items-center gap-1">
               <span className="relative flex h-1.5 w-1.5">
@@ -242,19 +268,15 @@ function GameCard({ game }: { game: BashGame }) {
         {/* Teams and scores */}
         <div className="px-3 py-2 flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
-            <Link
-              href={`/team/${game.awaySlug}`}
-              className="flex items-center gap-1.5 min-w-0 group/away"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="flex items-center gap-1.5 min-w-0">
               <TeamLogo slug={game.awaySlug} name={game.awayTeam} size={24} className="shrink-0" />
               <span className={cn(
-                "text-xs truncate transition-colors group-hover/away:text-foreground",
+                "text-xs truncate",
                 awayWon ? "font-semibold" : "text-muted-foreground",
               )}>
                 {game.awayTeam}
               </span>
-            </Link>
+            </div>
             <span className={cn(
               "text-sm tabular-nums font-mono w-6 text-right shrink-0",
               awayWon ? "font-bold" : isLive ? "font-bold" : "text-muted-foreground"
@@ -263,19 +285,15 @@ function GameCard({ game }: { game: BashGame }) {
             </span>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <Link
-              href={`/team/${game.homeSlug}`}
-              className="flex items-center gap-1.5 min-w-0 group/home"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="flex items-center gap-1.5 min-w-0">
               <TeamLogo slug={game.homeSlug} name={game.homeTeam} size={24} className="shrink-0" />
               <span className={cn(
-                "text-xs truncate transition-colors group-hover/home:text-foreground",
+                "text-xs truncate",
                 homeWon ? "font-semibold" : "text-muted-foreground",
               )}>
                 {game.homeTeam}
               </span>
-            </Link>
+            </div>
             <span className={cn(
               "text-sm tabular-nums font-mono w-6 text-right shrink-0",
               homeWon ? "font-bold" : isLive ? "font-bold" : "text-muted-foreground"

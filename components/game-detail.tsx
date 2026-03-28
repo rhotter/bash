@@ -37,6 +37,10 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
 
   const liveState: LiveGameState | null = liveData?.state ?? null
 
+  // Avoid hydration mismatch from Date.now() in computeCurrentClock
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
   // Admin edit mode
   const { isAdmin, pin: adminPin } = useAdmin()
   const [editMode, setEditMode] = useState(false)
@@ -114,7 +118,7 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground/40 opacity-75" />
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-foreground" />
                     </span>
-                    {liveState ? `${periodLabel(liveState.period)} ${formatClock(computeCurrentClock(liveState))}` : "Live"}
+                    {liveState ? `${periodLabel(liveState.period)} ${formatClock(mounted ? computeCurrentClock(liveState) : liveState.clockSeconds)}` : "Live"}
                   </span>
                 ) : isFinal ? (game.isOvertime ? "Final/OT" : "Final") : "Upcoming"}
               </div>
@@ -420,6 +424,18 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
     ...state.penalties.map((p) => ({ type: "penalty" as const, period: p.period, clock: p.clock, event: p })),
   ].sort((a, b) => a.period - b.period || parseClockString(b.clock) - parseClockString(a.clock))
 
+  // Compute running score at each goal
+  const goalsChrono = state.goals
+    .map((g) => ({ ...g }))
+    .sort((a, b) => a.period - b.period || parseClockString(b.clock) - parseClockString(a.clock))
+  const runningScores = new Map<string, { away: number; home: number }>()
+  let runAway = 0, runHome = 0
+  for (const g of goalsChrono) {
+    if (g.team === awaySlug) runAway++
+    else runHome++
+    runningScores.set(g.id, { away: runAway, home: runHome })
+  }
+
   // Group by period
   const periods = [...new Set(events.map((e) => e.period))].sort()
 
@@ -437,44 +453,50 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
               {periodEvents.map((item) => {
                 if (item.type === "goal") {
                   const g = item.event as GoalEvent
-                  const teamName = g.team === homeSlug ? homeTeam : awayTeam
                   const scorer = nameById(g.scorerId)
                   const a1 = nameById(g.assist1Id)
                   const a2 = nameById(g.assist2Id)
+                  const score = runningScores.get(g.id)
                   return (
-                    <div key={g.id} className="flex items-start gap-2 py-2 border-t border-border/20">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-foreground w-8 shrink-0 pt-0.5">GOAL</span>
+                    <div key={g.id} className="flex items-center gap-2.5 py-2.5 border-t border-border/30">
+                      <TeamLogo slug={g.team} name={g.team === homeSlug ? homeTeam : awayTeam} size={20} />
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px]">
-                          <span className="font-medium">{scorer}</span>
-                          {(a1 || a2) && (
+                          <span className="font-semibold text-foreground">{scorer}</span>
+                          {(a1 || a2) ? (
                             <span className="text-muted-foreground">
                               {" "}({a1}{a2 ? `, ${a2}` : ""})
                             </span>
+                          ) : (
+                            <span className="text-muted-foreground/50"> (unassisted)</span>
                           )}
                         </div>
                         {g.flags.length > 0 && (
                           <span className="text-[9px] text-muted-foreground/60">{g.flags.join(", ")}</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
+                      {score && (
+                        <span className="text-[11px] font-bold tabular-nums font-mono text-foreground shrink-0">
+                          {score.away}-{score.home}
+                        </span>
+                      )}
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-600/60 bg-emerald-500/8 rounded px-1.5 py-0.5 shrink-0">GOAL</span>
                       <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{clockToElapsedDisplay(g.clock, g.period)}</span>
                     </div>
                   )
                 } else {
                   const p = item.event as PenaltyEvent
-                  const teamName = p.team === homeSlug ? homeTeam : awayTeam
                   const player = nameById(p.playerId)
                   return (
-                    <div key={p.id} className="flex items-start gap-2 py-2 border-t border-border/20">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground w-8 shrink-0 pt-0.5">PEN</span>
+                    <div key={p.id} className="flex items-center gap-2.5 py-2 border-t border-border/10">
+                      <TeamLogo slug={p.team} name={p.team === homeSlug ? homeTeam : awayTeam} size={20} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px]">
+                        <div className="text-[11px] text-muted-foreground">
                           <span className="font-medium">{player}</span>
-                          <span className="text-muted-foreground"> {p.infraction} ({p.minutes} min)</span>
+                          <span className="text-muted-foreground/70"> &middot; {p.infraction} ({p.minutes} min)</span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
+                      <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-500/80 bg-amber-500/10 rounded px-1.5 py-0.5 shrink-0">PEN</span>
                       <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{clockToElapsedDisplay(p.clock, p.period)}</span>
                     </div>
                   )
@@ -589,19 +611,19 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
   }, [players, sortKey, sortDir])
 
   return (
-    <div className="overflow-x-auto -mx-4 px-4 mb-3">
-      <table className="w-full text-[11px] table-fixed">
+    <div className="overflow-x-auto -mx-4 sm:mx-0 mb-3">
+      <table className="w-full min-w-[600px] text-[11px] table-fixed">
         <thead>
           <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-            <th className="text-left font-medium py-2 pr-2 min-w-[120px]">Player</th>
+            <th className="text-left font-medium py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[140px] max-w-[140px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Player</th>
             <SortableTh label="G" sortKey="goals" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
             <SortableTh label="A" sortKey="assists" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
             <SortableTh label="PTS" sortKey="points" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} bold className="w-8 py-2" />
-            <SortableTh label="GWG" sortKey="gwg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell w-8 py-2" />
-            <SortableTh label="PPG" sortKey="ppg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell w-8 py-2" />
-            <SortableTh label="SHG" sortKey="shg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell w-8 py-2" />
-            <SortableTh label="ENG" sortKey="eng" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell w-8 py-2" />
-            <SortableTh label="HAT" sortKey="hatTricks" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="hidden sm:table-cell w-8 py-2" />
+            <SortableTh label="GWG" sortKey="gwg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
+            <SortableTh label="PPG" sortKey="ppg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
+            <SortableTh label="SHG" sortKey="shg" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
+            <SortableTh label="ENG" sortKey="eng" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
+            <SortableTh label="HAT" sortKey="hatTricks" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
             <SortableTh label="PIM" sortKey="pim" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} className="w-8 py-2" />
           </tr>
         </thead>
@@ -610,23 +632,23 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
             <tr
               key={p.name}
               className={cn(
-                "border-t border-border/30 hover:bg-muted/50",
+                "group border-t border-border/30 hover:bg-muted/50",
                 i % 2 === 0 && "bg-card/20"
               )}
             >
-              <td className="py-2 pr-2 whitespace-nowrap">
-                <Link href={`/player/${playerSlug(p.name)}`} className="hover:text-primary transition-colors">
+              <td className="py-2 whitespace-nowrap sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[140px] max-w-[140px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                <Link href={`/player/${playerSlug(p.name)}`} className="hover:text-primary transition-colors truncate block pr-4">
                   {p.name}
                 </Link>
               </td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.goals}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.assists}</td>
               <td className="text-center tabular-nums py-2 px-3 font-bold">{p.points}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.gwg ?? 0}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.ppg ?? 0}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.shg ?? 0}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.eng ?? 0}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{p.hatTricks ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gwg ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.ppg ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.shg ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.eng ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.hatTricks ?? 0}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.pim}</td>
             </tr>
           ))}
@@ -638,18 +660,18 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
 
 function GoalieBoxScoreTable({ goalies }: { goalies: GoalieBoxScore[] }) {
   return (
-    <div className="overflow-x-auto -mx-4 px-4">
-      <table className="w-full text-[11px] table-fixed">
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <table className="w-full min-w-[550px] text-[11px] table-fixed">
         <thead>
           <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-            <th className="text-left font-medium py-2 pr-2 min-w-[120px]">Goalie</th>
+            <th className="text-left font-medium py-2 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[140px] max-w-[140px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Goalie</th>
             <th className="text-center font-medium py-2 w-10">MIN</th>
             <th className="text-center font-medium py-2 w-10">SA</th>
             <th className="text-center font-medium py-2 w-10">SV</th>
             <th className="text-center font-medium py-2 w-10">GA</th>
             <th className="text-center font-medium py-2 w-12 font-bold">SV%</th>
-            <th className="text-center font-medium py-2 w-10 hidden sm:table-cell">SO</th>
-            <th className="text-center font-medium py-2 w-10 hidden sm:table-cell">A</th>
+            <th className="text-center font-medium py-2 w-10">SO</th>
+            <th className="text-center font-medium py-2 w-10">A</th>
             <th className="text-center font-medium py-2 w-10">DEC</th>
           </tr>
         </thead>
@@ -658,20 +680,20 @@ function GoalieBoxScoreTable({ goalies }: { goalies: GoalieBoxScore[] }) {
             <tr
               key={g.name}
               className={cn(
-                "border-t border-border/30 hover:bg-muted/50",
+                "group border-t border-border/30 hover:bg-muted/50",
                 i % 2 === 0 && "bg-card/20"
               )}
             >
-              <td className="py-2 pr-2 whitespace-nowrap">
-                <Link href={`/player/${playerSlug(g.name)}`} className="hover:text-primary transition-colors">{g.name}</Link>
+              <td className="py-2 whitespace-nowrap sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[140px] max-w-[140px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                <Link href={`/player/${playerSlug(g.name)}`} className="hover:text-primary transition-colors truncate block pr-4">{g.name}</Link>
               </td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{formatGoalieTime(g.seconds)}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shotsAgainst}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.saves}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.goalsAgainst}</td>
               <td className="text-center tabular-nums py-2 px-3 font-bold">{g.savePercentage}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.shutouts ?? 0}</td>
-              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground hidden sm:table-cell">{g.goalieAssists ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shutouts ?? 0}</td>
+              <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.goalieAssists ?? 0}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.result ?? "-"}</td>
             </tr>
           ))}

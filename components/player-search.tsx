@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
-import { SearchIcon } from "lucide-react"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import {
   Command,
@@ -90,46 +89,27 @@ export function PlayerSearch() {
 
   if (isMobile) {
     return (
-      <>
-        <SearchButton onClick={() => setOpen(true)} />
-        <Drawer open={open} onOpenChange={setOpen}>
-          <DrawerContent>
-            <DrawerHeader className="sr-only">
-              <DrawerTitle>Search players</DrawerTitle>
-              <DrawerDescription>Find a player by name</DrawerDescription>
-            </DrawerHeader>
-            <div className="p-2">{commandContent}</div>
-          </DrawerContent>
-        </Drawer>
-      </>
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerContent>
+          <DrawerHeader className="sr-only">
+            <DrawerTitle>Search players</DrawerTitle>
+            <DrawerDescription>Find a player by name</DrawerDescription>
+          </DrawerHeader>
+          <div className="p-2">{commandContent}</div>
+        </DrawerContent>
+      </Drawer>
     )
   }
 
   return (
-    <>
-      <SearchButton onClick={() => setOpen(true)} />
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogHeader className="sr-only">
-          <DialogTitle>Search players</DialogTitle>
-          <DialogDescription>Find a player by name</DialogDescription>
-        </DialogHeader>
-        <DialogContent className="overflow-hidden p-0 sm:max-w-md" showCloseButton={false}>
-          {commandContent}
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
-function SearchButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors min-h-[44px] sm:min-h-0"
-      aria-label="Search players"
-    >
-      <SearchIcon className="h-4 w-4" />
-      <span className="hidden sm:inline text-[11px] sm:text-xs font-semibold">Search</span>
-    </button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogHeader className="sr-only">
+        <DialogTitle>Search players</DialogTitle>
+        <DialogDescription>Find a player by name</DialogDescription>
+      </DialogHeader>
+      <DialogContent className="overflow-hidden p-0 sm:max-w-md" showCloseButton={false}>
+        {commandContent}
+      </DialogContent>
+    </Dialog>
   )
 }

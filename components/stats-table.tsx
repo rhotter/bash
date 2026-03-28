@@ -33,8 +33,8 @@ export function useSort<K extends string>(
 export function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/30" />
   return dir === "desc"
-    ? <ChevronDown className="h-2.5 w-2.5 text-primary" />
-    : <ChevronUp className="h-2.5 w-2.5 text-primary" />
+    ? <ChevronDown className="h-2.5 w-2.5 text-foreground" />
+    : <ChevronUp className="h-2.5 w-2.5 text-foreground" />
 }
 
 // ─── SortableTh ──────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ export function SortableTh<K extends string>({ label, sortKey, currentKey, dir, 
       onClick={() => onToggle(sortKey)}
     >
       <div className="flex items-center justify-center gap-0.5">
-        <span className={cn(bold && "font-bold")}>{label}</span>
+        <span className={cn(currentKey === sortKey ? "font-bold text-foreground" : bold && "font-bold")}>{label}</span>
         <SortIcon active={currentKey === sortKey} dir={dir} />
       </div>
     </th>
