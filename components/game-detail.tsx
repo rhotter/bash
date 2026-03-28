@@ -195,7 +195,7 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
           )}
 
           {/* Events (goals + penalties with details) — for both live and final games */}
-          {liveState && (liveState.goals.length > 0 || liveState.penalties.length > 0) && (
+          {liveState && liveState.goals.length > 0 && (
             <div className="pt-4">
               <EventLog
                 state={liveState}
@@ -421,7 +421,6 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
 
   const events = [
     ...state.goals.map((g) => ({ type: "goal" as const, period: g.period, clock: g.clock, event: g })),
-    ...state.penalties.map((p) => ({ type: "penalty" as const, period: p.period, clock: p.clock, event: p })),
   ].sort((a, b) => a.period - b.period || parseClockString(b.clock) - parseClockString(a.clock))
 
   // Compute running score at each goal
@@ -480,24 +479,7 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
                           {score.away}-{score.home}
                         </span>
                       )}
-                      <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-600/60 bg-emerald-500/8 rounded px-1.5 py-0.5 shrink-0">GOAL</span>
                       <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{clockToElapsedDisplay(g.clock, g.period)}</span>
-                    </div>
-                  )
-                } else {
-                  const p = item.event as PenaltyEvent
-                  const player = nameById(p.playerId)
-                  return (
-                    <div key={p.id} className="flex items-center gap-2.5 py-2 border-t border-border/10">
-                      <TeamLogo slug={p.team} name={p.team === homeSlug ? homeTeam : awayTeam} size={20} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] text-muted-foreground">
-                          <span className="font-medium">{player}</span>
-                          <span className="text-muted-foreground/70"> &middot; {p.infraction} ({p.minutes} min)</span>
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-500/80 bg-amber-500/10 rounded px-1.5 py-0.5 shrink-0">PEN</span>
-                      <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{clockToElapsedDisplay(p.clock, p.period)}</span>
                     </div>
                   )
                 }
