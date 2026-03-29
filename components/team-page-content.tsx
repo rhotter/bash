@@ -175,10 +175,10 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
       )}
       onClick={isFinal ? () => router.push(`/game/${g.id}`) : undefined}
     >
-      <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0 whitespace-nowrap">
+      <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0 w-32 whitespace-nowrap">
         {formatGameDate(g.date)}
       </span>
-      <span className="text-[10px] text-muted-foreground/40 w-6 shrink-0 text-center">
+      <span className="text-[10px] text-muted-foreground/40 w-4 shrink-0 text-center">
         {g.isHome ? "vs" : "@"}
       </span>
       <span className="flex-1 min-w-0 truncate">
@@ -191,11 +191,11 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
         </Link>
       </span>
       {isFinal ? (
-        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-          <span className="text-xs font-mono tabular-nums font-medium text-muted-foreground">
+        <div className="flex items-center shrink-0 whitespace-nowrap">
+          <span className="text-xs font-mono tabular-nums font-medium text-muted-foreground w-8 text-right">
             {g.result}
           </span>
-          <span className="text-xs font-mono tabular-nums text-foreground">
+          <span className="text-xs font-mono tabular-nums text-foreground w-10 text-right">
             {g.teamScore}-{g.opponentScore}
           </span>
         </div>

@@ -8,6 +8,7 @@ import { Loader2, SearchIcon } from "lucide-react"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import { useSort, SortableTh, statsRowClass } from "@/components/stats-table"
+import { TeamLogo } from "@/components/team-logo"
 
 type SortKey = "points" | "goals" | "assists" | "pim" | "gp" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen" | "ptsPg"
 type GoalieSortKey = "savePercentage" | "gaa" | "wins" | "losses" | "saves" | "goalsAgainst" | "shotsAgainst" | "gp" | "shutouts" | "goalieAssists"
@@ -198,8 +199,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
             <table className="w-full min-w-[700px] text-[11px] table-fixed">
               <thead>
                 <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                  <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Player</th>
-                  <th className="text-left font-medium py-2.5">Team</th>
+                  <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[170px] sm:w-[100px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Player</th>
                   <SortableTh label="GP" sortKey="gp" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                   <SortableTh label="G" sortKey="goals" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
                   <SortableTh label="A" sortKey="assists" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
@@ -222,14 +222,12 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                       i % 2 === 0 && "bg-card/15"
                     )}
                   >
-                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
-                      <div className="flex items-baseline gap-2 pr-4">
+                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[170px] sm:w-[100px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                      <div className="flex items-center gap-2 pr-4">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{(skaterPage - 1) * PER_PAGE + i + 1}</span>
+                        <TeamLogo slug={p.teamSlug} name={p.team} size={18} className="shrink-0" linked />
                         <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
                       </div>
-                    </td>
-                    <td className="py-2 text-muted-foreground text-xs">
-                      <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.goals}</td>
@@ -265,8 +263,7 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
             <table className="w-full min-w-[700px] text-[11px] table-fixed">
               <thead>
                 <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-                  <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Goalie</th>
-                  <th className="text-left font-medium py-2.5">Team</th>
+                  <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-2 w-[170px] sm:w-[100px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Goalie</th>
                   <SortableTh label="GP" sortKey="gp" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
                   <SortableTh label="W" sortKey="wins" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
                   <SortableTh label="L" sortKey="losses" currentKey={goalieSortKey} dir={goalieSortDir} onToggle={toggleGoalieSort} />
@@ -288,14 +285,12 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
                       i % 2 === 0 && "bg-card/15"
                     )}
                   >
-                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[160px] max-w-[160px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
-                      <div className="flex items-baseline gap-2 pr-4">
+                    <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[170px] sm:w-[100px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                      <div className="flex items-center gap-2 pr-4">
                         <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{(goaliePage - 1) * PER_PAGE + i + 1}</span>
+                        <TeamLogo slug={p.teamSlug} name={p.team} size={18} className="shrink-0" linked />
                         <Link href={`/player/${playerSlug(p.name)}`} className="text-xs font-semibold leading-tight text-foreground hover:text-primary transition-colors truncate">{p.name}</Link>
                       </div>
-                    </td>
-                    <td className="py-2 text-muted-foreground text-xs">
-                      <Link href={`/team/${p.teamSlug}`} className="hover:text-primary transition-colors whitespace-nowrap">{p.team}</Link>
                     </td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.gp}</td>
                     <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.wins}</td>
