@@ -53,20 +53,10 @@ export async function fetchLiveGameData(id: string): Promise<LiveGameData | null
       playerNames[r.id] = r.name
     }
 
-    // Use scorekeeper goalie overrides if set, otherwise fall back to player_seasons
-    const overrides = row.state?.goalieOverrides as Record<number, boolean> | undefined
-    const allAttending = [...(state.homeAttendance ?? []), ...(state.awayAttendance ?? [])]
-    const hasOverrides = overrides && allAttending.some((pid: number) => overrides[pid] === true)
-
-    if (hasOverrides) {
-      goalieIds = allAttending.filter((pid: number) => overrides[pid])
-    } else {
-      const goalieResult = await rawSql(sql`
-        SELECT DISTINCT player_id FROM player_seasons
-        WHERE player_id IN ${ids} AND is_goalie = true
-      `)
-      goalieIds = goalieResult.map((r) => r.player_id)
-    }
+    // Read goalie IDs from state
+    const stateObj = row.state as { homeGoalieId?: number | null; awayGoalieId?: number | null }
+    if (stateObj.homeGoalieId != null) goalieIds.push(stateObj.homeGoalieId)
+    if (stateObj.awayGoalieId != null) goalieIds.push(stateObj.awayGoalieId)
   }
 
   return {

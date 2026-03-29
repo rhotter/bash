@@ -386,7 +386,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
 
         await db
           .insert(schema.playerSeasons)
-          .values({ playerId, seasonId, teamSlug: currentTeamSlug, isGoalie: false })
+          .values({ playerId, seasonId, teamSlug: currentTeamSlug })
           .onConflictDoNothing()
 
         await db
@@ -496,7 +496,7 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
 
         await db
           .insert(schema.playerSeasons)
-          .values({ playerId, seasonId, teamSlug: currentTeamSlug, isGoalie: true })
+          .values({ playerId, seasonId, teamSlug: currentTeamSlug })
           .onConflictDoNothing()
 
         await db
@@ -514,6 +514,10 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
               result: sql`EXCLUDED.result`,
             },
           })
+        // Clean up stale player_game_stats if goalie was previously synced as a skater
+        await db.delete(schema.playerGameStats).where(
+          and(eq(schema.playerGameStats.playerId, playerId), eq(schema.playerGameStats.gameId, gameId))
+        )
         statsInserted = true
       }
 
@@ -522,7 +526,19 @@ async function syncBoxscore(gameId: string, leagueId: string, seasonId: string) 
   }
 
   if (hasAnyStats) {
-    await db.update(schema.games).set({ hasBoxscore: true }).where(eq(schema.games.id, gameId))
+    // Only mark boxscore complete if goalie stats exist for both teams
+    const game = (await rawSql(sql`SELECT home_team, away_team FROM games WHERE id = ${gameId}`))[0]
+    const goalieCheck = await rawSql(sql`
+      SELECT ps.team_slug
+      FROM goalie_game_stats ggs
+      JOIN player_seasons ps ON ggs.player_id = ps.player_id AND ps.season_id = ${seasonId}
+      WHERE ggs.game_id = ${gameId}
+        AND ps.team_slug IN (${game.home_team}, ${game.away_team})
+      GROUP BY ps.team_slug
+    `)
+    const teamsWithGoalies = new Set(goalieCheck.map((r: { team_slug: string }) => r.team_slug))
+    const hasAllGoalies = teamsWithGoalies.has(game.home_team) && teamsWithGoalies.has(game.away_team)
+    await db.update(schema.games).set({ hasBoxscore: hasAllGoalies }).where(eq(schema.games.id, gameId))
   }
 }
 

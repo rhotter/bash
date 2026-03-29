@@ -73,11 +73,9 @@ export function ScorekeeperApp({
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced")
   const syncRef = useRef<ReturnType<typeof createSyncManager> | null>(null)
 
-  // ─── Goalie Overrides ───────────────────────────────────────────────────
-  const goalieOverrides = state.goalieOverrides ?? {}
-
-  const effectiveRoster = (roster: RosterPlayer[]) =>
-    roster.map((p) => ({ ...p, isGoalie: goalieOverrides[p.id] ?? p.isGoalie }))
+  // ─── Goalie helpers ─────────────────────────────────────────────────────
+  const goalieIdForTeam = (team: string): number | null =>
+    team === homeSlug ? state.homeGoalieId : state.awayGoalieId
 
   // ─── UI State ────────────────────────────────────────────────────────────
   const [goalDrawerOpen, setGoalDrawerOpen] = useState(false)
@@ -282,16 +280,16 @@ export function ScorekeeperApp({
     return `${m}:${s.toString().padStart(2, "0")}`
   }
 
-  const rosterForTeam = (team: string) => effectiveRoster(team === homeSlug ? homeRoster : awayRoster)
+  const rosterForTeam = (team: string) => team === homeSlug ? homeRoster : awayRoster
   const attendanceForTeam = (team: string) => team === homeSlug ? state.homeAttendance : state.awayAttendance
   const attendingPlayers = (team: string) => {
     const ids = attendanceForTeam(team)
     return rosterForTeam(team).filter((p) => ids.includes(p.id))
   }
-  const attendingSkaters = (team: string) => attendingPlayers(team).filter((p) => !p.isGoalie)
+  const attendingSkaters = (team: string) => attendingPlayers(team).filter((p) => p.id !== goalieIdForTeam(team))
   const currentGoalieId = (team: string): string => {
-    const goalie = attendingPlayers(team).find((p) => p.isGoalie)
-    return goalie ? String(goalie.id) : "none"
+    const gid = goalieIdForTeam(team)
+    return gid != null ? String(gid) : "none"
   }
 
   // ─── PIN Auth ────────────────────────────────────────────────────────────
@@ -516,29 +514,15 @@ export function ScorekeeperApp({
   }
 
   function applyGoalieChange(team: string, playerId: string) {
-    updateState((prev) => {
-      const teamRoster = team === homeSlug ? homeRoster : awayRoster
-      const next = { ...(prev.goalieOverrides ?? {}) }
-      for (const p of teamRoster) {
-        next[p.id] = false
-      }
-      if (playerId !== "none") {
-        next[Number(playerId)] = true
-      }
-      return { ...prev, goalieOverrides: next }
-    })
+    const key = team === homeSlug ? "homeGoalieId" : "awayGoalieId"
+    const value = playerId !== "none" ? Number(playerId) : null
+    updateState((prev) => ({ ...prev, [key]: value }))
   }
 
   function handleGoalieSubstitution(team: string, outGoalieId: string, inGoalieId: string) {
     const clock = currentClockString()
+    const key = team === homeSlug ? "homeGoalieId" : "awayGoalieId"
     updateState((prev) => {
-      const teamRoster = team === homeSlug ? homeRoster : awayRoster
-      const next = { ...(prev.goalieOverrides ?? {}) }
-      for (const p of teamRoster) {
-        next[p.id] = false
-      }
-      next[Number(inGoalieId)] = true
-      const changes = prev.goalieChanges ?? []
       const event: GoalieChangeEvent = {
         id: crypto.randomUUID(),
         team,
@@ -547,7 +531,7 @@ export function ScorekeeperApp({
         outGoalieId: Number(outGoalieId),
         inGoalieId: Number(inGoalieId),
       }
-      return { ...prev, goalieOverrides: next, goalieChanges: [...changes, event] }
+      return { ...prev, [key]: Number(inGoalieId), goalieChanges: [...(prev.goalieChanges ?? []), event] }
     })
   }
 
@@ -1085,7 +1069,7 @@ export function ScorekeeperApp({
                 label={awayTeam}
                 count={state.awayAttendance.length}
                 team={awaySlug}
-                roster={effectiveRoster(awayRoster)}
+                roster={awayRoster}
                 attendance={state.awayAttendance}
                 onToggle={toggleAttendance}
                 onSelectAll={selectAllAttendance}
@@ -1095,7 +1079,7 @@ export function ScorekeeperApp({
                 label={homeTeam}
                 count={state.homeAttendance.length}
                 team={homeSlug}
-                roster={effectiveRoster(homeRoster)}
+                roster={homeRoster}
                 attendance={state.homeAttendance}
                 onToggle={toggleAttendance}
                 onSelectAll={selectAllAttendance}
@@ -1135,8 +1119,8 @@ export function ScorekeeperApp({
             </div>
 
             {(() => {
-              const homeGoaliePresent = attendingPlayers(homeSlug).some((p) => p.isGoalie)
-              const awayGoaliePresent = attendingPlayers(awaySlug).some((p) => p.isGoalie)
+              const homeGoaliePresent = state.homeGoalieId != null
+              const awayGoaliePresent = state.awayGoalieId != null
               const missingTeams = [
                 ...(!awayGoaliePresent ? [awayTeam] : []),
                 ...(!homeGoaliePresent ? [homeTeam] : []),
@@ -1375,8 +1359,8 @@ export function ScorekeeperApp({
           <div className="mt-5">
             <SectionHeader>Attendance</SectionHeader>
             <div className="space-y-3">
-              <AttendanceList label={awayTeam} count={state.awayAttendance.length} team={awaySlug} roster={effectiveRoster(awayRoster)} attendance={state.awayAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} />
-              <AttendanceList label={homeTeam} count={state.homeAttendance.length} team={homeSlug} roster={effectiveRoster(homeRoster)} attendance={state.homeAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} />
+              <AttendanceList label={awayTeam} count={state.awayAttendance.length} team={awaySlug} roster={awayRoster} attendance={state.awayAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} />
+              <AttendanceList label={homeTeam} count={state.homeAttendance.length} team={homeSlug} roster={homeRoster} attendance={state.homeAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} />
               <GoalieSelect label={awayTeam} players={attendingPlayers(awaySlug)} value={currentGoalieId(awaySlug)} onChange={(v) => setGoalie(awaySlug, v)} />
               <GoalieSelect label={homeTeam} players={attendingPlayers(homeSlug)} value={currentGoalieId(homeSlug)} onChange={(v) => setGoalie(homeSlug, v)} />
             </div>

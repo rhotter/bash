@@ -29,13 +29,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 async function getRoster(teamSlug: string, seasonId: string): Promise<RosterPlayer[]> {
   const rows = await rawSql(sql`
-    SELECT p.id, p.name, ps.is_goalie
+    SELECT p.id, p.name
     FROM player_seasons ps
     JOIN players p ON ps.player_id = p.id
     WHERE ps.season_id = ${seasonId} AND ps.team_slug = ${teamSlug}
-    ORDER BY ps.is_goalie ASC, p.name ASC
+    ORDER BY p.name ASC
   `)
-  return rows.map((r) => ({ id: r.id, name: r.name, isGoalie: r.is_goalie }))
+  return rows.map((r) => ({ id: r.id, name: r.name }))
 }
 
 export default async function GamePage({ params }: { params: Promise<{ id: string }> }) {

@@ -74,7 +74,8 @@ export interface LiveGameState {
   goalieChanges: GoalieChangeEvent[]
   shootout: ShootoutState | null
   threeStars: number[] | null // [1st, 2nd, 3rd] player IDs
-  goalieOverrides: Record<number, boolean> // player ID → is goalie (set by scorekeeper)
+  homeGoalieId: number | null
+  awayGoalieId: number | null
   officials: { ref1: string; ref2: string; scorekeeper: string }
   notes: string
   updatedAt: number // timestamp for merge resolution
@@ -83,7 +84,6 @@ export interface LiveGameState {
 export interface RosterPlayer {
   id: number
   name: string
-  isGoalie: boolean
 }
 
 export function createInitialState(): LiveGameState {
@@ -105,7 +105,8 @@ export function createInitialState(): LiveGameState {
     goalieChanges: [],
     shootout: null,
     threeStars: null,
-    goalieOverrides: {},
+    homeGoalieId: null,
+    awayGoalieId: null,
     officials: { ref1: "", ref2: "", scorekeeper: "" },
     notes: "",
     updatedAt: 0,

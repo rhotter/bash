@@ -146,27 +146,13 @@ export async function POST(
     }
 
     // 8. Figure out which players are goalies
-    // Use scorekeeper overrides if set, otherwise fall back to player_seasons
     const goalieIds = new Set<number>()
-    const overrides = state.goalieOverrides ?? {}
-    const allAttending = [...state.homeAttendance, ...state.awayAttendance]
-    const hasOverrides = allAttending.some((pid) => overrides[pid] === true)
-
-    if (hasOverrides) {
-      for (const pid of allAttending) {
-        if (overrides[pid]) goalieIds.add(pid)
-      }
-    } else {
-      const goalieRows = await db
-        .select({ playerId: schema.playerSeasons.playerId })
-        .from(schema.playerSeasons)
-        .where(
-          and(
-            eq(schema.playerSeasons.seasonId, game.seasonId),
-            eq(schema.playerSeasons.isGoalie, true)
-          )
-        )
-      for (const r of goalieRows) goalieIds.add(r.playerId)
+    if (state.homeGoalieId != null) goalieIds.add(state.homeGoalieId)
+    if (state.awayGoalieId != null) goalieIds.add(state.awayGoalieId)
+    // Include any goalies from mid-game substitutions
+    for (const change of state.goalieChanges ?? []) {
+      goalieIds.add(change.outGoalieId)
+      goalieIds.add(change.inGoalieId)
     }
 
     // 9. Delete old player/goalie stats then insert fresh for attending players

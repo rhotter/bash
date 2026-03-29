@@ -47,14 +47,13 @@ export function GoalieChangesEditor({ state, onChange, homeSlug, awaySlug, homeT
   const [outGoalieId, setOutGoalieId] = useState("")
   const [inGoalieId, setInGoalieId] = useState("")
 
-  const goalieOverrides = state.goalieOverrides ?? {}
-
   function getTeamGoalies(teamSlug: string): RosterPlayer[] {
     const roster = teamSlug === homeSlug ? homeRoster : awayRoster
     const attendance = teamSlug === homeSlug ? state.homeAttendance : state.awayAttendance
+    const goalieId = teamSlug === homeSlug ? state.homeGoalieId : state.awayGoalieId
     return roster
       .filter((p) => attendance.includes(p.id))
-      .filter((p) => (goalieOverrides[p.id] ?? p.isGoalie))
+      .filter((p) => p.id === goalieId)
   }
 
   // For the "in" goalie, also allow non-goalie attending players (someone might sub in as goalie)

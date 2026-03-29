@@ -44,7 +44,7 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
         </div>
         {team.record && (
           <p className="text-xs text-muted-foreground mt-1">
-            {team.record.rank > 0 && <><span className="font-medium">{team.record.rank}{team.record.rank === 1 ? "st" : team.record.rank === 2 ? "nd" : team.record.rank === 3 ? "rd" : "th"}</span> of {team.record.totalTeams}<span className="text-muted-foreground/40 mx-1.5">|</span></>}
+            {team.record.rank > 0 && <>{team.record.rank}{team.record.rank === 1 ? "st" : team.record.rank === 2 ? "nd" : team.record.rank === 3 ? "rd" : "th"} of {team.record.totalTeams}<span className="text-muted-foreground/40 mx-1.5">|</span></>}
             {team.record.w}-{team.record.l}{team.record.otw > 0 ? `-${team.record.otw}` : ""}{team.record.otl > 0 ? `-${team.record.otl}` : ""}
             <span className="text-muted-foreground/40 mx-1.5">|</span>
             {team.record.pts} pts

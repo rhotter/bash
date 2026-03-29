@@ -11,11 +11,6 @@ export function AttendanceEditor({ state, onChange, homeSlug, awaySlug, homeTeam
   homeTeam: string; awayTeam: string
   homeRoster: RosterPlayer[]; awayRoster: RosterPlayer[]
 }) {
-  const goalieOverrides = state.goalieOverrides ?? {}
-
-  const effectiveRoster = (roster: RosterPlayer[]) =>
-    roster.map((p) => ({ ...p, isGoalie: goalieOverrides[p.id] ?? p.isGoalie }))
-
   function toggleAttendance(team: string, id: number) {
     const key = team === homeSlug ? "homeAttendance" : "awayAttendance"
     const current = state[key]
@@ -37,25 +32,17 @@ export function AttendanceEditor({ state, onChange, homeSlug, awaySlug, homeTeam
   function attendingPlayers(teamSlug: string): RosterPlayer[] {
     const roster = teamSlug === homeSlug ? homeRoster : awayRoster
     const attendance = teamSlug === homeSlug ? state.homeAttendance : state.awayAttendance
-    return effectiveRoster(roster).filter((p) => attendance.includes(p.id))
+    return roster.filter((p) => attendance.includes(p.id))
   }
 
   function currentGoalieId(teamSlug: string): string {
-    const players = attendingPlayers(teamSlug)
-    const goalie = players.find((p) => p.isGoalie)
-    return goalie ? String(goalie.id) : "none"
+    const gid = teamSlug === homeSlug ? state.homeGoalieId : state.awayGoalieId
+    return gid != null ? String(gid) : "none"
   }
 
   function setGoalie(teamSlug: string, value: string) {
-    const attendance = teamSlug === homeSlug ? state.homeAttendance : state.awayAttendance
-    const newOverrides = { ...goalieOverrides }
-    for (const pid of attendance) {
-      newOverrides[pid] = false
-    }
-    if (value !== "none") {
-      newOverrides[parseInt(value)] = true
-    }
-    onChange({ goalieOverrides: newOverrides })
+    const key = teamSlug === homeSlug ? "homeGoalieId" : "awayGoalieId"
+    onChange({ [key]: value !== "none" ? parseInt(value) : null })
   }
 
   return (
@@ -64,12 +51,12 @@ export function AttendanceEditor({ state, onChange, homeSlug, awaySlug, homeTeam
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <AttendanceList
           label={awayTeam} count={state.awayAttendance.length} team={awaySlug}
-          roster={effectiveRoster(awayRoster)} attendance={state.awayAttendance}
+          roster={awayRoster} attendance={state.awayAttendance}
           onToggle={toggleAttendance} onSelectAll={selectAll} onUnselectAll={unselectAll}
         />
         <AttendanceList
           label={homeTeam} count={state.homeAttendance.length} team={homeSlug}
-          roster={effectiveRoster(homeRoster)} attendance={state.homeAttendance}
+          roster={homeRoster} attendance={state.homeAttendance}
           onToggle={toggleAttendance} onSelectAll={selectAll} onUnselectAll={unselectAll}
         />
       </div>
