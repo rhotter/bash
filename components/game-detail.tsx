@@ -483,11 +483,11 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
                         )}
                       </div>
                       {score && (
-                        <span className="text-[11px] font-bold tabular-nums font-mono text-foreground shrink-0">
+                        <span className="text-[11px] font-bold tabular-nums font-mono text-foreground shrink-0 w-10 text-right">
                           {score.away}-{score.home}
                         </span>
                       )}
-                      <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{clockToElapsedDisplay(g.clock, g.period)}</span>
+                      <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0 w-10 text-right">{clockToElapsedDisplay(g.clock, g.period)}</span>
                     </div>
                   )
                 }
