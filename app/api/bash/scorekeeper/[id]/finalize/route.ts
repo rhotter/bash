@@ -202,7 +202,14 @@ export async function POST(
     const totalAwayShots = state.awayShots.reduce((a, b) => a + b, 0)
 
     const homeWon = homeScore > awayScore
-    const totalGameSecs = isOvertime ? 3900 : 3600
+    // Compute total game time: 3 periods of 1200s + OT periods
+    // Regular season OT = 300s, Playoff OT = 1200s per period
+    const gameRow = gameRows[0]
+    const gameIsPlayoff = !!(await db.select({ isPlayoff: schema.games.isPlayoff }).from(schema.games).where(eq(schema.games.id, id)))[0]?.isPlayoff
+    const maxPeriod = Math.max(...state.goals.map((g) => g.period), state.period ?? 3)
+    const otPeriods = Math.max(0, Math.min(maxPeriod, isShootout ? maxPeriod - 1 : maxPeriod) - 3)
+    const otSecsPerPeriod = gameIsPlayoff ? 1200 : 300
+    const totalGameSecs = 3600 + otPeriods * otSecsPerPeriod
     const pulls = state.goaliePulls ?? []
     const goalieChanges = state.goalieChanges ?? []
 

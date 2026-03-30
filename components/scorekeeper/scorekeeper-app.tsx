@@ -43,6 +43,7 @@ interface Props {
   date: string
   time: string
   status: string
+  isPlayoff: boolean
   homeSlug: string
   awaySlug: string
   homeTeam: string
@@ -53,7 +54,7 @@ interface Props {
 }
 
 export function ScorekeeperApp({
-  gameId, date, time, status,
+  gameId, date, time, status, isPlayoff,
   homeSlug, awaySlug, homeTeam, awayTeam,
   homeRoster, awayRoster, existingState,
 }: Props) {
@@ -167,9 +168,13 @@ export function ScorekeeperApp({
       } else if (state.period === 3 && scoresRef.current.home === scoresRef.current.away) {
         // P3 tied → OT
         startNextPeriod()
+      } else if (isPlayoff && state.period >= 4 && scoresRef.current.home === scoresRef.current.away) {
+        // Playoff OT period ended tied → start another OT period
+        startNextPeriod()
       }
       // P3 not tied → game over (bottom bar handles)
-      // P4 (OT) → bottom bar handles shootout/finalize
+      // Regular season P4 (OT) → bottom bar handles shootout/finalize
+      // Playoff OT with a lead → bottom bar handles finalize
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayClock])
@@ -371,7 +376,7 @@ export function ScorekeeperApp({
   function startNextPeriod() {
     updateState((prev) => {
       const nextPeriod = prev.period + 1
-      const clockSecs = nextPeriod === 4 ? 300 : 1200
+      const clockSecs = nextPeriod >= 4 ? (isPlayoff ? 1200 : 300) : 1200
       const homeShots = [...prev.homeShots]
       const awayShots = [...prev.awayShots]
       while (homeShots.length < (nextPeriod <= 3 ? nextPeriod : 4)) homeShots.push(0)
@@ -581,7 +586,7 @@ export function ScorekeeperApp({
   /** Convert elapsed min:sec inputs back to countdown clock string. */
   function elapsedPartsToCountdown(min: string, sec: string, period: number): string {
     const elapsedSecs = (parseInt(min) || 0) * 60 + (parseInt(sec) || 0)
-    const periodLength = period <= 3 ? 1200 : period === 4 ? 300 : 0
+    const periodLength = period <= 3 ? 1200 : (isPlayoff ? 1200 : 300)
     const remaining = Math.max(0, periodLength - elapsedSecs)
     const m = Math.floor(remaining / 60)
     const s = remaining % 60
@@ -591,7 +596,7 @@ export function ScorekeeperApp({
   /** Set the clock parts from a countdown clock string, converting to elapsed for display. */
   function setElapsedPartsFromCountdown(clock: string, period: number) {
     const remaining = parseClockString(clock)
-    const periodLength = period <= 3 ? 1200 : period === 4 ? 300 : 0
+    const periodLength = period <= 3 ? 1200 : (isPlayoff ? 1200 : 300)
     const elapsed = Math.max(0, periodLength - remaining)
     const m = Math.floor(elapsed / 60)
     const s = elapsed % 60
@@ -684,7 +689,7 @@ export function ScorekeeperApp({
         }
 
         // OT sudden death: stop clock when a goal breaks the tie
-        if (capturedPeriod === 4) {
+        if (capturedPeriod >= 4) {
           const { home, away } = computeScore(next.goals, homeSlug, awaySlug)
           if (home !== away) {
             next.clockRunning = false
@@ -1231,11 +1236,28 @@ export function ScorekeeperApp({
             {(() => {
               const hg = state.shootout.homeAttempts.filter((a) => a.scored).length
               const ag = state.shootout.awayAttempts.filter((a) => a.scored).length
-              const minRounds = Math.min(state.shootout.homeAttempts.length, state.shootout.awayAttempts.length)
-              const isDecided = minRounds >= 5
-                ? (state.shootout.homeAttempts.length === state.shootout.awayAttempts.length && hg !== ag)
-                : false
-              const canFinalize = isDecided || (minRounds >= 3 && state.shootout.homeAttempts.length === state.shootout.awayAttempts.length && hg !== ag)
+              const homeLen = state.shootout.homeAttempts.length
+              const awayLen = state.shootout.awayAttempts.length
+              const minRounds = Math.min(homeLen, awayLen)
+              const equalAttempts = homeLen === awayLen
+
+              // First 5 rounds: decided when both teams complete round 5 with different scores,
+              // or when trailing team can't mathematically catch up.
+              // After round 5 (sudden death): decided when both have shot and scores differ.
+              let canFinalize = false
+              if (minRounds < 5) {
+                // Check if mathematically clinched during first 5 rounds
+                const remainingHome = 5 - homeLen
+                const remainingAway = 5 - awayLen
+                const homeBest = hg + remainingHome
+                const awayBest = ag + remainingAway
+                if (equalAttempts && (homeBest < ag || awayBest < hg)) {
+                  canFinalize = true
+                }
+              } else if (equalAttempts && hg !== ag) {
+                // Round 5+ complete with both teams having shot: decided
+                canFinalize = true
+              }
               if (!canFinalize) return null
               return (
                 <Button className="w-full bg-foreground text-background hover:bg-foreground/90" onClick={() => setShowThreeStars(true)}>
@@ -1421,15 +1443,15 @@ export function ScorekeeperApp({
       {/* ─── Bottom Sticky Bar (shootout + finalize) ──────── */}
       {!isPreGame && !isShootout && (
         (displayClock <= 0 && (
-          (state.period === 4 && scores.home === scores.away) ||
+          (!isPlayoff && state.period === 4 && scores.home === scores.away) ||
           (state.period >= 3 && scores.home !== scores.away)
         )) ||
         // OT sudden death: show finalize when clock stopped with a lead
-        (state.period === 4 && !state.clockRunning && scores.home !== scores.away)
+        (state.period >= 4 && !state.clockRunning && scores.home !== scores.away)
       ) && (
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-background/95 backdrop-blur border-t border-border/60">
           <div className="max-w-2xl mx-auto flex items-center gap-2">
-            {state.period === 4 && scores.home === scores.away && (
+            {!isPlayoff && state.period === 4 && scores.home === scores.away && (
               <Button className="flex-1 bg-foreground text-background hover:bg-foreground/90" onClick={startShootout}>
                 Start Shootout
               </Button>

@@ -28,6 +28,13 @@ export function ShootoutPanel({
   const homeGoals = shootout.homeAttempts.filter((a) => a.scored).length
   const awayGoals = shootout.awayAttempts.filter((a) => a.scored).length
 
+  // Filter out already-used shooters (can't repeat until all have shot)
+  const usedShooterIds = (awayTurn ? shootout.awayAttempts : shootout.homeAttempts).map((a) => a.playerId)
+  const allShooterIds = new Set(currentRoster.map((p) => p.id))
+  const availableShooters = usedShooterIds.length >= allShooterIds.size
+    ? currentRoster // everyone has gone, reset pool
+    : currentRoster.filter((p) => !usedShooterIds.includes(p.id))
+
   return (
     <div className="space-y-3">
       <div className="text-center">
@@ -52,7 +59,7 @@ export function ShootoutPanel({
         <Select value={selectedShooter} onValueChange={setSelectedShooter}>
           <SelectTrigger><SelectValue placeholder="Select shooter" /></SelectTrigger>
           <SelectContent>
-            {currentRoster.map((p) => (
+            {availableShooters.map((p) => (
               <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
             ))}
           </SelectContent>
