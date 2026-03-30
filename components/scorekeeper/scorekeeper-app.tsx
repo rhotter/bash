@@ -683,6 +683,16 @@ export function ScorekeeperApp({
           }
         }
 
+        // OT sudden death: stop clock when a goal breaks the tie
+        if (capturedPeriod === 4) {
+          const { home, away } = computeScore(next.goals, homeSlug, awaySlug)
+          if (home !== away) {
+            next.clockRunning = false
+            next.clockSeconds = Math.max(0, computeCurrentClock(prev))
+            next.clockStartedAt = null
+          }
+        }
+
         return next
       })
     }
@@ -1409,9 +1419,13 @@ export function ScorekeeperApp({
       </div>
 
       {/* ─── Bottom Sticky Bar (shootout + finalize) ──────── */}
-      {!isPreGame && !isShootout && displayClock <= 0 && (
-        (state.period === 4 && scores.home === scores.away) ||
-        (state.period >= 3 && scores.home !== scores.away)
+      {!isPreGame && !isShootout && (
+        (displayClock <= 0 && (
+          (state.period === 4 && scores.home === scores.away) ||
+          (state.period >= 3 && scores.home !== scores.away)
+        )) ||
+        // OT sudden death: show finalize when clock stopped with a lead
+        (state.period === 4 && !state.clockRunning && scores.home !== scores.away)
       ) && (
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-background/95 backdrop-blur border-t border-border/60">
           <div className="max-w-2xl mx-auto flex items-center gap-2">
