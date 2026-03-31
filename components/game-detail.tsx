@@ -215,6 +215,19 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
               />
             </div>
           )}
+
+          {liveState && liveState.penalties.length > 0 && (
+            <div className="pt-4">
+              <PenaltyLog
+                state={liveState}
+                homeSlug={game.homeSlug}
+                awaySlug={game.awaySlug}
+                homeTeam={game.homeTeam}
+                awayTeam={game.awayTeam}
+                playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+              />
+            </div>
+          )}
         </>
       )}
 
@@ -492,6 +505,49 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
                   )
                 }
               })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function PenaltyLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }: {
+  state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
+  playerNames: Record<number, string>
+}) {
+  const nameById = (id: number) => playerNames[id] ?? `#${id}`
+
+  const sorted = [...state.penalties].sort(
+    (a, b) => a.period - b.period || parseClockString(b.clock) - parseClockString(a.clock)
+  )
+
+  const periods = [...new Set(sorted.map((p) => p.period))].sort()
+
+  return (
+    <div className="space-y-4">
+      <SectionHeader>Penalties</SectionHeader>
+      {periods.map((period) => {
+        const periodPenalties = sorted.filter((p) => p.period === period)
+        return (
+          <div key={period}>
+            <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/50 mb-1">
+              {periodLabel(period)}
+            </div>
+            <div className="space-y-0">
+              {periodPenalties.map((p) => (
+                <div key={p.id} className="flex items-center gap-2.5 py-2.5 border-t border-border/30">
+                  <TeamLogo slug={p.team} name={p.team === homeSlug ? homeTeam : awayTeam} size={20} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px]">
+                      <span className="font-semibold text-foreground">{nameById(p.playerId)}</span>
+                      <span className="text-muted-foreground"> — {p.infraction} ({p.minutes} min)</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0 w-10 text-right">{clockToElapsedDisplay(p.clock, p.period)}</span>
+                </div>
+              ))}
             </div>
           </div>
         )
