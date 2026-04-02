@@ -184,7 +184,7 @@ async function handleToolCall(name: string, args: Record<string, string>) {
       if (!dbUrl) throw new Error("Database not configured.")
       const sql = neon(dbUrl)
       const rows = await sql.query(limitedQuery)
-      return JSON.stringify({ rows: rows.rows, rowCount: rows.rowCount })
+      return JSON.stringify({ rows, rowCount: rows.length })
     }
     default:
       throw new Error(`Unknown tool: ${name}`)
