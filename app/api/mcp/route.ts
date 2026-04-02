@@ -35,6 +35,11 @@ Only SELECT queries are allowed. Results limited to 100 rows.`,
       },
       required: ["sql"],
     },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
   },
 ]
 
