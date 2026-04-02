@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { neon } from "@neondatabase/serverless"
 
 // BASH MCP Server — Streamable HTTP transport
 // Tools for querying BASH hockey league data across all seasons
@@ -83,6 +84,36 @@ const TOOLS = [
       required: ["player"],
     },
   },
+  {
+    name: "query_stats",
+    description: `Run a read-only SQL query against the BASH database. Use this for complex historical analysis that other tools can't answer efficiently (e.g. "who has the most 20-goal seasons", "all-time points leaders", "most hat tricks in a single season").
+
+Database schema:
+- seasons (id TEXT PK, name TEXT, league_id TEXT, is_current BOOL, season_type TEXT)
+- teams (slug TEXT PK, name TEXT)
+- season_teams (season_id TEXT, team_slug TEXT)
+- games (id TEXT PK, season_id TEXT, date TEXT, time TEXT, home_team TEXT, away_team TEXT, home_score INT, away_score INT, status TEXT, is_overtime BOOL, is_playoff BOOL, location TEXT, has_boxscore BOOL)
+- players (id SERIAL PK, name TEXT UNIQUE)
+- player_seasons (player_id INT, season_id TEXT, team_slug TEXT, is_goalie BOOL)
+- player_game_stats (player_id INT, game_id TEXT, goals INT, assists INT, points INT, gwg INT, ppg INT, shg INT, eng INT, hat_tricks INT, pen INT, pim INT)
+- player_season_stats (player_id INT, season_id TEXT, team_slug TEXT, is_playoff BOOL, gp INT, goals INT, assists INT, points INT, gwg INT, ppg INT, shg INT, eng INT, hat_tricks INT, pen INT, pim INT)
+- goalie_game_stats (player_id INT, game_id TEXT, seconds INT, goals_against INT, shots_against INT, saves INT, shutouts INT, goalie_assists INT, result TEXT)
+- player_awards (id SERIAL, player_name TEXT, player_id INT, season_id TEXT, award_type TEXT)
+- hall_of_fame (id SERIAL, player_name TEXT, player_id INT, class_year INT, wing TEXT, years_active TEXT, achievements TEXT)
+- game_officials (id SERIAL, game_id TEXT, name TEXT, role TEXT)
+
+Only SELECT queries are allowed. Results limited to 100 rows.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        sql: {
+          type: "string",
+          description: "A read-only SQL SELECT query.",
+        },
+      },
+      required: ["sql"],
+    },
+  },
 ]
 
 async function fetchJSON(url: string) {
@@ -136,6 +167,24 @@ async function handleToolCall(name: string, args: Record<string, string>) {
     case "get_player": {
       const data = await fetchJSON(`${BASE_URL}/player/${args.player}`)
       return JSON.stringify(data)
+    }
+    case "query_stats": {
+      const query = (args.sql || "").trim()
+      // Block anything that isn't a SELECT
+      const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXECUTE|DO)\b/i
+      if (forbidden.test(query)) {
+        throw new Error("Only SELECT queries are allowed.")
+      }
+      if (!query.toUpperCase().startsWith("SELECT")) {
+        throw new Error("Query must start with SELECT.")
+      }
+      // Enforce row limit
+      const limitedQuery = /\bLIMIT\b/i.test(query) ? query : `${query} LIMIT 100`
+      const dbUrl = process.env.DATABASE_URL_READONLY
+      if (!dbUrl) throw new Error("Database not configured.")
+      const sql = neon(dbUrl)
+      const rows = await sql(limitedQuery)
+      return JSON.stringify({ rows, rowCount: rows.length })
     }
     default:
       throw new Error(`Unknown tool: ${name}`)
