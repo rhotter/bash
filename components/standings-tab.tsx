@@ -49,7 +49,7 @@ export function StandingsTab({
         <table className="w-full min-w-[500px] text-[11px] table-fixed">
           <thead>
             <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
-              <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-0 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Team</th>
+              <th className="text-left font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-0 w-[170px] min-w-[170px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">Team</th>
               <SortableTh label="GP" sortKey="gp" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
               <SortableTh label="W" sortKey="w" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
               <SortableTh label="OTW" sortKey="otw" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
@@ -67,7 +67,7 @@ export function StandingsTab({
                 key={row.slug}
                 className={cn(statsRowClass(i), "group")}
               >
-                <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-0 whitespace-nowrap after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-0 w-[170px] min-w-[170px] whitespace-nowrap after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
                   <div className="flex items-center gap-2 pr-4">
                     <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{i + 1}</span>
                     <Link href={`/team/${row.slug}`} className="flex items-center gap-2 group/team">
