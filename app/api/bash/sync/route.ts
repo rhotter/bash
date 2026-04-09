@@ -253,10 +253,16 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
         .onConflictDoUpdate({
           target: schema.games.id,
           set: {
+            date: sql`EXCLUDED.date`,
+            time: sql`EXCLUDED.time`,
+            awayTeam: sql`EXCLUDED.away_team`,
+            homeTeam: sql`EXCLUDED.home_team`,
             awayScore: sql`EXCLUDED.away_score`,
             homeScore: sql`EXCLUDED.home_score`,
             status: sql`EXCLUDED.status`,
             isOvertime: sql`EXCLUDED.is_overtime`,
+            isPlayoff: sql`EXCLUDED.is_playoff`,
+            location: sql`EXCLUDED.location`,
           },
         })
     }
