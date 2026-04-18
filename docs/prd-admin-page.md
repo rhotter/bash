@@ -88,12 +88,18 @@ There is no centralized place for commissioners to manage the league — seasons
 
 ### Phase 3 — Advanced
 
-#### 4.8 Data Quality Dashboard
+#### 4.8 Action Items / Alert Panel (`/admin` dashboard)
+- Auto-generated alerts surfacing issues needing commissioner attention
+- Games needing scores (overdue), games without boxscores, today's games, stale sync, draft seasons
+- Each alert links directly to the page or action needed to resolve it
+- Green "All clear" state when nothing needs attention
+
+#### 4.9 Data Quality Dashboard
 - Flag games missing boxscores
 - Flag players with stat anomalies
 - Show unlinked `player_awards` (where `player_id` is null)
 
-#### 4.9 Audit Log
+#### 4.10 Audit Log
 - Track admin actions (who changed what, when)
 - Requires evolving beyond single shared PIN
 
@@ -136,13 +142,13 @@ app/
 - **Routing**: Next.js App Router with `app/admin/layout.tsx` for shared PIN gate + admin nav
 - **API**: New routes under `app/api/bash/admin/` for CRUD operations
 - **Data**: Drizzle ORM queries, consistent with existing patterns
-- **UI**: shadcn/ui components (Tables, Cards, Dialogs, Tabs), consistent with site design
+- **UI**: shadcn/ui components (Tables, Cards, Dialogs, Tabs), consistent with site design. Uses the **same light theme** as the public site with a prominent **orange admin bar** at the top to indicate commissioner mode (no separate dark theme).
 - **Mobile**: Gameday-specific views optimized for mobile; management pages desktop-first
 
 ## 7. Open Questions
 
 - [x] ~~Should `/admin` be a separate Next.js layout group?~~ **Resolved: Option B** — nested layout under `app/admin/` with its own shell, no changes to existing pages.
-- [x] ~~Where should the admin link live?~~ **Resolved**: Keep existing placement — subtle "Admin" link in the site footer (`components/site-footer.tsx`), opens `PinDialog` on click. "Scorekeeper" link also lives in the footer alongside it.
+- [x] ~~Where should the admin link live?~~ **Resolved**: Keep existing placement — subtle "Admin" link in the site footer (`components/site-footer.tsx`), links directly to `/admin` where the PIN gate handles authentication. "Scorekeeper" link also lives in the footer alongside it.
 - [x] ~~Which Phase 1 features are highest priority?~~ **Resolved**: Season management is the highest priority. Phase 1 will get its own detailed PRD (`docs/prd-admin-phase1.md`) to flesh out season wizard, draft states, and registration/schedule placeholders.
 - [x] ~~Should we persist the PIN session in a cookie?~~ **Resolved: Yes** — use an `httpOnly` session cookie set after initial PIN validation, so auth persists across page navigations within the admin section. This avoids commissioners re-entering the PIN on every page transition. Cookie should be scoped to `/admin` path and expire after a reasonable session duration (e.g. 4 hours).
 - [x] ~~Move beyond single shared PIN before v1?~~ **Resolved: No** — single shared PIN is sufficient for v1. Role-based access and individual identity deferred to future phases.

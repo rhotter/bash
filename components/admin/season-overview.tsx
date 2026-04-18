@@ -1,0 +1,128 @@
+"use client"
+
+import { Users, UserCheck, Gamepad2, CheckCircle, MapPin, Timer, Trophy, StickyNote } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+interface SeasonOverviewProps {
+  season: {
+    teams: { teamSlug: string; teamName: string }[]
+    teamCount?: number
+    playerCount: number
+    gameCount: number
+    completedGameCount: number
+    standingsMethod?: string | null
+    gameLength?: number | null
+    defaultLocation?: string | null
+    adminNotes?: string | null
+    upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
+  }
+}
+
+const STANDINGS_LABELS: Record<string, string> = {
+  "pts-pbla": "Points (PBLA)",
+  "pts-standard": "Points (Standard)",
+  "win-pct": "Win Percentage",
+  "pts-custom": "Custom Points",
+}
+
+export function SeasonOverview({ season }: SeasonOverviewProps) {
+  const analytics = [
+    { label: "Teams", value: season.teams.length, icon: Users, color: "text-blue-600" },
+    { label: "Players", value: season.playerCount, icon: UserCheck, color: "text-green-600" },
+    { label: "Games", value: season.gameCount, icon: Gamepad2, color: "text-primary" },
+    { label: "Completed", value: season.completedGameCount, icon: CheckCircle, color: "text-emerald-600" },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Key Analytics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {analytics.map((stat) => (
+          <Card key={stat.label}>
+            <CardContent className="pt-4 pb-3 px-4">
+              <div className="flex items-center gap-2">
+                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                <div>
+                  <p className="text-lg font-bold">{stat.value}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Upcoming Games */}
+      {season.upcomingGames && season.upcomingGames.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">Upcoming Games</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {season.upcomingGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                      {game.date}
+                      {game.time && <br />}
+                      {game.time && <span>{game.time}</span>}
+                    </span>
+                    <span className="text-sm">
+                      {game.awayTeam} @ {game.homeTeam}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{game.location}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Settings Summary */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Season Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-start gap-2">
+              <Trophy className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+              <div>
+                <p className="font-medium">{STANDINGS_LABELS[season.standingsMethod || "pts-pbla"] || season.standingsMethod}</p>
+                <p className="text-xs text-muted-foreground">Standings method</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <Timer className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+              <div>
+                <p className="font-medium">{season.gameLength || 60} min</p>
+                <p className="text-xs text-muted-foreground">Game length</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <MapPin className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+              <div>
+                <p className="font-medium">{season.defaultLocation || "Not set"}</p>
+                <p className="text-xs text-muted-foreground">Default location</p>
+              </div>
+            </div>
+            {season.adminNotes && (
+              <div className="flex items-start gap-2">
+                <StickyNote className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium line-clamp-2">{season.adminNotes}</p>
+                  <p className="text-xs text-muted-foreground">Admin notes</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

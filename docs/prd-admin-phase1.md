@@ -145,31 +145,18 @@ For Phase 1, the admin will manage seasons in the **database** (`seasons` table)
 - 🔓 Logout (action button)
 
 **Topbar**:
-- "BASH Admin" branding
-- Current season indicator
-- Commissioner session status
+- Orange/amber admin indicator bar at top (matches existing admin mode UX)
+- "BASH Admin Dashboard" branding with logo
+- Quick links: "View Public Site", "Logout"
+- Below: sidebar trigger + "Commissioner Tools" label
 
-**Design**: Desktop-first. Sidebar collapses to a hamburger on mobile. Dark-themed to visually differentiate from the public site.
+**Design**: Desktop-first. Sidebar collapses to a hamburger on mobile. Uses the **same light theme as the public site** for visual consistency, with a prominent **orange admin bar** across the top to clearly indicate commissioner mode. All UI components use standard design tokens (`--background`, `--foreground`, `--primary`, etc.) — no custom dark theme overrides.
 
 ### 3.2 Dashboard Home (`/admin`)
 
-The dashboard is organized around **what needs attention**, not passive stats. Inspired by Sportability's admin summary, the layout prioritizes actionable items.
+The dashboard provides a quick overview of active/draft seasons and key actions.
 
-#### Action Items / Alerts (top, most prominent)
-
-Auto-generated alerts that surface issues needing commissioner attention. Each alert links directly to the page or action needed to resolve it.
-
-| Alert | Condition | Example | Links to |
-|---|---|---|---|
-| **Games needing scores** | `status = 'upcoming'` AND `date < today` | "2 games need scores" | Game edit links |
-| **Games without boxscores** | `status = 'final'` AND `has_boxscore = false` | "5 games without boxscores" | Game list (filtered) |
-| **Today's games** | `date = today` | "Today: 9a Loons @ Seals, 11a Yetis @ Reign" | Scorekeeper links |
-| **Stale sync** | `last_sync` > 24 hours ago | "Last sync was 3 days ago" | Sync Now button |
-| **Draft seasons** | `status = 'draft'` | "1 season in draft" | Season detail link |
-
-When there are no alerts, show a green "All clear" state.
-
-#### Active Seasons Table (below alerts)
+#### Active Seasons Table (primary content)
 
 Compact summary table showing only **active and draft** seasons (mirrors Sportability's "Open Leagues" pattern). Completed/archived seasons are accessible via a "View Archived" link.
 
@@ -188,6 +175,9 @@ Each row links to the season detail page.
 #### Sidebar quick actions
 - "Sync Now" button with last sync timestamp
 - "New Season" button → `/admin/seasons/new`
+
+> [!NOTE]
+> An **Action Items / Alert Panel** (overdue games, missing boxscores, stale sync, etc.) is planned for Phase 3. See [prd-admin-page.md §4.8](./prd-admin-page.md).
 
 ### 3.3 Season List (`/admin/seasons`)
 

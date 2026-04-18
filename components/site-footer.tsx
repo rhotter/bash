@@ -27,14 +27,10 @@ export function SiteFooter() {
           >
             Exit Admin
           </button>
-        ) : (
-          <button
-            onClick={() => setPinDialogOpen(true)}
-            className="text-xs text-muted-foreground/30 hover:text-muted-foreground transition-colors cursor-pointer"
-          >
-            Admin
-          </button>
-        )}
+        ) : null}
+        <Link href="/admin" className="text-xs text-muted-foreground/30 hover:text-muted-foreground transition-colors">
+          Admin
+        </Link>
         </div>
       </div>
       <PinDialog
