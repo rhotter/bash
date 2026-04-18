@@ -84,7 +84,12 @@ sequenceDiagram
 The `seasons` table needs a new `status` column:
 
 ```sql
-ALTER TABLE seasons ADD COLUMN status text NOT NULL DEFAULT 'active';
+ALTER TABLE seasons
+  ADD COLUMN status text NOT NULL DEFAULT 'active',
+  ADD COLUMN standings_method text NOT NULL DEFAULT 'pts-pbla',
+  ADD COLUMN game_length integer NOT NULL DEFAULT 60,
+  ADD COLUMN default_location text,
+  ADD COLUMN admin_notes text;
 ```
 
 **Drizzle schema update** (`lib/db/schema.ts`):
@@ -95,7 +100,11 @@ export const seasons = pgTable("seasons", {
   leagueId: text("league_id"),  // optional — only needed when connecting to Sportability for sync
   isCurrent: boolean("is_current").notNull().default(false),
   seasonType: text("season_type").notNull().default("fall"),
-  status: text("status").notNull().default("active"),  // NEW: draft | active | completed
+  status: text("status").notNull().default("active"),       // draft | active | completed
+  standingsMethod: text("standings_method").notNull().default("pts-pbla"), // see §3.7
+  gameLength: integer("game_length").notNull().default(60),  // in minutes
+  defaultLocation: text("default_location"),                 // e.g. "James Lick Arena"
+  adminNotes: text("admin_notes"),                           // private commissioner notes
 })
 ```
 
@@ -144,19 +153,41 @@ For Phase 1, the admin will manage seasons in the **database** (`seasons` table)
 
 ### 3.2 Dashboard Home (`/admin`)
 
-At-a-glance overview cards:
+The dashboard is organized around **what needs attention**, not passive stats. Inspired by Sportability's admin summary, the layout prioritizes actionable items.
 
-| Card | Data source | Content |
+#### Action Items / Alerts (top, most prominent)
+
+Auto-generated alerts that surface issues needing commissioner attention. Each alert links directly to the page or action needed to resolve it.
+
+| Alert | Condition | Example | Links to |
+|---|---|---|---|
+| **Games needing scores** | `status = 'upcoming'` AND `date < today` | "2 games need scores" | Game edit links |
+| **Games without boxscores** | `status = 'final'` AND `has_boxscore = false` | "5 games without boxscores" | Game list (filtered) |
+| **Today's games** | `date = today` | "Today: 9a Loons @ Seals, 11a Yetis @ Reign" | Scorekeeper links |
+| **Stale sync** | `last_sync` > 24 hours ago | "Last sync was 3 days ago" | Sync Now button |
+| **Draft seasons** | `status = 'draft'` | "1 season in draft" | Season detail link |
+
+When there are no alerts, show a green "All clear" state.
+
+#### Active Seasons Table (below alerts)
+
+Compact summary table showing only **active and draft** seasons (mirrors Sportability's "Open Leagues" pattern). Completed/archived seasons are accessible via a "View Archived" link.
+
+| Column | Source | Example |
 |---|---|---|
-| Current Season | `seasons` WHERE `is_current` | Season name, type, status badge |
-| Season Progress | `games` WHERE `season_id` | X of Y games completed, progress bar |
-| Last Sync | `sync_metadata` WHERE `key = 'last_sync'` | Timestamp, "Sync Now" button |
-| Players | `player_seasons` WHERE `season_id` | Player count for current season |
+| Season | `seasons.name` | BASH 2025-2026 |
+| Status | `seasons.status` | 🟢 Active |
+| Tms | COUNT from `season_teams` | 7 |
+| Gms | COUNT from `games` | 72 |
+| Plyrs | COUNT from `player_seasons` | 131 |
+| Progress | Completed / Total games | 47 / 72 |
+| Actions | Summ \| Edit \| View | links |
 
-**Quick actions**:
-- "Sync Now" button → triggers `POST /api/bash/sync`
-- "New Season" button → navigates to `/admin/seasons/new`
-- Link to current season detail
+Each row links to the season detail page.
+
+#### Sidebar quick actions
+- "Sync Now" button with last sync timestamp
+- "New Season" button → `/admin/seasons/new`
 
 ### 3.3 Season List (`/admin/seasons`)
 
@@ -184,11 +215,43 @@ At-a-glance overview cards:
   - Transitioning draft → active **automatically sets `is_current = true`** on this season. Does NOT modify the previous season's `is_current` flag (multiple seasons can have `is_current = true` during a transition, but `getCurrentSeason()` should resolve to the newest active one).
 - League ID (Sportability reference) — optional, can be added later when ready to sync
 
+**Season Settings** (collapsible section on the detail page):
+- **Standings method** — dropdown with options from §3.7. Default: `Pts-PBLA` (BASH's current method: W=3, OTW=2, OTL=1, L=0). Determines how standings are calculated and displayed on the public site.
+- **Game length** — number input in minutes. Default: `60`. Used for scheduling and period calculations.
+- **Default location** — text input. Auto-populated based on season type (fall → "James Lick Arena", summer → "Dolores Park Multi-purpose Court"). Can be overridden.
+- **Admin notes** — textarea. Private commissioner-only notes, not visible on the public site. Useful for tracking decisions, rule changes, or season-specific context (e.g. "Self Request; Added 8/24/2025").
+
 **Tabbed sections on the season detail page**:
 
-#### Overview tab
-- Season stats summary (games played, total goals, etc.)
-- Quick status actions
+#### Overview tab (season-level dashboard)
+
+The overview acts as a mini-dashboard for this specific season, with inline previews that link to their respective tabs. Inspired by Sportability's "League Summary" page but better organized.
+
+**Key Analytics bar** (top):
+- Compact row of clickable stat badges: `7 Teams` | `131 Players` | `72 Games` | `47 Completed`
+- Each badge links to its respective tab (Teams, Roster, Schedule)
+
+**"View Public Site →"** button:
+- Prominent link to the public site's view of this season (e.g. `/?season=2025-2026`)
+- Only shown for active/completed seasons (not draft)
+
+**Upcoming Schedule preview** (inline, 5 games max):
+- Shows next 5 upcoming games with date, time, teams, location
+- "View Full Schedule →" links to the Schedule tab
+- For completed seasons: shows "Season complete" with final standings link
+
+**Settings summary** (read-only card):
+- Displays current standings method, game length, default location, league ID as a compact key-value list
+- "Edit Settings" button opens the settings form (§3.4 editable fields + season settings)
+
+**Registration status** (banner):
+- For draft seasons: "Registration not started" or placeholder date
+- For active seasons: "Registration closed [date]"
+- For completed seasons: "Registration closed [date]" (read-only)
+
+**Admin notes** (expandable):
+- Shows the first line of admin notes, expandable to full text
+- Quick "Edit" link to modify
 
 #### Teams tab
 - List of teams assigned to this season (from `season_teams`)
@@ -242,6 +305,27 @@ Accessible from the dashboard and as a sidebar action:
 - Show loading spinner during sync
 - Display result (success with game count, or error message)
 - Show last sync timestamp from `sync_metadata`
+
+### 3.7 Standings Method Reference
+
+The standings method determines how team records and points are computed from game results. BASH currently uses **Pts-PBLA** (hardcoded in `lib/fetch-bash-data.ts`). Making this configurable per season allows historical seasons to use different methods or future rule changes without code deploys.
+
+| Method | Description | Point System |
+|---|---|---|
+| `Pts-PBLA` | **BASH default**. Points-based with OT differentiation. | W=3, OTW=2, OTL=1, L=0 |
+| `Pts-NHL` | NHL-style points. OT losses earn a point. | W=2, T=1, OTL=1, L=0 |
+| `Pts-Hockey` | Standard hockey points. | W=2, T=1, L=0 |
+| `Pts-Hockey-Limited` | Same as Pts-Hockey but without GF, GA, +/- display. | W=2, T=1, L=0 |
+| `Pts-Soccer` | Soccer-style points. | W=3, T=1, L=0 |
+| `Pts-Forfeit-Penalty` | Hockey points with forfeit penalty. | W=2, T=1, L=0, Forfeit=-3 |
+| `Pct` | Win-loss percentage. Ties excluded. | — |
+| `Pct-Limited` | Same as Pct but without GF, GA, +/- display. | — |
+| `Pct-NCAA` | Win percentage where ties count as wins and losses. | — |
+| `No-Standings` | Hides won-loss records, removes head-to-head page. | — |
+| `Match-Scores` | Cumulative game score as primary sort (volleyball-style). | — |
+
+> [!NOTE]
+> For Phase 1, the standings method is stored per season and displayed in the admin UI. Actually wiring it into the standings calculation in `fetchBashData()` is a follow-up task — the current Pts-PBLA logic remains the runtime default. This field establishes the data model so the calculation can be made dynamic in a future iteration.
 
 ---
 
