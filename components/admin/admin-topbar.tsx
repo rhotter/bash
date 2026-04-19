@@ -9,7 +9,7 @@ import { LogOut } from "lucide-react"
 export function AdminTopbar() {
   function handleLogout() {
     fetch("/api/bash/admin/logout", { method: "POST" }).then(() => {
-      window.location.href = "/admin"
+      window.location.href = "/"
     })
   }
 

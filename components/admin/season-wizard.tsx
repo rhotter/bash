@@ -29,6 +29,7 @@ export function SeasonWizard() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: suggestSeasonName(),
@@ -48,6 +49,7 @@ export function SeasonWizard() {
 
   async function handleCreate() {
     setCreating(true)
+    setError(null)
     try {
       const res = await fetch("/api/bash/admin/seasons", {
         method: "POST",
@@ -61,9 +63,17 @@ export function SeasonWizard() {
       })
 
       if (res.ok) {
+        // The API returns { id, name, status }
+        // Success: instead of pushing directly, we can show a success state or just push
+        // The user requested to be returned to the all seasons page
+        router.push("/admin/seasons")
+        router.refresh()
+      } else {
         const data = await res.json()
-        router.push(`/admin/seasons/${data.id}`)
+        setError(data.error || "Failed to create season")
       }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.")
     } finally {
       setCreating(false)
     }
@@ -222,18 +232,25 @@ export function SeasonWizard() {
             <ArrowRight className="h-4 w-4 ml-1.5" />
           </Button>
         ) : (
-          <Button
-            onClick={handleCreate}
-            disabled={creating || !form.name}
-            className="font-semibold cursor-pointer"
-          >
-            {creating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-            ) : (
-              <Check className="h-4 w-4 mr-1.5" />
+          <div className="flex items-center gap-3">
+            {error && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                {error}
+              </p>
             )}
-            Create Season
-          </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={creating || !form.name}
+              className="font-semibold cursor-pointer"
+            >
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <Check className="h-4 w-4 mr-1.5" />
+              )}
+              Create Season
+            </Button>
+          </div>
         )}
       </div>
     </div>

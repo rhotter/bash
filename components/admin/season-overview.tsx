@@ -36,15 +36,15 @@ export function SeasonOverview({ season }: SeasonOverviewProps) {
   return (
     <div className="space-y-4">
       {/* Key Analytics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         {analytics.map((stat) => (
           <Card key={stat.label}>
-            <CardContent className="pt-4 pb-3 px-4">
+            <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                <stat.icon className={`h-3 w-3 ${stat.color}`} />
                 <div>
-                  <p className="text-lg font-bold">{stat.value}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+                  <p className="text-sm font-bold leading-none">{stat.value}</p>
+                  <p className="text-[9px] uppercase tracking-wider text-muted-foreground mt-0.5">{stat.label}</p>
                 </div>
               </div>
             </CardContent>

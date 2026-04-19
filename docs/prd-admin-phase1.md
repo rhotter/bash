@@ -117,20 +117,20 @@ export const seasons = pgTable("seasons", {
 
 **Migration strategy**: All existing seasons get `status = 'completed'` except the current season which gets `status = 'active'`. This can be done via a Drizzle migration or a one-time script.
 
-### 2.4 Seasons Source-of-Truth Migration
+### 2.4 Phase 2 Data Migration: Read-Through Fallback
 
-Currently, seasons are **hardcoded** in `lib/seasons.ts` as a static `SEASONS` array with a hardcoded `CURRENT_SEASON_ID`. This is the source of truth for the public site.
+Currently, seasons are **hardcoded** in `lib/seasons.ts` as a static `SEASONS` array. This is the source of truth for the public site.
 
-For Phase 1, the admin will manage seasons in the **database** (`seasons` table). This creates a dual-source problem that needs to be addressed:
+For Phase 1, the admin will manage new seasons entirely in the **database** (`seasons` table). To gradually migrate the public frontend to the database without requiring a massive data import script, we will use a **Read-Through Fallback (Union)** strategy in a future Phase 2 update.
 
-**Approach**: Keep `lib/seasons.ts` as the source of truth for Phase 1, but:
-1. Admin season list reads from the database
-2. Admin season creation inserts into the database AND appends to `lib/seasons.ts` (via API)
-3. The `status` field lives only in the database — `lib/seasons.ts` doesn't need it since public pages already filter by `is_current` and `hasGames/hasStats`
-4. Draft seasons (status = `draft`) are excluded from the public `SeasonSelector` by filtering on `status != 'draft'` server-side
+When Phase 2 updates `app/api/bash/seasons/route.ts`, it will:
+1. **Query both sources**: Fetch all non-draft seasons from the database.
+2. **Merge and Deduplicate**: Pull the hardcoded `getAllSeasons()` from `lib/seasons.ts` and append them, filtering out any hardcoded seasons that have matching IDs in the database. The database is always authoritative.
+3. **Sort**: Alphabetically sort the combined list descending by ID (e.g. `2026-summer` > `2025-2026`) so the newest seasons bubble to the top.
+4. **Wire up `isCurrent`**: Read the `is_current` boolean directly from the database rows to identify the current season for the UI rather than relying on a hardcoded ID.
 
 > [!IMPORTANT]
-> A full migration to database-only season config is recommended for Phase 2, removing the static `SEASONS` array entirely. Phase 1 keeps the dual approach to minimize blast radius.
+> This pattern allows us to immediately reap the benefits of the admin dashboard for all upcoming seasons while keeping 30+ years of historical data strictly intact.
 
 ---
 

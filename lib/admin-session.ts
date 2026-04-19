@@ -80,7 +80,7 @@ export function setSessionCookie(response: Response): Response {
     "Set-Cookie",
     [
       `${COOKIE_NAME}=${token}`,
-      `Path=/admin`,
+      `Path=/`,
       `HttpOnly`,
       `SameSite=Lax`,
       `Max-Age=${MAX_AGE}`,
@@ -94,6 +94,17 @@ export function setSessionCookie(response: Response): Response {
  * Clear the admin session cookie on a Response.
  */
 export function clearSessionCookie(response: Response): Response {
+  response.headers.append(
+    "Set-Cookie",
+    [
+      `${COOKIE_NAME}=`,
+      `Path=/`,
+      `HttpOnly`,
+      `SameSite=Lax`,
+      `Max-Age=0`,
+    ].join("; ")
+  )
+  // Clear the deprecated cookie path as well, just in case they have a stale session
   response.headers.append(
     "Set-Cookie",
     [
