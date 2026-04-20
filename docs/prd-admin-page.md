@@ -78,7 +78,6 @@ There is no centralized place for commissioners to manage the league — seasons
 #### 4.6 Team Management (`/admin/teams`)
 - List teams, edit names/slugs
 - Assign teams to seasons
-- Upload/manage team logos & details
 
 #### 4.7 Awards & Hall of Fame (`/admin/awards`)
 - View/edit player awards by season
@@ -102,6 +101,10 @@ There is no centralized place for commissioners to manage the league — seasons
 #### 4.10 Audit Log
 - Track admin actions (who changed what, when)
 - Requires evolving beyond single shared PIN
+
+#### 4.11 Team Logo Management
+- Upload and manage team logos directly in the UI instead of relying on `lib/team-logos.ts` mapping.
+- Requires cloud storage implementation (e.g. S3, Vercel Blob).
 
 ## 5. Auth Model
 
@@ -144,6 +147,13 @@ app/
 - **Data**: Drizzle ORM queries, consistent with existing patterns
 - **UI**: shadcn/ui components (Tables, Cards, Dialogs, Tabs), consistent with site design. Uses the **same light theme** as the public site with a prominent **orange admin bar** at the top to indicate commissioner mode (no separate dark theme).
 - **Mobile**: Gameday-specific views optimized for mobile; management pages desktop-first
+
+### Database Pattern — Playoff Placeholders
+Instead of utilizing generic "TBD vs TBD" scheduling, provisional playoff trees should utilize explicit canonical "Seeds".
+- Add an `is_placeholder` boolean column to the `teams` table.
+- Maintain six explicit placeholder franchise records: `1-seed`, `2-seed`, `3-seed`, `4-seed`, `5-seed`, and `6-seed`.
+- Filter out `is_placeholder = true` everywhere public tables, profiles, or admin indexes are generated.
+- In Admin Season Tools, build a "Resolve Placeholders" configuration wizard at season's end that searches `games` for `home_team` or `away_team` matching a seed, providing dropdowns to explicitly swap the seed for the real finalized franchise.
 
 ## 7. Open Questions
 

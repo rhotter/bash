@@ -4,6 +4,7 @@ import { useState } from "react"
 import { SeasonOverview } from "./season-overview"
 import { SeasonForm } from "./season-form"
 import { PlaceholderCard } from "./placeholder-card"
+import { SeasonTeamsTab } from "./season-teams-tab"
 
 type Tab = "Overview" | "Settings" | "Teams" | "Roster" | "Schedule" | "Draft" | "Registration"
 
@@ -64,7 +65,7 @@ export function SeasonTabs({ season }: SeasonTabsProps) {
       <div>
         {activeTab === "Overview" && <SeasonOverview season={season} onEditSettings={() => setActiveTab("Settings")} />}
         {activeTab === "Settings" && <SeasonForm season={season} />}
-        {activeTab === "Teams" && <PlaceholderCard title="Team Management" phase={2} />}
+        {activeTab === "Teams" && <SeasonTeamsTab seasonId={season.id} seasonStatus={season.status} initialTeams={season.teams} />}
         {activeTab === "Roster" && <PlaceholderCard title="Roster Management" phase={2} />}
         {activeTab === "Schedule" && <PlaceholderCard title="Schedule Editor" phase={2} />}
         {activeTab === "Draft" && (
