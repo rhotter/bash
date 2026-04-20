@@ -5,8 +5,15 @@ import { SeasonOverview } from "./season-overview"
 import { SeasonForm } from "./season-form"
 import { PlaceholderCard } from "./placeholder-card"
 
-const TABS = ["Overview", "Settings", "Teams", "Roster", "Schedule"] as const
-type Tab = (typeof TABS)[number]
+type Tab = "Overview" | "Settings" | "Teams" | "Roster" | "Schedule" | "Draft" | "Registration"
+
+function getTabsForStatus(status: string): Tab[] {
+  const base: Tab[] = ["Overview", "Settings", "Teams", "Roster", "Schedule"]
+  if (status === "draft") {
+    return [...base, "Draft", "Registration"]
+  }
+  return base
+}
 
 interface SeasonTabsProps {
   season: {
@@ -31,13 +38,14 @@ interface SeasonTabsProps {
 }
 
 export function SeasonTabs({ season }: SeasonTabsProps) {
+  const tabs = getTabsForStatus(season.status)
   const [activeTab, setActiveTab] = useState<Tab>("Overview")
 
   return (
     <div className="space-y-4">
       {/* Tab Buttons */}
       <div className="flex gap-1 border-b">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -54,12 +62,27 @@ export function SeasonTabs({ season }: SeasonTabsProps) {
 
       {/* Tab Content */}
       <div>
-        {activeTab === "Overview" && <SeasonOverview season={season} />}
+        {activeTab === "Overview" && <SeasonOverview season={season} onEditSettings={() => setActiveTab("Settings")} />}
         {activeTab === "Settings" && <SeasonForm season={season} />}
         {activeTab === "Teams" && <PlaceholderCard title="Team Management" phase={2} />}
         {activeTab === "Roster" && <PlaceholderCard title="Roster Management" phase={2} />}
         {activeTab === "Schedule" && <PlaceholderCard title="Schedule Editor" phase={2} />}
+        {activeTab === "Draft" && (
+          <PlaceholderCard
+            title="Draft Setup"
+            phase={2}
+            description="Configure the draft format: number of rounds, protection list sizes (2–10 per BASH rules), draft order based on previous season standings, and supplemental draft rules."
+          />
+        )}
+        {activeTab === "Registration" && (
+          <PlaceholderCard
+            title="Player Registration"
+            phase={2}
+            description="Manage player registration for the upcoming season. Track veteran returns, free agent declarations, rookie signups from pickups, and registration fee status."
+          />
+        )}
       </div>
     </div>
   )
 }
+

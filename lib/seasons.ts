@@ -8,6 +8,7 @@ export interface Season {
   name: string
   leagueId: string
   seasonType: SeasonType
+  status: string
   statsOnly?: boolean
 }
 
@@ -21,6 +22,7 @@ function mapRow(s: typeof schema.seasons.$inferSelect): Season {
     name: s.name,
     leagueId: s.leagueId ?? "",
     seasonType: s.seasonType as SeasonType,
+    status: s.status,
     statsOnly: s.statsOnly,
   }
 }

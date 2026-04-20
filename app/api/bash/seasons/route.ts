@@ -9,6 +9,7 @@ export interface SeasonInfo {
   isCurrent: boolean
   hasGames: boolean
   hasStats: boolean
+  status: string
 }
 
 export interface SeasonsData {
@@ -48,6 +49,7 @@ export async function GET() {
       isCurrent: s.id === currentSeason.id,
       hasGames: (seasonGameCounts.get(s.id) ?? 0) > 0,
       hasStats: seasonsWithStats.has(s.id),
+      status: s.status,
     }))
 
     return NextResponse.json({ seasons } satisfies SeasonsData, {

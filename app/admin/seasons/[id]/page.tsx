@@ -3,8 +3,6 @@ import { db, rawSql, schema } from "@/lib/db"
 import { eq, sql } from "drizzle-orm"
 import { Badge } from "@/components/ui/badge"
 import { SeasonTabs } from "@/components/admin/season-tabs"
-import Link from "next/link"
-import { ExternalLink } from "lucide-react"
 
 interface SeasonDetailPageProps {
   params: Promise<{ id: string }>

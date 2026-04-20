@@ -1,13 +1,16 @@
 "use client"
 
-import { Users, UserCheck, Gamepad2, CheckCircle, MapPin, Timer, Trophy, StickyNote } from "lucide-react"
+import { useState } from "react"
+import { Users, UserCheck, Gamepad2, CheckCircle, MapPin, Timer, Trophy, StickyNote, ChevronDown, ChevronUp, Edit2, CalendarClock } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { TeamLogo } from "@/components/team-logo"
+import { Button } from "@/components/ui/button"
 
 interface SeasonOverviewProps {
   season: {
+    status: string
     teams: { teamSlug: string; teamName: string }[]
     teamCount?: number
     playerCount: number
@@ -20,6 +23,7 @@ interface SeasonOverviewProps {
     recentGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
     upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
   }
+  onEditSettings?: () => void
 }
 
 const STANDINGS_LABELS: Record<string, string> = {
@@ -36,7 +40,8 @@ const STANDINGS_DESCRIPTIONS: Record<string, string> = {
   "pts-custom": "Custom points calculation.",
 }
 
-export function SeasonOverview({ season }: SeasonOverviewProps) {
+export function SeasonOverview({ season, onEditSettings }: SeasonOverviewProps) {
+  const [notesExpanded, setNotesExpanded] = useState(false)
   const analytics = [
     { label: "Teams", value: season.teams.length, icon: Users, color: "text-blue-600" },
     { label: "Players", value: season.playerCount, icon: UserCheck, color: "text-green-600" },
@@ -46,6 +51,18 @@ export function SeasonOverview({ season }: SeasonOverviewProps) {
 
   return (
     <div className="space-y-4">
+      {/* Registration Banner */}
+      <div className={`rounded-md px-4 py-2 flex items-center gap-2 text-sm font-medium ${
+        season.status === 'draft' ? "bg-amber-500/10 text-amber-800" :
+        season.status === 'active' ? "bg-primary/10 text-primary" : 
+        "bg-muted text-muted-foreground"
+      }`}>
+        <CalendarClock className="h-4 w-4" />
+        {season.status === 'draft' && <span>Registration not started</span>}
+        {season.status === 'active' && <span>Registration closed</span>}
+        {season.status === 'completed' && <span>Registration closed</span>}
+      </div>
+
       {/* Key Analytics */}
       <div className="grid grid-cols-4 gap-3">
         {analytics.map((stat) => (
@@ -155,8 +172,14 @@ export function SeasonOverview({ season }: SeasonOverviewProps) {
 
       {/* Settings Summary */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">Season Settings</CardTitle>
+          {onEditSettings && (
+            <Button variant="ghost" size="sm" onClick={onEditSettings} className="h-8 px-2 text-xs font-medium cursor-pointer -mt-1 -mr-2">
+              <Edit2 className="h-3.5 w-3.5 mr-1" />
+              Edit
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -191,11 +214,19 @@ export function SeasonOverview({ season }: SeasonOverviewProps) {
               </div>
             </div>
             {season.adminNotes && (
-              <div className="flex items-start gap-2">
-                <StickyNote className="h-3.5 w-3.5 mt-0.5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium line-clamp-2">{season.adminNotes}</p>
-                  <p className="text-xs text-muted-foreground">Admin notes</p>
+              <div className="flex items-start gap-2 col-span-2">
+                <StickyNote className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className={`font-medium ${notesExpanded ? '' : 'line-clamp-1'}`}>{season.adminNotes}</p>
+                  <div className="flex items-center gap-3 mt-0.5">
+                    <p className="text-xs text-muted-foreground">Admin notes</p>
+                    <button 
+                      onClick={() => setNotesExpanded(!notesExpanded)}
+                      className="text-xs font-semibold text-primary/70 hover:text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
+                    >
+                      {notesExpanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Read all</>}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -205,3 +236,4 @@ export function SeasonOverview({ season }: SeasonOverviewProps) {
     </div>
   )
 }
+
