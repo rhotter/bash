@@ -105,6 +105,7 @@ export const seasons = pgTable("seasons", {
   gameLength: integer("game_length").notNull().default(60),  // in minutes
   defaultLocation: text("default_location"),                 // e.g. "James Lick Arena"
   adminNotes: text("admin_notes"),                           // private commissioner notes
+  playoffTeams: integer("playoff_teams"),                    // Number of teams that make playoffs (nullable for historical seasons)
 })
 ```
 
@@ -202,7 +203,7 @@ Each row links to the season detail page.
 **Editable fields**:
 - Season name
 - Season type (fall / summer)
-- Status (draft → active → completed) — one-way progression with confirmation
+- Status (draft → active → completed) — one-way progression with a native `AlertDialog` confirmation to prevent accidental clicks.
   - Transitioning draft → active **automatically sets `is_current = true`** on this season. Does NOT modify the previous season's `is_current` flag (multiple seasons can have `is_current = true` during a transition, but `getCurrentSeason()` should resolve to the newest active one).
 - League ID (Sportability reference) — optional, can be added later when ready to sync
 
@@ -210,6 +211,7 @@ Each row links to the season detail page.
 - **Standings method** — dropdown with options from §3.7. Default: `Pts-PBLA` (BASH's current method: W=3, OTW=2, OTL=1, L=0). Determines how standings are calculated and displayed on the public site.
 - **Game length** — number input in minutes. Default: `60`. Used for scheduling and period calculations.
 - **Default location** — text input. Auto-populated based on season type (fall → "James Lick Arena", summer → "Dolores Park Multi-purpose Court"). Can be overridden.
+- **Playoff teams** — number input. Sets the count of playoff teams, editable only while in `draft` status.
 - **Admin notes** — textarea. Private commissioner-only notes, not visible on the public site. Useful for tracking decisions, rule changes, or season-specific context (e.g. "Self Request; Added 8/24/2025").
 
 **Tabbed sections on the season detail page**:
@@ -246,7 +248,9 @@ The overview acts as a mini-dashboard for this specific season, with inline prev
 
 #### Teams tab
 - List of teams assigned to this season (from `season_teams`)
-- Add/remove teams for draft seasons only
+- Add/remove teams for draft seasons only (locked otherwise).
+- Global Franchise Directory filters out placeholder teams (`tbd`, `seed-*`).
+- **Create Team**: Inline button opens a dialog to quickly create a new team (Name and auto-generated Team ID). It calls `POST /api/bash/admin/teams` and instantly assigns it to the season. New teams use a generic hockey stick SVG fallback if no image logo is mapped.
 
 #### Roster tab
 - Player assignments for this season (from `player_seasons`)
@@ -280,8 +284,9 @@ Multi-step wizard flow:
 - Status: Automatically set to `draft`
 
 **Step 2: Teams**
-- Select the count of teams to include in this season
-- Option to select "unknown" if team count hasn't been decided yet
+- Select the count of teams to include in this season (optional).
+- Select the number of **Playoff Teams** (default 4).
+- The wizard automatically generates and assigns `seed-X` placeholder teams to the season based on the selected playoff count (so draft formats have placeholders to work with).
 
 **Step 3: Confirmation**
 - Review summary of season name, type, and team count

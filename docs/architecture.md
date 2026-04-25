@@ -61,7 +61,7 @@ erDiagram
 The Drizzle schema (`lib/db/schema.ts`) is designed around 15 core tables:
 
 1. **League Structure**
-   - `seasons`: Defines seasons (e.g., "Fall 2025") and links to Sportability league IDs.
+   - `seasons`: Defines seasons (e.g., "Fall 2025") and links to Sportability league IDs. Stores configuration like `status` (draft/active/completed), `season_type` (fall/summer), and `playoff_teams`.
    - `teams`: Global team identities.
    - `season_teams`: Junction table linking teams to specific seasons.
 
