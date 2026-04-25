@@ -110,7 +110,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     if (defaultLocation !== undefined) updates.defaultLocation = defaultLocation
     if (adminNotes !== undefined) updates.adminNotes = adminNotes
     if (statsOnly !== undefined) updates.statsOnly = statsOnly
-    if (playoffTeams !== undefined) updates.playoffTeams = playoffTeams
+    if (playoffTeams !== undefined && existing.status === "draft") {
+      updates.playoffTeams = playoffTeams
+    }
 
     // Auto-set is_current when activating
     if (status === "active" && existing.status === "draft") {

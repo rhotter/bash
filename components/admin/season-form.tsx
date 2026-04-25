@@ -185,9 +185,18 @@ export function SeasonForm({ season }: SeasonFormProps) {
                 type="number"
                 min={0}
                 max={16}
-                value={form.playoffTeams}
-                onChange={(e) => setForm((f) => ({ ...f, playoffTeams: parseInt(e.target.value) || 0 }))}
+                value={form.playoffTeams ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setForm((f) => ({ ...f, playoffTeams: val === "" ? null : parseInt(val) }))
+                }}
+                disabled={season.status !== "draft"}
               />
+              {season.status !== "draft" && (
+                <p className="text-[10px] text-muted-foreground">
+                  Playoff teams can only be modified while the season is in draft status.
+                </p>
+              )}
             </div>
           </div>
 
