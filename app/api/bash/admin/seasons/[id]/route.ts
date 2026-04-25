@@ -85,6 +85,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       defaultLocation,
       adminNotes,
       statsOnly,
+      playoffTeams,
     } = body
 
     // Validate status transition
@@ -109,6 +110,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     if (defaultLocation !== undefined) updates.defaultLocation = defaultLocation
     if (adminNotes !== undefined) updates.adminNotes = adminNotes
     if (statsOnly !== undefined) updates.statsOnly = statsOnly
+    if (playoffTeams !== undefined) updates.playoffTeams = playoffTeams
 
     // Auto-set is_current when activating
     if (status === "active" && existing.status === "draft") {
@@ -131,6 +133,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     })
 
     // Bust the Next.js season cache so subsequent reads see fresh data
+    // @ts-expect-error - Next.js canary changed the signature of revalidateTag
     revalidateTag("seasons")
 
     return NextResponse.json({ ok: true })

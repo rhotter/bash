@@ -37,6 +37,7 @@ export function SeasonWizard() {
     leagueId: "",
     teamCount: 7,
     teamCountUnknown: false,
+    playoffTeams: 4,
   })
 
   function nextStep() {
@@ -59,6 +60,7 @@ export function SeasonWizard() {
           seasonType: form.seasonType,
           leagueId: form.leagueId || null,
           teamCount: form.teamCountUnknown ? null : form.teamCount,
+          playoffTeams: form.playoffTeams,
         }),
       })
 
@@ -173,6 +175,20 @@ export function SeasonWizard() {
                   Team count hasn&apos;t been decided yet
                 </Label>
               </div>
+
+              <div className="space-y-2 mt-4 pt-4 border-t">
+                <Label className="text-xs text-muted-foreground">Number of Playoff Teams</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={16}
+                  value={form.playoffTeams}
+                  onChange={(e) => setForm((f) => ({ ...f, playoffTeams: parseInt(e.target.value) || 0 }))}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  We will automatically create playoff placeholder teams (e.g. seed-1, seed-2)
+                </p>
+              </div>
             </div>
           )}
 
@@ -193,6 +209,10 @@ export function SeasonWizard() {
                   <span className="font-medium">
                     {form.teamCountUnknown ? "TBD" : form.teamCount}
                   </span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground">Playoff Teams</span>
+                  <span className="font-medium">{form.playoffTeams}</span>
                 </div>
                 {form.leagueId && (
                   <div className="flex justify-between py-1.5 border-b">

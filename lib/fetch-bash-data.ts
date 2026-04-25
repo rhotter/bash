@@ -59,6 +59,11 @@ function computeStandings(games: BashGame[]): Standing[] {
     t.gd = t.gf - t.ga
   }
 
+  teamMap.delete("tbd")
+  for (const key of teamMap.keys()) {
+    if (key.startsWith("seed-")) teamMap.delete(key)
+  }
+
   return [...teamMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
 }
 

@@ -32,7 +32,7 @@ async function getSeasons(statusFilter?: string, typeFilter?: string) {
       s.season_type AS "seasonType",
       s.status,
       s.is_current AS "isCurrent",
-      (SELECT COUNT(*)::int FROM season_teams WHERE season_id = s.id) AS "teamCount",
+      (SELECT COUNT(*)::int FROM season_teams WHERE season_id = s.id AND team_slug != 'tbd' AND team_slug NOT LIKE 'seed-%') AS "teamCount",
       (SELECT COUNT(*)::int FROM games WHERE season_id = s.id) AS "gameCount",
       (SELECT COUNT(DISTINCT player_id)::int FROM player_seasons WHERE season_id = s.id) AS "playerCount"
     FROM seasons s

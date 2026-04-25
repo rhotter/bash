@@ -29,6 +29,7 @@ interface SeasonFormProps {
     defaultLocation: string | null
     adminNotes: string | null
     statsOnly: boolean
+    playoffTeams: number | null
   }
 }
 
@@ -47,6 +48,7 @@ export function SeasonForm({ season }: SeasonFormProps) {
     defaultLocation: season.defaultLocation || "",
     adminNotes: season.adminNotes || "",
     statsOnly: season.statsOnly || false,
+    playoffTeams: season.playoffTeams ?? 4,
   })
 
   async function handleSave() {
@@ -172,6 +174,19 @@ export function SeasonForm({ season }: SeasonFormProps) {
                 value={form.defaultLocation}
                 onChange={(e) => setForm((f) => ({ ...f, defaultLocation: e.target.value }))}
                 placeholder="Venue name"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Number of Playoff Teams</Label>
+              <Input
+                type="number"
+                min={0}
+                max={16}
+                value={form.playoffTeams}
+                onChange={(e) => setForm((f) => ({ ...f, playoffTeams: parseInt(e.target.value) || 0 }))}
               />
             </div>
           </div>

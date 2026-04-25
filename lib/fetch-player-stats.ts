@@ -295,7 +295,9 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
     ...(isAllTime ? { seasonsPlayed: r.seasons_played } : {}),
   }))
 
-  const teams = teamRows.map((r) => ({ slug: r.slug, name: r.name }))
+  const teams = teamRows
+    .filter((r) => r.slug !== "tbd" && !r.slug.startsWith("seed-"))
+    .map((r) => ({ slug: r.slug, name: r.name }))
 
   return { skaters, goalies, teams, lastUpdated: new Date().toISOString(), hasPlayoffs }
 }

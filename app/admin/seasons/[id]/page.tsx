@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import { db, rawSql, schema } from "@/lib/db"
-import { eq, sql } from "drizzle-orm"
+import { eq, ne, and, sql } from "drizzle-orm"
 import { Badge } from "@/components/ui/badge"
 import { SeasonTabs } from "@/components/admin/season-tabs"
 
@@ -17,11 +17,12 @@ async function getSeason(id: string) {
 
   if (!season) return null
 
-  const teams = await db
+  const allTeams = await db
     .select({ teamSlug: schema.seasonTeams.teamSlug, teamName: schema.teams.name })
     .from(schema.seasonTeams)
     .innerJoin(schema.teams, eq(schema.seasonTeams.teamSlug, schema.teams.slug))
-    .where(eq(schema.seasonTeams.seasonId, id))
+    .where(and(eq(schema.seasonTeams.seasonId, id), ne(schema.seasonTeams.teamSlug, "tbd")))
+  const teams = allTeams.filter(t => !t.teamSlug.startsWith("seed-"))
 
   const [counts] = await rawSql(sql`
     SELECT

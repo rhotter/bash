@@ -28,6 +28,7 @@ interface SeasonTabsProps {
     defaultLocation: string | null
     adminNotes: string | null
     statsOnly: boolean
+    playoffTeams: number | null
     isCurrent: boolean
     teams: { teamSlug: string; teamName: string }[]
     gameCount: number

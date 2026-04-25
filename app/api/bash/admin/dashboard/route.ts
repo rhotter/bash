@@ -16,7 +16,7 @@ export async function GET() {
       seasonType: schema.seasons.seasonType,
       status: schema.seasons.status,
       isCurrent: schema.seasons.isCurrent,
-      teamCount: sql<number>`(SELECT COUNT(*) FROM season_teams WHERE season_id = ${schema.seasons.id})`,
+      teamCount: sql<number>`(SELECT COUNT(*)::int FROM season_teams WHERE season_id = ${schema.seasons.id} AND team_slug != 'tbd' AND team_slug NOT LIKE 'seed-%')`,
       gameCount: sql<number>`(SELECT COUNT(*) FROM games WHERE season_id = ${schema.seasons.id})`,
       completedGameCount: sql<number>`(SELECT COUNT(*) FROM games WHERE season_id = ${schema.seasons.id} AND status = 'final')`,
       playerCount: sql<number>`(SELECT COUNT(DISTINCT player_id) FROM player_seasons WHERE season_id = ${schema.seasons.id})`,
