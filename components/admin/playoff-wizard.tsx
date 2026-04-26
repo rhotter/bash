@@ -58,26 +58,28 @@ export function PlayoffWizard({
   // Step 1: Format & Teams
   const [numTeams, setNumTeams] = useState(Math.min(teams.length, 4))
   const [playIn, setPlayIn] = useState(false)
+  const [quarterSeriesLength, setQuarterSeriesLength] = useState<1 | 3>(1)
   const [semiSeriesLength, setSemiSeriesLength] = useState<1 | 3>(1)
   const [finalSeriesLength, setFinalSeriesLength] = useState<1 | 3>(1)
   const [usePlaceholders, setUsePlaceholders] = useState(false)
 
   // Step 2: Seeding — ordered list of team slugs
   const [seeds, setSeeds] = useState<string[]>(() =>
-    teams.slice(0, Math.min(teams.length, 5)).map((t) => t.teamSlug)
+    teams.slice(0, Math.min(teams.length, 8)).map((t) => t.teamSlug)
   )
 
   // Generated bracket
   const bracketGames = useMemo((): BracketGame[] => {
     return generateBracket({
       numTeams,
-      playIn: playIn && numTeams >= 5,
+      playIn: playIn && numTeams % 2 !== 0,
+      quarterSeriesLength,
       semiSeriesLength,
       finalSeriesLength,
       seeds: seeds.slice(0, numTeams),
       usePlaceholders,
     })
-  }, [numTeams, playIn, semiSeriesLength, finalSeriesLength, seeds, usePlaceholders])
+  }, [numTeams, playIn, quarterSeriesLength, semiSeriesLength, finalSeriesLength, seeds, usePlaceholders])
 
   // Step 3: Game details (mutable dates/times/locations per bracket game)
   const [gameDetails, setGameDetails] = useState<
@@ -98,6 +100,7 @@ export function PlayoffWizard({
   const roundLabel = (round: string): string => {
     switch (round) {
       case "play-in": return "Play-in"
+      case "quarterfinal": return "Quarterfinals"
       case "semifinal": return "Semi-Finals"
       case "final": return "Finals"
       default: return round
@@ -114,7 +117,7 @@ export function PlayoffWizard({
     return grouped
   }, [bracketGames])
 
-  const roundOrder = ["play-in", "semifinal", "final"]
+  const roundOrder = ["play-in", "quarterfinal", "semifinal", "final"]
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
@@ -241,7 +244,8 @@ export function PlayoffWizard({
                       onValueChange={(v) => {
                         const n = +v
                         setNumTeams(n)
-                        if (n < 5) setPlayIn(false)
+                        // Auto-enable play-in for odd counts
+                        setPlayIn(n % 2 !== 0)
                       }}
                     >
                       <SelectTrigger>
@@ -249,24 +253,46 @@ export function PlayoffWizard({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="4">4 teams</SelectItem>
-                        {teams.length >= 5 && <SelectItem value="5">5 teams (with play-in)</SelectItem>}
+                        {teams.length >= 5 && <SelectItem value="5">5 teams</SelectItem>}
+                        {teams.length >= 6 && <SelectItem value="6">6 teams</SelectItem>}
+                        {teams.length >= 7 && <SelectItem value="7">7 teams</SelectItem>}
+                        {teams.length >= 8 && <SelectItem value="8">8 teams</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {numTeams >= 5 && (
+                  {numTeams % 2 !== 0 && (
                     <div className="flex items-center gap-3">
                       <Switch
                         checked={playIn}
                         onCheckedChange={setPlayIn}
                         id="play-in"
                       />
-                      <Label htmlFor="play-in">Play-in Game (#4 vs #5)</Label>
+                      <Label htmlFor="play-in">
+                        Play-in Game (#{numTeams - 1} vs #{numTeams})
+                      </Label>
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${numTeams >= 6 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  {numTeams >= 6 && (
+                    <div className="space-y-2">
+                      <Label>Quarterfinal Format</Label>
+                      <Select
+                        value={String(quarterSeriesLength)}
+                        onValueChange={(v) => setQuarterSeriesLength(+v as 1 | 3)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Single Game</SelectItem>
+                          <SelectItem value="3">Best of 3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Semi-Final Format</Label>
                     <Select
@@ -282,7 +308,6 @@ export function PlayoffWizard({
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="space-y-2">
                     <Label>Finals Format</Label>
                     <Select
@@ -313,6 +338,7 @@ export function PlayoffWizard({
                   <strong>Preview:</strong>{" "}
                   {bracketGames.length} total playoff games
                   {playIn && " (including play-in)"}
+                  {numTeams >= 6 && quarterSeriesLength === 3 && " • Best-of-3 quarters"}
                   {semiSeriesLength === 3 && " • Best-of-3 semis"}
                   {finalSeriesLength === 3 && " • Best-of-3 finals"}
                 </div>
@@ -383,19 +409,15 @@ export function PlayoffWizard({
                 {/* Visual bracket preview */}
                 <div className="p-3 border rounded-lg text-sm bg-muted/30 space-y-1">
                   <strong>Bracket Preview:</strong>
-                  {playIn && numTeams >= 5 && (
-                    <div className="ml-2">
-                      Play-in: #{4} {teamNameForSlug(seeds[3] || "")} vs #{5} {teamNameForSlug(seeds[4] || "")}
-                    </div>
-                  )}
-                  <div className="ml-2">
-                    SF-A: #{1} {teamNameForSlug(seeds[0] || "")} vs{" "}
-                    {playIn ? "Play-in Winner" : `#${4} ${teamNameForSlug(seeds[3] || "")}`}
-                  </div>
-                  <div className="ml-2">
-                    SF-B: #{2} {teamNameForSlug(seeds[1] || "")} vs #{3} {teamNameForSlug(seeds[2] || "")}
-                  </div>
-                  <div className="ml-2">Final: Winner SF-A vs Winner SF-B</div>
+                  {bracketGames
+                    .filter((g, i, arr) => arr.findIndex((x) => x.seriesId === g.seriesId) === i)
+                    .map((g) => (
+                      <div key={g.seriesId} className="ml-2">
+                        <span className="uppercase text-xs font-medium text-muted-foreground">{g.seriesId}:</span>{" "}
+                        {displayTeam(g.homeTeam, g.homePlaceholder)} vs{" "}
+                        {displayTeam(g.awayTeam, g.awayPlaceholder)}
+                      </div>
+                    ))}
                 </div>
               </div>
             )}

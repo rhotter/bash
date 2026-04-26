@@ -31,12 +31,13 @@ export interface GeneratedGame {
 }
 
 export interface BracketConfig {
-  numTeams: number       // 4 or 5
-  playIn: boolean        // true if 5th team needs a play-in
+  numTeams: number          // 4–8
+  playIn: boolean           // true if odd team count needs a play-in
+  quarterSeriesLength: 1 | 3
   semiSeriesLength: 1 | 3
   finalSeriesLength: 1 | 3
-  seeds: string[]        // team slugs in seeded order (index 0 = #1 seed)
-  usePlaceholders: boolean // true → use "Seed 1" labels instead of real teams
+  seeds: string[]           // team slugs in seeded order (index 0 = #1 seed)
+  usePlaceholders: boolean  // true → use "Seed 1" labels instead of real teams
 }
 
 export interface BracketGame {
@@ -186,38 +187,26 @@ export function mapRoundRobinToGames(
 /**
  * Generate a playoff bracket for the BASH league.
  *
- * Supports:
- * - 4 teams: SF-A (#1 vs #4), SF-B (#2 vs #3), Final
- * - 5 teams: Play-in (#4 vs #5) → SF-A (#1 vs play-in winner), SF-B (#2 vs #3), Final
- * - Series lengths of 1 or 3 per round
+ * Supports 4–8 teams with standard bracket seeding:
+ *   8: QF(#1v#8, #4v#5, #2v#7, #3v#6) → SF → Final
+ *   7: Play-in(#7v#8→bye) then same as 8 with #1 bye on A-side
+ *   6: QF(#4v#5, #3v#6) + #1,#2 byes → SF → Final
+ *   5: Play-in(#4v#5) + #1,#2,#3 byes → SF → Final
+ *   4: SF(#1v#4, #2v#3) → Final
  *
+ * Each round can be best-of-1 or best-of-3.
  * Returns fully linked games with nextGameId/nextGameSlot references.
  */
 export function generateBracket(config: BracketConfig): BracketGame[] {
-  const { numTeams, playIn, semiSeriesLength, finalSeriesLength, seeds, usePlaceholders } = config
+  const {
+    numTeams, playIn, quarterSeriesLength, semiSeriesLength,
+    finalSeriesLength, seeds, usePlaceholders,
+  } = config
 
   const games: BracketGame[] = []
   let idCounter = 1
   const makeId = () => `playoff-${idCounter++}`
 
-  // Pre-generate all IDs so we can link them
-  const playInIds: string[] = playIn ? [makeId()] : []
-
-  const sfaIds: string[] = []
-  for (let i = 0; i < semiSeriesLength; i++) sfaIds.push(makeId())
-
-  const sfbIds: string[] = []
-  for (let i = 0; i < semiSeriesLength; i++) sfbIds.push(makeId())
-
-  const finalIds: string[] = []
-  for (let i = 0; i < finalSeriesLength; i++) finalIds.push(makeId())
-
-  // The "destination" game for each series winner
-  // SF-A winner → Final (home slot)
-  // SF-B winner → Final (away slot)
-  const finalFirstId = finalIds[0]
-
-  // Helper to resolve seed to team slug or placeholder
   const teamOrTbd = (seedIndex: number): { slug: string; placeholder: string | null } => {
     if (seedIndex >= seeds.length || usePlaceholders) {
       return { slug: "tbd", placeholder: `Seed ${seedIndex + 1}` }
@@ -225,52 +214,27 @@ export function generateBracket(config: BracketConfig): BracketGame[] {
     return { slug: seeds[seedIndex], placeholder: null }
   }
 
-  // ─── Play-in game (if 5 teams) ──────────────────────────
-  if (playIn && numTeams >= 5) {
-    const seed4 = teamOrTbd(3)
-    const seed5 = teamOrTbd(4)
-
-    games.push({
-      id: playInIds[0],
-      homeTeam: seed4.slug,
-      awayTeam: seed5.slug,
-      homePlaceholder: seed4.placeholder,
-      awayPlaceholder: seed5.placeholder,
-      bracketRound: "play-in",
-      seriesId: "play-in",
-      seriesGameNumber: 1,
-      nextGameId: sfaIds[0],
-      nextGameSlot: "away", // play-in winner becomes away in SF-A (vs #1 seed at home)
-      gameType: "playoff",
-      status: "upcoming",
-      date: "",
-      time: "TBD",
-      location: "James Lick Arena",
-    })
-  }
-
-  // ─── Semi-final A ──────────────────────────────────────
-  {
-    const seed1 = teamOrTbd(0) // #1 seed always home in SF-A
-    const sfaAway = playIn
-      ? { slug: "tbd", placeholder: "Play-in Winner" }
-      : teamOrTbd(3) // #4 seed if no play-in
-
-    for (let g = 0; g < semiSeriesLength; g++) {
-      // Only the last game in the series links to the final
-      // (in practice, advancement is determined dynamically by the API,
-      //  but we link the first game of the series for bracket resolution)
+  const makeSeries = (
+    seriesLen: number, seriesId: string, round: string,
+    homeTeam: { slug: string; placeholder: string | null },
+    awayTeam: { slug: string; placeholder: string | null },
+    nextId: string | null, nextSlot: "home" | "away" | null,
+  ): string[] => {
+    const ids: string[] = []
+    for (let g = 0; g < seriesLen; g++) {
+      const id = makeId()
+      ids.push(id)
       games.push({
-        id: sfaIds[g],
-        homeTeam: g % 2 === 0 ? seed1.slug : sfaAway.slug, // alternate home ice
-        awayTeam: g % 2 === 0 ? sfaAway.slug : seed1.slug,
-        homePlaceholder: g % 2 === 0 ? seed1.placeholder : sfaAway.placeholder,
-        awayPlaceholder: g % 2 === 0 ? sfaAway.placeholder : seed1.placeholder,
-        bracketRound: "semifinal",
-        seriesId: "sf-a",
+        id,
+        homeTeam: g % 2 === 0 ? homeTeam.slug : awayTeam.slug,
+        awayTeam: g % 2 === 0 ? awayTeam.slug : homeTeam.slug,
+        homePlaceholder: g % 2 === 0 ? homeTeam.placeholder : awayTeam.placeholder,
+        awayPlaceholder: g % 2 === 0 ? awayTeam.placeholder : homeTeam.placeholder,
+        bracketRound: round,
+        seriesId,
         seriesGameNumber: g + 1,
-        nextGameId: g === 0 ? finalFirstId : null, // link series to next round via first game
-        nextGameSlot: g === 0 ? "home" : null,
+        nextGameId: g === 0 ? nextId : null,
+        nextGameSlot: g === 0 ? nextSlot : null,
         gameType: "playoff",
         status: "upcoming",
         date: "",
@@ -278,58 +242,174 @@ export function generateBracket(config: BracketConfig): BracketGame[] {
         location: "James Lick Arena",
       })
     }
+    return ids
   }
 
-  // ─── Semi-final B ──────────────────────────────────────
-  {
-    const seed2 = teamOrTbd(1)
-    const seed3 = teamOrTbd(2)
+  // Pre-generate final IDs so we can link to them
+  const finalIds: string[] = []
+  for (let i = 0; i < finalSeriesLength; i++) finalIds.push(makeId())
+  const finalFirstId = finalIds[0]
 
+  // Pre-generate semi IDs so quarterfinals can link to them
+  const sfaIds: string[] = []
+  for (let i = 0; i < semiSeriesLength; i++) sfaIds.push(makeId())
+  const sfbIds: string[] = []
+  for (let i = 0; i < semiSeriesLength; i++) sfbIds.push(makeId())
+
+  // ─── Determine bracket structure ────────────────────────
+  // Standard bracket: A-side (#1,#8,#4,#5)  B-side (#2,#7,#3,#6)
+  // With byes for missing seeds
+
+  const hasPlayIn = playIn && numTeams % 2 !== 0
+
+  if (numTeams <= 5) {
+    // ─── 4–5 teams: optional play-in → semis → final ──────
+    if (hasPlayIn && numTeams === 5) {
+      const s4 = teamOrTbd(3)
+      const s5 = teamOrTbd(4)
+      makeSeries(1, "play-in", "play-in", s4, s5, sfaIds[0], "away")
+    }
+
+    const s1 = teamOrTbd(0)
+    const sfaAway = (hasPlayIn && numTeams === 5)
+      ? { slug: "tbd", placeholder: "Play-in Winner" }
+      : teamOrTbd(3)
+    const s2 = teamOrTbd(1)
+    const s3 = teamOrTbd(2)
+
+    // Overwrite the pre-generated IDs by building series that use them
+    // SF-A
+    for (let g = 0; g < semiSeriesLength; g++) {
+      games.push({
+        id: sfaIds[g],
+        homeTeam: g % 2 === 0 ? s1.slug : sfaAway.slug,
+        awayTeam: g % 2 === 0 ? sfaAway.slug : s1.slug,
+        homePlaceholder: g % 2 === 0 ? s1.placeholder : sfaAway.placeholder,
+        awayPlaceholder: g % 2 === 0 ? sfaAway.placeholder : s1.placeholder,
+        bracketRound: "semifinal", seriesId: "sf-a", seriesGameNumber: g + 1,
+        nextGameId: g === 0 ? finalFirstId : null,
+        nextGameSlot: g === 0 ? "home" : null,
+        gameType: "playoff", status: "upcoming", date: "", time: "TBD", location: "James Lick Arena",
+      })
+    }
+    // SF-B
     for (let g = 0; g < semiSeriesLength; g++) {
       games.push({
         id: sfbIds[g],
-        homeTeam: g % 2 === 0 ? seed2.slug : seed3.slug,
-        awayTeam: g % 2 === 0 ? seed3.slug : seed2.slug,
-        homePlaceholder: g % 2 === 0 ? seed2.placeholder : seed3.placeholder,
-        awayPlaceholder: g % 2 === 0 ? seed3.placeholder : seed2.placeholder,
-        bracketRound: "semifinal",
-        seriesId: "sf-b",
-        seriesGameNumber: g + 1,
+        homeTeam: g % 2 === 0 ? s2.slug : s3.slug,
+        awayTeam: g % 2 === 0 ? s3.slug : s2.slug,
+        homePlaceholder: g % 2 === 0 ? s2.placeholder : s3.placeholder,
+        awayPlaceholder: g % 2 === 0 ? s3.placeholder : s2.placeholder,
+        bracketRound: "semifinal", seriesId: "sf-b", seriesGameNumber: g + 1,
         nextGameId: g === 0 ? finalFirstId : null,
         nextGameSlot: g === 0 ? "away" : null,
-        gameType: "playoff",
-        status: "upcoming",
-        date: "",
-        time: "TBD",
-        location: "James Lick Arena",
+        gameType: "playoff", status: "upcoming", date: "", time: "TBD", location: "James Lick Arena",
+      })
+    }
+  } else {
+    // ─── 6–8 teams: quarterfinals → semis → final ─────────
+    // A-side: QF-A (#1 vs #8), QF-B (#4 vs #5)  →  SF-A
+    // B-side: QF-C (#2 vs #7), QF-D (#3 vs #6)  →  SF-B
+    // Byes for missing seeds; play-in for odd counts
+
+    // Determine which QF matchups exist
+    // A-side
+    const qfA_exists = numTeams >= 8 // #1 vs #8
+    const qfB_exists = numTeams >= 6 // #4 vs #5
+
+    // B-side
+    const qfC_exists = numTeams >= 8 // #2 vs #7 (only with 8 teams, or 7+play-in gives #7 to play-in)
+    const qfD_exists = numTeams >= 6 // #3 vs #6
+
+    // Build QF series, linking winners to their respective semi
+    // QF-A: #1 vs #8 → SF-A (home)
+    if (qfA_exists) {
+      makeSeries(quarterSeriesLength, "qf-a", "quarterfinal",
+        teamOrTbd(0), teamOrTbd(7), sfaIds[0], "home")
+    }
+    // QF-B: #4 vs #5 → SF-A (away)
+    if (qfB_exists) {
+      makeSeries(quarterSeriesLength, "qf-b", "quarterfinal",
+        teamOrTbd(3), teamOrTbd(4), sfaIds[0], "away")
+    }
+    // QF-C: #2 vs #7 → SF-B (home)
+    if (qfC_exists) {
+      makeSeries(quarterSeriesLength, "qf-c", "quarterfinal",
+        teamOrTbd(1), teamOrTbd(6), sfbIds[0], "home")
+    }
+    // QF-D: #3 vs #6 → SF-B (away)
+    if (qfD_exists) {
+      const qfDAway = (hasPlayIn && numTeams === 7)
+        ? { slug: "tbd", placeholder: "Play-in Winner" }
+        : teamOrTbd(5)
+      const qfDIds = makeSeries(quarterSeriesLength, "qf-d", "quarterfinal",
+        teamOrTbd(2), qfDAway, sfbIds[0], "away")
+
+      // If 7 teams, create play-in that feeds into QF-D
+      if (hasPlayIn && numTeams === 7) {
+        const s6 = teamOrTbd(5)
+        const s7 = teamOrTbd(6)
+        makeSeries(1, "play-in", "play-in", s6, s7, qfDIds[0], "away")
+      }
+    }
+
+    // SF-A: determine home/away labels based on who has byes
+    const sfaHome = qfA_exists
+      ? { slug: "tbd", placeholder: "Winner QF-A" }
+      : teamOrTbd(0) // #1 gets bye
+    const sfaAway = qfB_exists
+      ? { slug: "tbd", placeholder: "Winner QF-B" }
+      : teamOrTbd(3)
+    for (let g = 0; g < semiSeriesLength; g++) {
+      games.push({
+        id: sfaIds[g],
+        homeTeam: g % 2 === 0 ? sfaHome.slug : sfaAway.slug,
+        awayTeam: g % 2 === 0 ? sfaAway.slug : sfaHome.slug,
+        homePlaceholder: g % 2 === 0 ? sfaHome.placeholder : sfaAway.placeholder,
+        awayPlaceholder: g % 2 === 0 ? sfaAway.placeholder : sfaHome.placeholder,
+        bracketRound: "semifinal", seriesId: "sf-a", seriesGameNumber: g + 1,
+        nextGameId: g === 0 ? finalFirstId : null,
+        nextGameSlot: g === 0 ? "home" : null,
+        gameType: "playoff", status: "upcoming", date: "", time: "TBD", location: "James Lick Arena",
+      })
+    }
+
+    // SF-B
+    const sfbHome = qfC_exists
+      ? { slug: "tbd", placeholder: "Winner QF-C" }
+      : teamOrTbd(1) // #2 gets bye
+    const sfbAway = qfD_exists
+      ? { slug: "tbd", placeholder: "Winner QF-D" }
+      : teamOrTbd(2)
+    for (let g = 0; g < semiSeriesLength; g++) {
+      games.push({
+        id: sfbIds[g],
+        homeTeam: g % 2 === 0 ? sfbHome.slug : sfbAway.slug,
+        awayTeam: g % 2 === 0 ? sfbAway.slug : sfbHome.slug,
+        homePlaceholder: g % 2 === 0 ? sfbHome.placeholder : sfbAway.placeholder,
+        awayPlaceholder: g % 2 === 0 ? sfbAway.placeholder : sfbHome.placeholder,
+        bracketRound: "semifinal", seriesId: "sf-b", seriesGameNumber: g + 1,
+        nextGameId: g === 0 ? finalFirstId : null,
+        nextGameSlot: g === 0 ? "away" : null,
+        gameType: "playoff", status: "upcoming", date: "", time: "TBD", location: "James Lick Arena",
       })
     }
   }
 
   // ─── Final ─────────────────────────────────────────────
-  {
-    const finalHome = { slug: "tbd", placeholder: "Winner SF-A" }
-    const finalAway = { slug: "tbd", placeholder: "Winner SF-B" }
-
-    for (let g = 0; g < finalSeriesLength; g++) {
-      games.push({
-        id: finalIds[g],
-        homeTeam: g % 2 === 0 ? finalHome.slug : finalAway.slug,
-        awayTeam: g % 2 === 0 ? finalAway.slug : finalHome.slug,
-        homePlaceholder: g % 2 === 0 ? finalHome.placeholder : finalAway.placeholder,
-        awayPlaceholder: g % 2 === 0 ? finalAway.placeholder : finalHome.placeholder,
-        bracketRound: "final",
-        seriesId: "final",
-        seriesGameNumber: g + 1,
-        nextGameId: null,
-        nextGameSlot: null,
-        gameType: "playoff",
-        status: "upcoming",
-        date: "",
-        time: "TBD",
-        location: "James Lick Arena",
-      })
-    }
+  const fHome = { slug: "tbd", placeholder: "Winner SF-A" }
+  const fAway = { slug: "tbd", placeholder: "Winner SF-B" }
+  for (let g = 0; g < finalSeriesLength; g++) {
+    games.push({
+      id: finalIds[g],
+      homeTeam: g % 2 === 0 ? fHome.slug : fAway.slug,
+      awayTeam: g % 2 === 0 ? fAway.slug : fHome.slug,
+      homePlaceholder: g % 2 === 0 ? fHome.placeholder : fAway.placeholder,
+      awayPlaceholder: g % 2 === 0 ? fAway.placeholder : fHome.placeholder,
+      bracketRound: "final", seriesId: "final", seriesGameNumber: g + 1,
+      nextGameId: null, nextGameSlot: null,
+      gameType: "playoff", status: "upcoming", date: "", time: "TBD", location: "James Lick Arena",
+    })
   }
 
   return games
