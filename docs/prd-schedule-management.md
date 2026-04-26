@@ -25,26 +25,38 @@ A robust 4-step generator to build a playoff bracket with configurable series fo
 
 #### BASH Playoff Formats
 
-BASH has two primary playoff formats that vary by season:
+BASH supports 4–8 team brackets using standard bracket seeding. Common seasonal configurations:
 
-| | Fall Season (5 teams) | Summer Season (4 teams) |
-|---|---|---|
-| Play-in | #4 vs #5, single game | N/A |
-| Semi-finals | Best-of-3 series | Single game |
-| Finals | Best-of-3 series | Single game |
-| Scheduling | Multi-week (play-in Sunday, semis Sat+Sun) | Single day (all games back-to-back) |
+| | Fall Season (5 teams) | Summer Season (4 teams) | Expanded (6–8 teams) |
+|---|---|---|---|
+| Quarterfinals | N/A | N/A | Single game or Best-of-3 |
+| Play-in | #4 vs #5, single game | N/A | Auto for odd team counts |
+| Semi-finals | Best-of-3 series | Single game | Single game or Best-of-3 |
+| Finals | Best-of-3 series | Single game | Single game or Best-of-3 |
+| Scheduling | Multi-week | Single day | Multi-week |
+
+Standard bracket seeding (8-team example):
+*   **A-side**: QF-A (#1 vs #8), QF-B (#4 vs #5) → SF-A
+*   **B-side**: QF-C (#2 vs #7), QF-D (#3 vs #6) → SF-B
+*   **Final**: Winner SF-A vs Winner SF-B
+
+For fewer than 8 teams, top seeds receive byes:
+*   **6 teams**: #1 and #2 bye to semis; QF matchups are #4 vs #5 and #3 vs #6.
+*   **7 teams**: Play-in (#6 vs #7) feeds into QF-D; #1 gets bye to SF-A.
+*   **5 teams**: Play-in (#4 vs #5) feeds into SF-A; #2 and #3 direct to SF-B.
+*   **4 teams**: No quarterfinals; direct to SF (#1 vs #4, #2 vs #3).
 
 These are the typical configurations, but the wizard should support full customization:
-*   **Play-in game**: Optional. Only applicable when number of teams exceeds bracket slots (e.g., 5 teams in a 4-team bracket).
-*   **Series length per round**: 1-game (single elimination) or 3-game (best-of-3). Configurable independently for semi-finals and finals.
+*   **Play-in game**: Auto-enabled for odd team counts. Can be toggled off.
+*   **Series length per round**: 1-game (single elimination) or 3-game (best-of-3). Configurable independently for quarterfinals, semi-finals, and finals.
 *   **Auto-advancement**: When a series is decided (team wins ⌈seriesLength/2⌉ games), the winner is pushed to the downstream round. For best-of-3, this means winning 2 games.
 
 #### Wizard Steps
 
-*   **Step 1 (Format & Teams)**: Select the number of teams. Toggle play-in game on/off. Choose series length for semi-finals (1 or 3) and finals (1 or 3). Choose to auto-seed using standings or use manual placeholders (e.g. #1 Seed). Placeholders allow admins to build and save the bracket early in the season before final standings are known, then revisit later to assign real teams.
-*   **Step 2 (Assign Matchups)**: Shows a visual bracket tree. Seeds are auto-assigned (1 vs play-in winner, 2 vs 3 — or 1 vs 4, 2 vs 3 without play-in). Admins can adjust dropdowns. For best-of-3 rounds, the bracket shows "Series A" / "Series B" labels.
-*   **Step 3 (Enter Game Details)**: Assign Dates, Times, and Locations to all games in the bracket. For best-of-3 series, all potential games (1, 2, 3) are scheduled upfront — Game 3 can be cancelled later if unnecessary (2-0 sweep). Later round games show opponents as "Winner SF-A" etc.
-*   **Step 4 (Review & Save)**: Generates a final list preview and the visual bracket. An in-app `AlertDialog` (replacing the legacy browser alert) confirms overwriting any existing playoff tournament. Saving automatically tags all generated games with `gameType = "playoff"`.
+*   **Step 1 (Format & Teams)**: Select 4–8 playoff teams (defaults to 4). Play-in auto-enables for odd counts. Choose series length independently for quarterfinals (shown when ≥6 teams), semi-finals, and finals (1 or 3). Toggle placeholder mode for early bracket creation.
+*   **Step 2 (Assign Seeds)**: Shows a dynamic seeding list with reorder controls. Bracket preview auto-generates from the seed assignments showing all series matchups (play-in, QF, SF, Final) with proper labels.
+*   **Step 3 (Enter Game Details)**: Assign Dates, Times, and Locations to all games in the bracket, grouped by round. For best-of-3 series, all potential games (1, 2, 3) are scheduled upfront — Game 3 can be cancelled later if unnecessary (2-0 sweep). Later round games show opponents as "Winner SF-A" etc.
+*   **Step 4 (Review & Save)**: Displays the finalized bracket grouped by round with linked game references. An in-app `AlertDialog` confirms overwriting any existing playoff tournament. Saving automatically tags all generated games with `gameType = "playoff"`.
 
 ---
 
@@ -58,7 +70,9 @@ The following decisions have been finalized after design review:
 
 3.  **Playoff Wizard → Support early bracket creation.** Admins can save a bracket with placeholder team names (e.g., "Seed 1", "Seed 2") early in the season. They can revisit the bracket later to replace placeholders with real teams once standings are finalized.
 
-4.  **Playoff Series → Configurable series length.** The wizard supports both single-game elimination and best-of-3 series, configurable per round (semi-finals and finals independently). Play-in games are always single-game. For best-of-3 series, all potential games are pre-scheduled. Auto-advancement triggers when a team clinches the series (wins 2 games).
+4.  **Playoff Series → Configurable series length.** The wizard supports both single-game elimination and best-of-3 series, configurable per round (quarterfinals, semi-finals, and finals independently). Play-in games are always single-game. For best-of-3 series, all potential games are pre-scheduled. Auto-advancement triggers when a team clinches the series (wins 2 games).
+
+5.  **Playoff Bracket → Up to 8 teams.** The bracket uses standard seeding (#1 vs #8, #4 vs #5 on A-side; #2 vs #7, #3 vs #6 on B-side) with byes for team counts under 8 and auto play-in for odd counts. Default is 4 teams.
 
 ---
 
@@ -96,10 +110,10 @@ All changes are **additive** — no existing columns are modified or removed, an
     *   Values: `"home"` or `"away"`. Indicates which slot of the `nextGameId` game the winner of this game feeds into.
 
 7.  **Add `bracketRound` (text, nullable)**
-    *   Identifies the playoff round: `"play-in"`, `"semifinal"`, `"final"`. Used for display grouping and series advancement logic.
+    *   Identifies the playoff round: `"play-in"`, `"quarterfinal"`, `"semifinal"`, `"final"`. Used for display grouping and series advancement logic.
 
 8.  **Add `seriesId` (text, nullable)**
-    *   Groups games belonging to the same matchup/series (e.g., `"sf-a"`, `"sf-b"`, `"final"`, `"play-in"`). For single-game rounds, the series has one game. For best-of-3, it has up to three.
+    *   Groups games belonging to the same matchup/series (e.g., `"qf-a"`, `"qf-b"`, `"qf-c"`, `"qf-d"`, `"sf-a"`, `"sf-b"`, `"final"`, `"play-in"`). For single-game rounds, the series has one game. For best-of-3, it has up to three.
 
 9.  **Add `seriesGameNumber` (integer, nullable)**
     *   Which game within the series: 1, 2, or 3. Used for display ("Game 1 of 3") and to determine series clinch.
@@ -149,7 +163,7 @@ UPDATE games SET game_type = 'regular' WHERE is_playoff = false;
     *   **Overwrite**: Deletes existing games (only those with `status != "final"` unless force-confirmed) and inserts the new schedule.
     *   **Append**: Inserts new games alongside existing ones.
     *   Generated game IDs should use a `gen-` prefix to avoid collision with Sportability-synced numeric IDs.
-*   **[NEW]** `POST /api/bash/admin/seasons/[id]/schedule/playoffs` — Bulk insert for the Playoff Wizard. Creates linked games with `nextGameId`/`nextGameSlot`/`seriesId`/`bracketRound` references. Supports configurable series length per round (1 or 3) and optional play-in game. For best-of-3 rounds, generates all potential games (1, 2, 3). Overwrites any existing playoff games for the season (after confirmation).
+*   **[NEW]** `POST /api/bash/admin/seasons/[id]/schedule/playoffs` — Bulk insert for the Playoff Wizard. Creates linked games with `nextGameId`/`nextGameSlot`/`seriesId`/`bracketRound` references. Supports 4–8 teams with standard bracket seeding, configurable series length per round (quarterfinals, semi-finals, finals: 1 or 3), and auto play-in for odd team counts. For best-of-3 rounds, generates all potential games (1, 2, 3). Overwrites any existing playoff games for the season (after confirmation).
 
 ### 3. Frontend Components
 
@@ -165,8 +179,10 @@ UPDATE games SET game_type = 'regular' WHERE is_playoff = false;
 *   **`components/admin/round-robin-wizard.tsx`** — 6-step round robin generator.
     *   Uses a Berger tables algorithm in the browser to generate pairings.
     *   Manages state internally; sends final payload to server at save.
-*   **`components/admin/playoff-wizard.tsx`** — 4-step bracket generator with visual tree.
-    *   Supports both auto-seeded (from standings) and placeholder modes.
+*   **`components/admin/playoff-wizard.tsx`** — 4-step bracket generator.
+    *   Supports 4–8 teams (default 4) with standard bracket seeding and auto play-in for odd counts.
+    *   Per-round series configuration: quarterfinals (≥6 teams), semi-finals, and finals.
+    *   Dynamic bracket preview auto-generated from seed assignments.
     *   Visual bracket rendered via CSS/SVG for the review step.
 
 ### 4. Public Site (deferred)
