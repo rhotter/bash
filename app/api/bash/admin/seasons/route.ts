@@ -84,29 +84,6 @@ export async function POST(request: NextRequest) {
       playoffTeams: body.playoffTeams ?? 4,
     })
 
-    // Auto-create seed placeholder teams
-    const playoffTeamsCount = body.playoffTeams ?? 4
-    if (playoffTeamsCount > 0) {
-      const seedTeams = []
-      const seasonTeamsList = []
-
-      for (let i = 1; i <= playoffTeamsCount; i++) {
-        const slug = `seed-${i}`
-        seedTeams.push({ slug, name: `Seed ${i}` })
-        seasonTeamsList.push({ seasonId: id, teamSlug: slug })
-      }
-
-      // Insert seed teams (ignore if they already exist from previous seasons)
-      await db.insert(schema.teams)
-        .values(seedTeams)
-        .onConflictDoNothing()
-
-      // Map seed teams to the new season
-      await db.insert(schema.seasonTeams)
-        .values(seasonTeamsList)
-        .onConflictDoNothing()
-    }
-
     // Bust the Next.js season cache so subsequent reads see the new season
     // @ts-expect-error - Next.js canary changed the signature of revalidateTag
     revalidateTag("seasons")
