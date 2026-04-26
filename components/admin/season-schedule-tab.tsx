@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, Loader2, Plus, Calendar, Trash2, Edit, ClipboardList } from "lucide-react"
+import { Search, Loader2, Plus, Calendar, Trash2, Edit, ClipboardList, Shuffle, Trophy } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +26,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { EditGameModal, GameFormData } from "./edit-game-modal"
+import { RoundRobinWizard } from "./round-robin-wizard"
+import { PlayoffWizard } from "./playoff-wizard"
 
 interface SeasonScheduleTabProps {
   seasonId: string
@@ -68,6 +70,9 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
   
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const [rrWizardOpen, setRrWizardOpen] = useState(false)
+  const [playoffWizardOpen, setPlayoffWizardOpen] = useState(false)
 
   const isEditable = seasonStatus === "draft" || seasonStatus === "active"
 
@@ -205,10 +210,20 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
         </div>
         <div className="flex gap-2">
           {isEditable && (
-            <Button onClick={openAddGame}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Game
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setRrWizardOpen(true)}>
+                <Shuffle className="h-4 w-4 mr-2" />
+                Generate Schedule
+              </Button>
+              <Button variant="outline" onClick={() => setPlayoffWizardOpen(true)}>
+                <Trophy className="h-4 w-4 mr-2" />
+                Playoff Bracket
+              </Button>
+              <Button onClick={openAddGame}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Game
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -353,6 +368,24 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RoundRobinWizard
+        open={rrWizardOpen}
+        onOpenChange={setRrWizardOpen}
+        teams={initialTeams}
+        seasonId={seasonId}
+        defaultLocation="James Lick Arena"
+        onSaved={fetchGames}
+      />
+
+      <PlayoffWizard
+        open={playoffWizardOpen}
+        onOpenChange={setPlayoffWizardOpen}
+        teams={initialTeams}
+        seasonId={seasonId}
+        defaultLocation="James Lick Arena"
+        onSaved={fetchGames}
+      />
     </div>
   )
 }
