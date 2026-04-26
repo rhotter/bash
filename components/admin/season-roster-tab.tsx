@@ -33,6 +33,7 @@ import { toast } from "sonner"
 import { TeamLogo } from "@/components/team-logo"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { SportabilityImportModal } from "@/components/admin/sportability-import-modal"
 
 interface RosterPlayer {
   playerId: number
@@ -224,13 +225,15 @@ export function SeasonRosterTab({ seasonId, seasonStatus, roster, teams }: Seaso
             </CardDescription>
           </div>
           {seasonStatus === "draft" && (
-            <Dialog open={isAddPlayerOpen} onOpenChange={setIsAddPlayerOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Player
-                </Button>
-              </DialogTrigger>
+            <div className="flex items-center gap-2">
+              <SportabilityImportModal seasonId={seasonId} seasonStatus={seasonStatus} />
+              <Dialog open={isAddPlayerOpen} onOpenChange={setIsAddPlayerOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Player
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Player to Roster</DialogTitle>
@@ -288,6 +291,7 @@ export function SeasonRosterTab({ seasonId, seasonStatus, roster, teams }: Seaso
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           )}
 
           {/* Edit Player Modal (Hidden structure, triggered by row click) */}
