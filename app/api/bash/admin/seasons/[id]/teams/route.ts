@@ -36,7 +36,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     await db.insert(schema.seasonTeams).values({ seasonId, teamSlug })
 
     return NextResponse.json({ ok: true }, { status: 201 })
-  } catch {
+  } catch (err) {
+    console.error("Failed to add team:", err)
     return NextResponse.json({ error: "Failed to add team" }, { status: 500 })
   }
 }
@@ -80,7 +81,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       )
 
     return NextResponse.json({ ok: true })
-  } catch {
+  } catch (err) {
+    console.error("Failed to remove team:", err)
     return NextResponse.json({ error: "Failed to remove team" }, { status: 500 })
   }
 }

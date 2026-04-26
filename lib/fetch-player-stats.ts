@@ -295,6 +295,7 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
     ...(isAllTime ? { seasonsPlayed: r.seasons_played } : {}),
   }))
 
+  // TODO: Remove seed-* filtering once legacy seed teams are cleaned from production
   const teams = teamRows
     .filter((r) => r.slug !== "tbd" && !r.slug.startsWith("seed-"))
     .map((r) => ({ slug: r.slug, name: r.name }))

@@ -59,10 +59,10 @@ function computeStandings(games: BashGame[]): Standing[] {
     t.gd = t.gf - t.ga
   }
 
+  // TODO: Remove seed-* filtering once legacy seed teams are cleaned from production
   teamMap.delete("tbd")
-  for (const key of teamMap.keys()) {
-    if (key.startsWith("seed-")) teamMap.delete(key)
-  }
+  const seedKeys = [...teamMap.keys()].filter(k => k.startsWith("seed-"))
+  seedKeys.forEach(k => teamMap.delete(k))
 
   return [...teamMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
 }

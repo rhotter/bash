@@ -1,5 +1,8 @@
 # dependencies
 /node_modules
+
+# data files
+*.xlsx
 /.pnp
 .pnp.*
 .yarn/install-state.gz

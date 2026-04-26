@@ -158,7 +158,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     revalidateTag("seasons")
 
     return NextResponse.json({ ok: true })
-  } catch {
+  } catch (err) {
+    console.error("Failed to update season:", err)
     return NextResponse.json({ error: "Failed to update season" }, { status: 500 })
   }
 }

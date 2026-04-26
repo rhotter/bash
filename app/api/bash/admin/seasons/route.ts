@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       seasonType: schema.seasons.seasonType,
       status: schema.seasons.status,
       isCurrent: schema.seasons.isCurrent,
+      // TODO: Remove seed-* filtering once legacy seed teams are cleaned from production
       teamCount: sql<number>`(SELECT COUNT(*)::int FROM season_teams WHERE season_id = ${schema.seasons.id} AND team_slug != 'tbd' AND team_slug NOT LIKE 'seed-%')`,
       gameCount: sql<number>`(SELECT COUNT(*) FROM games WHERE season_id = ${schema.seasons.id})`,
       playerCount: sql<number>`(SELECT COUNT(DISTINCT player_id) FROM player_seasons WHERE season_id = ${schema.seasons.id})`,
@@ -89,7 +90,8 @@ export async function POST(request: NextRequest) {
     revalidateTag("seasons")
 
     return NextResponse.json({ id, name, status: "draft" }, { status: 201 })
-  } catch {
+  } catch (err) {
+    console.error("Failed to create season:", err)
     return NextResponse.json({ error: "Failed to create season" }, { status: 500 })
   }
 }
