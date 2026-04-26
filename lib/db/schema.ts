@@ -25,6 +25,7 @@ export const seasons = pgTable("seasons", {
   defaultLocation: text("default_location"),
   adminNotes: text("admin_notes"),
   statsOnly: boolean("stats_only").notNull().default(false),
+  playoffTeams: integer("playoff_teams").default(4),
 })
 
 // ─── Teams ──────────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export const playerSeasons = pgTable(
       .notNull()
       .references(() => teams.slug),
     isGoalie: boolean("is_goalie").notNull().default(false),
+    isRookie: boolean("is_rookie").notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.playerId, t.seasonId, t.teamSlug] }),

@@ -102,6 +102,11 @@ function computeStandings(games: BashGame[]): Standing[] {
     t.gd = t.gf - t.ga
   }
 
+  // TODO: Remove seed-* filtering once legacy seed teams are cleaned from production
+  teamMap.delete("tbd")
+  const seedKeys = [...teamMap.keys()].filter(k => k.startsWith("seed-"))
+  seedKeys.forEach(k => teamMap.delete(k))
+
   return [...teamMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
 }
 
@@ -109,7 +114,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const seasonParam = searchParams.get("season")
-    const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
+    const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : (await getCurrentSeason()).id
 
     const rows = await rawSql(sql`
       SELECT
