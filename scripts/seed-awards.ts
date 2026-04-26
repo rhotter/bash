@@ -555,7 +555,7 @@ async function main() {
   // ─── Seed historical awards ───────────────────────────────────────────
   console.log("\nSeeding historical awards...")
   let insertedAwards = 0
-  let unmatchedAwards: string[] = []
+  const unmatchedAwards: string[] = []
 
   for (const [awardType, entries] of Object.entries(HISTORICAL_AWARDS)) {
     for (const entry of entries) {
@@ -609,7 +609,7 @@ async function main() {
   // ─── Seed Hall of Fame ────────────────────────────────────────────────
   console.log("\nSeeding Hall of Fame...")
   let insertedHof = 0
-  let unmatchedHof: string[] = []
+  const unmatchedHof: string[] = []
 
   for (const entry of HALL_OF_FAME) {
     const playerId = matchPlayerByLastName(entry.name, players, "", playerSeasons)

@@ -76,6 +76,18 @@ export const games = pgTable(
     location: text("location").default("James Lick Arena"),
     hasBoxscore: boolean("has_boxscore").notNull().default(false),
     notes: text("notes"),
+    // ─── Schedule Management (additive) ─────────────────────────────────
+    gameType: text("game_type").notNull().default("regular"),
+    hasShootout: boolean("has_shootout").notNull().default(false),
+    awayNotes: text("away_notes"),
+    homeNotes: text("home_notes"),
+    homePlaceholder: text("home_placeholder"),
+    awayPlaceholder: text("away_placeholder"),
+    nextGameId: text("next_game_id"),
+    nextGameSlot: text("next_game_slot"),
+    bracketRound: text("bracket_round"),
+    seriesId: text("series_id"),
+    seriesGameNumber: integer("series_game_number"),
   },
   (t) => [
     index("idx_games_season").on(t.seasonId),

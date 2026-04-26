@@ -6,6 +6,7 @@ import { SeasonForm } from "./season-form"
 import { PlaceholderCard } from "./placeholder-card"
 import { SeasonTeamsTab } from "./season-teams-tab"
 import { SeasonRosterTab } from "./season-roster-tab"
+import { SeasonScheduleTab } from "./season-schedule-tab"
 
 type Tab = "Overview" | "Settings" | "Teams" | "Roster" | "Schedule" | "Draft" | "Registration"
 
@@ -70,7 +71,7 @@ export function SeasonTabs({ season }: SeasonTabsProps) {
         {activeTab === "Settings" && <SeasonForm season={season} />}
         {activeTab === "Teams" && <SeasonTeamsTab seasonId={season.id} seasonStatus={season.status} initialTeams={season.teams} />}
         {activeTab === "Roster" && <SeasonRosterTab seasonId={season.id} seasonStatus={season.status} roster={season.roster} teams={season.teams} />}
-        {activeTab === "Schedule" && <PlaceholderCard title="Schedule Editor" phase={2} />}
+        {activeTab === "Schedule" && <SeasonScheduleTab seasonId={season.id} seasonStatus={season.status} initialTeams={season.teams} />}
         {activeTab === "Draft" && (
           <PlaceholderCard
             title="Draft Setup"

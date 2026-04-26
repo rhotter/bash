@@ -29,10 +29,14 @@ export function GamePageContent({ initialDetail, initialLiveData, homeRoster, aw
     location: initialDetail.location,
     hasBoxscore: initialDetail.homePlayers.length > 0 || initialDetail.awayPlayers.length > 0,
     hasLiveStats: !!initialLiveData,
-    livePeriod: (initialLiveData?.state as any)?.period ?? null,
-    liveClockSeconds: (initialLiveData?.state as any)?.clockSeconds ?? null,
-    liveClockRunning: (initialLiveData?.state as any)?.clockRunning ?? null,
-    liveClockStartedAt: (initialLiveData?.state as any)?.clockStartedAt ?? null,
+    livePeriod: (initialLiveData?.state as { period?: number })?.period ?? null,
+    liveClockSeconds: (initialLiveData?.state as { clockSeconds?: number })?.clockSeconds ?? null,
+    liveClockRunning: (initialLiveData?.state as { clockRunning?: boolean })?.clockRunning ?? null,
+    liveClockStartedAt: (initialLiveData?.state as { clockStartedAt?: string })?.clockStartedAt ?? null,
+    gameType: "regular",
+    hasShootout: false,
+    homePlaceholder: null,
+    awayPlaceholder: null,
   }
 
   return (

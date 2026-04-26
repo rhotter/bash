@@ -26,6 +26,10 @@ export interface BashGame {
   liveClockSeconds: number | null
   liveClockRunning: boolean | null
   liveClockStartedAt: number | null
+  gameType: string
+  hasShootout: boolean
+  homePlaceholder: string | null
+  awayPlaceholder: string | null
 }
 
 export interface Standing {
@@ -120,6 +124,7 @@ export async function GET(request: Request) {
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime, g.is_playoff, g.is_forfeit, g.location, g.has_boxscore,
+        g.game_type, g.has_shootout, g.home_placeholder, g.away_placeholder,
         ht.name as home_team, ht.slug as home_slug,
         awt.name as away_team, awt.slug as away_slug,
         (gl.game_id IS NOT NULL) as has_live_stats,
@@ -154,6 +159,10 @@ export async function GET(request: Request) {
       liveClockSeconds: r.live_state?.clockSeconds ?? null,
       liveClockRunning: r.live_state?.clockRunning ?? null,
       liveClockStartedAt: r.live_state?.clockStartedAt ?? null,
+      gameType: r.game_type ?? "regular",
+      hasShootout: r.has_shootout ?? false,
+      homePlaceholder: r.home_placeholder ?? null,
+      awayPlaceholder: r.away_placeholder ?? null,
     }))
 
     const standings = computeStandings(games)

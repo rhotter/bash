@@ -52,6 +52,10 @@ export default async function ScorekeeperIndexPage() {
     liveClockSeconds: r.live_clock_seconds as number | null,
     liveClockRunning: r.live_clock_running as boolean | null,
     liveClockStartedAt: r.live_clock_started_at as number | null,
+    gameType: "regular",
+    hasShootout: false,
+    homePlaceholder: null,
+    awayPlaceholder: null,
   }))
 
   return (

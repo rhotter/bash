@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const sheet = workbook.Sheets[sheetName]
     
     // Read raw data
-    const rawData = xlsx.utils.sheet_to_json<any>(sheet)
+    const rawData = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet)
 
     // Fetch all existing team slugs to validate team assignments
     const allTeams = await db.select({ slug: schema.teams.slug }).from(schema.teams)
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const playerName = `${firstName} ${lastName}`.trim()
 
       // Team
-      let rawTeam = row["Team"]?.toString().trim() || ""
+      const rawTeam = row["Team"]?.toString().trim() || ""
       let teamSlug = rawTeam.toLowerCase().replace(/\s+/g, '-')
       if (!validTeamSlugs.has(teamSlug)) {
         teamSlug = "tbd"
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       mappedPlayers
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to parse Sportability file:", error)
     return NextResponse.json({ error: "Failed to process file. Ensure it is a valid Sportability .xlsx export." }, { status: 500 })
   }

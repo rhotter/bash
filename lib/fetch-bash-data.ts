@@ -75,6 +75,7 @@ export async function fetchBashData(seasonParam?: string | null): Promise<BashAp
     SELECT
       g.id, g.date, g.time, g.home_score, g.away_score,
       g.status, g.is_overtime, g.is_playoff, g.is_forfeit, g.location, g.has_boxscore,
+      g.game_type, g.has_shootout, g.home_placeholder, g.away_placeholder,
       ht.name as home_team, ht.slug as home_slug,
       awt.name as away_team, awt.slug as away_slug,
       (gl.game_id IS NOT NULL) as has_live_stats
@@ -108,6 +109,10 @@ export async function fetchBashData(seasonParam?: string | null): Promise<BashAp
     liveClockSeconds: null,
     liveClockRunning: null,
     liveClockStartedAt: null,
+    gameType: r.game_type ?? "regular",
+    hasShootout: r.has_shootout ?? false,
+    homePlaceholder: r.home_placeholder ?? null,
+    awayPlaceholder: r.away_placeholder ?? null,
   }))
 
   const standings = computeStandings(games)
