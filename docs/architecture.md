@@ -42,6 +42,7 @@ erDiagram
     seasons ||--o{ games : "schedules"
     teams ||--o{ games : "home_team"
     teams ||--o{ games : "away_team"
+    games ||--o{ games : "next_game (bracket)"
     players ||--o{ player_seasons : "plays_in"
     seasons ||--o{ player_seasons : "includes"
     teams ||--o{ player_seasons : "rosters"
@@ -66,7 +67,12 @@ The Drizzle schema (`lib/db/schema.ts`) is designed around 15 core tables:
    - `season_teams`: Junction table linking teams to specific seasons.
 
 2. **Games & Scheduling**
-   - `games`: Stores game details, dates, times, home/away teams, scores, and status (`upcoming` vs `final`). Also flags overtime and playoff games.
+   - `games`: Stores game details, dates, times, home/away teams, scores, and status (`upcoming` vs `final`). Flags for overtime, shootout, and forfeit. Includes schedule management columns:
+     - `game_type`: Categorizes games as `regular`, `playoff`, `practice`, `exhibition`, `championship`, or `jamboree`. The legacy `is_playoff` boolean is kept for stats queries.
+     - `home_placeholder` / `away_placeholder`: Display labels for unresolved teams (e.g., "Seed 1", "Winner SF-A"). When set, `home_team`/`away_team` reference a sentinel `"tbd"` slug.
+     - `bracket_round`: Playoff round identifier (`play-in`, `quarterfinal`, `semifinal`, `final`).
+     - `series_id` / `series_game_number`: Groups games into matchup series (e.g., `sf-a` game 1 of 3).
+     - `next_game_id` / `next_game_slot`: Self-referential FK linking bracket games for auto-advancement.
    - `game_live`: Stores real-time scorekeeping state for live updates.
    - `game_officials`: Records referees and linesmen for each game.
 
@@ -98,8 +104,17 @@ The application heavily uses Next.js async Server Components. When a page loads,
 ### 3. Client-Side Hydration & Live Updates (`lib/hockey-data.ts`)
 While initial page loads are server-rendered, the application uses SWR hooks (e.g., `useBashData`) to maintain fresh data. The server passes `fallbackData` to the client, and SWR periodically polls the API (every 60-120s) to refresh the UI without full page reloads, ensuring live scores are updated seamlessly.
 
-### 4. Routing Structure
+### 4. Schedule Generation (`lib/schedule-utils.ts`)
+Pure utility functions (no side effects, no DB calls) used by the admin wizards:
+- **`generateRoundRobin()`**: Berger tables algorithm for fair round-robin pairings with configurable games-per-week and multi-cycle support.
+- **`mapRoundRobinToGames()`**: Maps generic slot pairings to real teams and dates.
+- **`generateBracket()`**: Builds a linked playoff bracket for 4–8 teams using standard seeding (#1v#8, #4v#5, #2v#7, #3v#6) with byes and auto play-in for odd counts. Supports per-round series lengths (best-of-1 or best-of-3).
+- **`checkSeriesClinch()`**: Determines if a best-of-N series has been decided.
+
+### 5. Routing Structure
 The App Router maps URLs directly to server components:
 - `/` -> Home page (Scoreboard)
 - `/standings`, `/stats` -> Leaderboards and league tables
 - `/player/[slug]`, `/team/[slug]`, `/game/[id]` -> Detail views
+- `/admin/seasons/[id]` -> Season management (Schedule, Standings, Teams tabs)
+- `/scorekeeper/[gameId]` -> Live game scorekeeper
