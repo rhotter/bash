@@ -37,8 +37,8 @@ interface SeasonTabsProps {
     gameCount: number
     completedGameCount: number
     playerCount: number
-    recentGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
-    upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
+    recentGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[]
+    upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[]
   }
 }
 

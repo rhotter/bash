@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Check, AlertTriangle, HelpCircle } from "lucide-react"
+import { Loader2, Check, AlertTriangle, HelpCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -55,6 +55,10 @@ export function SeasonForm({ season }: SeasonFormProps) {
     title: string
     description: string
   }>({ open: false, status: "", title: "", description: "" })
+
+  const [deleteDialog, setDeleteDialog] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState("")
+  const [deleting, setDeleting] = useState(false)
 
   const [form, setForm] = useState({
     name: season.name,
@@ -131,6 +135,30 @@ export function SeasonForm({ season }: SeasonFormProps) {
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    setError("")
+    try {
+      const force = season.status !== "draft" ? "?force=true" : ""
+      const res = await fetch(`/api/bash/admin/seasons/${season.id}${force}`, {
+        method: "DELETE",
+      })
+      if (res.ok) {
+        router.push("/admin")
+        router.refresh()
+      } else {
+        const data = await res.json()
+        setError(data.error || "Failed to delete season")
+        setDeleteDialog(false)
+      }
+    } catch {
+      setError("Connection error")
+      setDeleteDialog(false)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -229,27 +257,7 @@ export function SeasonForm({ season }: SeasonFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Number of Playoff Teams</Label>
-              <Input
-                type="number"
-                min={0}
-                max={16}
-                value={form.playoffTeams ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setForm((f) => ({ ...f, playoffTeams: val === "" ? null : parseInt(val) }))
-                }}
-                disabled={season.status !== "draft"}
-              />
-              {season.status !== "draft" && (
-                <p className="text-[10px] text-muted-foreground">
-                  Playoff teams can only be modified while the season is in draft status.
-                </p>
-              )}
-            </div>
-          </div>
+
 
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Admin Notes</Label>
@@ -348,6 +356,61 @@ export function SeasonForm({ season }: SeasonFormProps) {
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Continue
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Danger Zone */}
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-destructive">Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Delete this season</p>
+              <p className="text-xs text-muted-foreground">Permanently remove this season and all associated data (games, stats, rosters, awards).</p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => { setDeleteDialog(true); setDeleteConfirmText("") }}
+              className="cursor-pointer shrink-0"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete Season
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={deleteDialog} onOpenChange={(open) => { if (!open) { setDeleteDialog(false); setDeleteConfirmText("") } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Delete "{season.name}"?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">This action is <strong>permanent and irreversible</strong>. It will delete:</span>
+              <span className="block text-xs text-muted-foreground">• All games and box scores<br/>• All player stats and rosters<br/>• All awards for this season<br/>• The season itself</span>
+              <span className="block pt-2">Type <strong>{season.name}</strong> to confirm:</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder={season.name}
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting || deleteConfirmText !== season.name}
+              className="cursor-pointer"
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Permanently Delete
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

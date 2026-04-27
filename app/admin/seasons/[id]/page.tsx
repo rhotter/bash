@@ -47,21 +47,29 @@ async function getSeason(id: string) {
   `)
 
   const recentGames = await rawSql(sql`
-    SELECT id, date, time, away_team AS "awayTeam", home_team AS "homeTeam", location
-    FROM games
-    WHERE season_id = ${id} 
-      AND date::date >= (now() AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '7 days'
-      AND date::date <= (now() AT TIME ZONE 'America/Los_Angeles')::date
-    ORDER BY date DESC, time DESC
+    SELECT g.id, g.date, g.time, g.away_team AS "awayTeam", g.home_team AS "homeTeam", g.location,
+      COALESCE(
+        (SELECT json_agg(json_build_object('name', o.name, 'role', o.role) ORDER BY o.role, o.name)
+         FROM game_officials o WHERE o.game_id = g.id), '[]'::json
+      ) AS officials
+    FROM games g
+    WHERE g.season_id = ${id} 
+      AND g.date::date >= (now() AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '7 days'
+      AND g.date::date <= (now() AT TIME ZONE 'America/Los_Angeles')::date
+    ORDER BY g.date DESC, g.time DESC
   `)
 
   const upcomingGames = await rawSql(sql`
-    SELECT id, date, time, away_team AS "awayTeam", home_team AS "homeTeam", location
-    FROM games
-    WHERE season_id = ${id} 
-      AND date::date > (now() AT TIME ZONE 'America/Los_Angeles')::date
-      AND date::date <= (now() AT TIME ZONE 'America/Los_Angeles')::date + INTERVAL '7 days'
-    ORDER BY date ASC, time ASC
+    SELECT g.id, g.date, g.time, g.away_team AS "awayTeam", g.home_team AS "homeTeam", g.location,
+      COALESCE(
+        (SELECT json_agg(json_build_object('name', o.name, 'role', o.role) ORDER BY o.role, o.name)
+         FROM game_officials o WHERE o.game_id = g.id), '[]'::json
+      ) AS officials
+    FROM games g
+    WHERE g.season_id = ${id} 
+      AND g.date::date > (now() AT TIME ZONE 'America/Los_Angeles')::date
+      AND g.date::date <= (now() AT TIME ZONE 'America/Los_Angeles')::date + INTERVAL '7 days'
+    ORDER BY g.date ASC, g.time ASC
   `)
 
   return {
@@ -71,8 +79,8 @@ async function getSeason(id: string) {
     gameCount: counts?.gameCount ?? 0,
     completedGameCount: counts?.completedGameCount ?? 0,
     playerCount: counts?.playerCount ?? 0,
-    recentGames: recentGames as { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[],
-    upcomingGames: upcomingGames as { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[],
+    recentGames: recentGames as { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[],
+    upcomingGames: upcomingGames as { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[],
   }
 }
 

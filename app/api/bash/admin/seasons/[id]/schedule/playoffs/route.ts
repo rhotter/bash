@@ -18,7 +18,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   try {
     const body = await request.json()
-    const { games } = body
+    const { games, playoffTeams } = body
 
     if (!games || !Array.isArray(games)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // Insert new playoff games
     if (games.length > 0) {
-      const insertData = games.map(g => ({
+      const insertData = games.map((g: Record<string, unknown>) => ({
         ...g,
         seasonId,
         gameType: "playoff",
@@ -42,6 +42,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }))
 
       await db.insert(schema.games).values(insertData)
+    }
+
+    if (typeof playoffTeams === "number") {
+      await db.update(schema.seasons)
+        .set({ playoffTeams })
+        .where(eq(schema.seasons.id, seasonId))
     }
 
     // @ts-expect-error - Next.js canary changed the signature of revalidateTag

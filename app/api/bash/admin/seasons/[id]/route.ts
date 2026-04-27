@@ -161,3 +161,72 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Failed to update season" }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const isAuthenticated = await getSession()
+  if (!isAuthenticated) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { id } = await context.params
+
+  const [existing] = await db
+    .select()
+    .from(schema.seasons)
+    .where(eq(schema.seasons.id, id))
+    .limit(1)
+
+  if (!existing) {
+    return NextResponse.json({ error: "Season not found" }, { status: 404 })
+  }
+
+  // Safety check: require explicit confirmation for non-draft seasons
+  const url = new URL(request.url)
+  const force = url.searchParams.get("force") === "true"
+
+  if (existing.status !== "draft" && !force) {
+    return NextResponse.json(
+      { error: "Cannot delete a non-draft season without force=true confirmation" },
+      { status: 400 }
+    )
+  }
+
+  try {
+    // Get all game IDs for this season first (needed for cascading child deletes)
+    const gameRows = await db
+      .select({ id: schema.games.id })
+      .from(schema.games)
+      .where(eq(schema.games.seasonId, id))
+    const gameIds = gameRows.map((g) => g.id)
+
+    if (gameIds.length > 0) {
+      // Delete game-level children
+      for (const gid of gameIds) {
+        await db.delete(schema.gameOfficials).where(eq(schema.gameOfficials.gameId, gid))
+        await db.delete(schema.playerGameStats).where(eq(schema.playerGameStats.gameId, gid))
+        await db.delete(schema.goalieGameStats).where(eq(schema.goalieGameStats.gameId, gid))
+        await db.delete(schema.gameLive).where(eq(schema.gameLive.gameId, gid))
+      }
+
+      // Delete games
+      await db.delete(schema.games).where(eq(schema.games.seasonId, id))
+    }
+
+    // Delete season-level children
+    await db.delete(schema.playerSeasonStats).where(eq(schema.playerSeasonStats.seasonId, id))
+    await db.delete(schema.playerSeasons).where(eq(schema.playerSeasons.seasonId, id))
+    await db.delete(schema.playerAwards).where(eq(schema.playerAwards.seasonId, id))
+    await db.delete(schema.seasonTeams).where(eq(schema.seasonTeams.seasonId, id))
+
+    // Delete the season itself
+    await db.delete(schema.seasons).where(eq(schema.seasons.id, id))
+
+    // @ts-expect-error - Next.js canary changed the signature of revalidateTag
+    revalidateTag("seasons")
+
+    return NextResponse.json({ ok: true, deleted: id })
+  } catch (err) {
+    console.error("Failed to delete season:", err)
+    return NextResponse.json({ error: "Failed to delete season" }, { status: 500 })
+  }
+}

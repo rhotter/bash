@@ -235,7 +235,7 @@ export function PlayoffWizard({
         const res = await fetch(`/api/bash/admin/seasons/${seasonId}/schedule/playoffs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ games: payload }),
+          body: JSON.stringify({ games: payload, playoffTeams: numTeams }),
         })
 
         if (!res.ok) {

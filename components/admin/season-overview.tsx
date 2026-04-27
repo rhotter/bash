@@ -20,8 +20,8 @@ interface SeasonOverviewProps {
     gameLength?: number | null
     defaultLocation?: string | null
     adminNotes?: string | null
-    recentGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
-    upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null }[]
+    recentGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[]
+    upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[]
   }
   onEditSettings?: () => void
 }
@@ -91,33 +91,57 @@ export function SeasonOverview({ season, onEditSettings }: SeasonOverviewProps) 
               {season.recentGames.map((game) => (
                 <div
                   key={game.id}
-                  className="grid grid-cols-[80px_1fr_auto] items-center py-2 border-b last:border-0 gap-4"
+                  className="py-2 border-b last:border-0"
                 >
-                  <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap leading-tight">
-                    {game.date}
-                    {game.time && <br />}
-                    {game.time && <span>{game.time}</span>}
-                  </span>
-                  
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 min-w-0">
-                    <div className="flex items-center justify-end gap-1.5 min-w-0">
-                      <span className="uppercase text-xs font-bold truncate leading-none pt-0.5">{game.awayTeam}</span>
-                      <TeamLogo slug={game.awayTeam} name={game.awayTeam} size={16} className="shrink-0" />
+                  <div className="grid grid-cols-[80px_1fr_auto] items-center gap-4">
+                    <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap leading-tight">
+                      {game.date}
+                      {game.time && <br />}
+                      {game.time && <span>{game.time}</span>}
+                    </span>
+                    
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 min-w-0">
+                      <div className="flex items-center justify-end gap-1.5 min-w-0">
+                        <span className="uppercase text-xs font-bold truncate leading-none pt-0.5">{game.awayTeam}</span>
+                        <TeamLogo slug={game.awayTeam} name={game.awayTeam} size={16} className="shrink-0" />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground text-center w-4">@</span>
+                      <div className="flex items-center justify-start gap-1.5 min-w-0">
+                        <TeamLogo slug={game.homeTeam} name={game.homeTeam} size={16} className="shrink-0" />
+                        <span className="uppercase text-xs font-bold truncate leading-none pt-0.5">{game.homeTeam}</span>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground text-center w-4">@</span>
-                    <div className="flex items-center justify-start gap-1.5 min-w-0">
-                      <TeamLogo slug={game.homeTeam} name={game.homeTeam} size={16} className="shrink-0" />
-                      <span className="uppercase text-xs font-bold truncate leading-none pt-0.5">{game.homeTeam}</span>
-                    </div>
-                  </div>
 
-                  <Link 
-                    href={`/scorekeeper/${game.id}`} 
-                    target="_blank" 
-                    className="text-[10px] uppercase tracking-wider font-bold text-primary hover:underline px-2 py-1 bg-primary/10 rounded justify-self-end shrink-0"
-                  >
-                    Boxscore
-                  </Link>
+                    <Link 
+                      href={`/scorekeeper/${game.id}`} 
+                      target="_blank" 
+                      className="text-[10px] uppercase tracking-wider font-bold text-primary hover:underline px-2 py-1 bg-primary/10 rounded justify-self-end shrink-0"
+                    >
+                      Boxscore
+                    </Link>
+                  </div>
+                  {game.officials && game.officials.length > 0 && (
+                    <div className="ml-[96px] mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+                      {(() => {
+                        const refs = game.officials.filter((o: { name: string; role: string }) => o.role === 'ref')
+                        const sk = game.officials.find((o: { name: string; role: string }) => o.role === 'scorekeeper')
+                        return (
+                          <>
+                            {refs.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                Ref{refs.length > 1 ? 's' : ''}: {refs.map((r: { name: string }) => r.name).join(', ')}
+                              </span>
+                            )}
+                            {sk && (
+                              <span className="text-[10px] text-muted-foreground">
+                                SK: {sk.name}
+                              </span>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
