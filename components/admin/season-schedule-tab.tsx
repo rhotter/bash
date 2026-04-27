@@ -23,6 +23,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { EditGameModal, GameFormData } from "./edit-game-modal"
@@ -70,6 +73,10 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
   
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const [deleteScheduleModalOpen, setDeleteScheduleModalOpen] = useState(false)
+  const [deleteScheduleMode, setDeleteScheduleMode] = useState<"upcoming" | "all">("upcoming")
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   const [rrWizardOpen, setRrWizardOpen] = useState(false)
   const [playoffWizardOpen, setPlayoffWizardOpen] = useState(false)
@@ -121,6 +128,25 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
       toast.error(err instanceof Error ? err.message : "An error occurred")
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setIsBulkDeleting(true)
+    try {
+      const res = await fetch(`/api/bash/admin/seasons/${seasonId}/schedule?mode=${deleteScheduleMode}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) {
+        throw new Error("Failed to delete schedule")
+      }
+      toast.success("Schedule deleted successfully")
+      setDeleteScheduleModalOpen(false)
+      fetchGames()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "An error occurred")
+    } finally {
+      setIsBulkDeleting(false)
     }
   }
 
@@ -182,6 +208,9 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
     }
     return teamName
   }
+
+  const totalUpcoming = games.filter(g => g.status === "upcoming").length
+  const totalToDelete = deleteScheduleMode === "all" ? games.length : totalUpcoming
 
   return (
     <div className="space-y-6">
@@ -337,6 +366,15 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
         </CardContent>
       </Card>
 
+      {isEditable && games.length > 0 && (
+        <div className="flex justify-end mt-4">
+          <Button variant="destructive" onClick={() => setDeleteScheduleModalOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Schedule
+          </Button>
+        </div>
+      )}
+
       <EditGameModal 
         open={modalOpen} 
         onOpenChange={setModalOpen}
@@ -386,6 +424,43 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams }: Seas
         defaultLocation="James Lick Arena"
         onSaved={fetchGames}
       />
+
+      <Dialog open={deleteScheduleModalOpen} onOpenChange={setDeleteScheduleModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Schedule</DialogTitle>
+            <DialogDescription>
+              Choose which games you want to remove from the schedule.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <RadioGroup value={deleteScheduleMode} onValueChange={(v: "upcoming" | "all") => setDeleteScheduleMode(v)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="upcoming" id="r-upcoming" />
+                <Label htmlFor="r-upcoming" className="cursor-pointer">Only upcoming games ({totalUpcoming})</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="all" id="r-all" />
+                <Label htmlFor="r-all" className="cursor-pointer">All games ({games.length})</Label>
+              </div>
+            </RadioGroup>
+
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm font-medium">
+              You are about to delete {totalToDelete} out of {games.length} total games. This action cannot be undone.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteScheduleModalOpen(false)} disabled={isBulkDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={isBulkDeleting || totalToDelete === 0}>
+              {isBulkDeleting ? "Deleting..." : "Confirm Deletion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

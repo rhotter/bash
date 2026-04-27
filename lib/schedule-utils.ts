@@ -66,6 +66,11 @@ export interface SeriesGame {
   status: string
 }
 
+export interface Holiday {
+  name: string
+  date: string // YYYY-MM-DD
+}
+
 // ─── Round Robin (Berger tables) ────────────────────────────────────────────
 
 /**
@@ -79,7 +84,8 @@ export interface SeriesGame {
 export function generateRoundRobin(
   numTeams: number,
   gamesPerWeek: number,
-  cycles: number = 1
+  cycles: number = 1,
+  maxTotalGames?: number
 ): RoundRobinSlot[] {
   if (numTeams < 2) return []
 
@@ -116,8 +122,14 @@ export function generateRoundRobin(
         } else {
           allSlots.push({ round: roundNum, home: away, away: home })
         }
+        
+        if (maxTotalGames && allSlots.length >= maxTotalGames) {
+          break
+        }
       }
+      if (maxTotalGames && allSlots.length >= maxTotalGames) break
     }
+    if (maxTotalGames && allSlots.length >= maxTotalGames) break
   }
 
   // Now chunk into weeks based on gamesPerWeek
@@ -133,6 +145,72 @@ export function generateRoundRobin(
   }
 
   return allSlots
+}
+
+/**
+ * Generate a list of major US holidays (and some key dates like Super Bowl) for a given year.
+ */
+export function getHolidaysForYear(year: number): Holiday[] {
+  const holidays: Holiday[] = []
+
+  const add = (name: string, date: string) => holidays.push({ name, date })
+  
+  const fmt = (d: Date) => {
+    const mm = d.getMonth() + 1
+    const dd = d.getDate()
+    return `${d.getFullYear()}-${mm < 10 ? '0' + mm : mm}-${dd < 10 ? '0' + dd : dd}`
+  }
+
+  // Fixed dates
+  add("New Year's Day", `${year}-01-01`)
+  add("Independence Day", `${year}-07-04`)
+  add("Halloween", `${year}-10-31`)
+  add("Veterans Day", `${year}-11-11`)
+  add("Christmas Eve", `${year}-12-24`)
+  add("Christmas Day", `${year}-12-25`)
+  add("New Year's Eve", `${year}-12-31`)
+
+  // Helpers for floating dates
+  const getNth = (m: number, dow: number, n: number) => {
+    const d = new Date(year, m, 1)
+    const offset = (dow - d.getDay() + 7) % 7
+    d.setDate(1 + offset + (n - 1) * 7)
+    return fmt(d)
+  }
+  
+  const getLast = (m: number, dow: number) => {
+    const d = new Date(year, m + 1, 0)
+    const offset = (d.getDay() - dow + 7) % 7
+    d.setDate(d.getDate() - offset)
+    return fmt(d)
+  }
+
+  // Floating dates (month is 0-indexed, dow: 0=Sun, 1=Mon...6=Sat)
+  add("MLK Day", getNth(0, 1, 3)) // 3rd Monday in Jan
+  add("Super Bowl", getNth(1, 0, 2)) // 2nd Sunday in Feb
+  add("Presidents' Day", getNth(1, 1, 3)) // 3rd Monday in Feb
+  add("Mother's Day", getNth(4, 0, 2)) // 2nd Sunday in May
+  add("Memorial Day", getLast(4, 1)) // Last Monday in May
+  add("Father's Day", getNth(5, 0, 3)) // 3rd Sunday in June
+  add("Labor Day", getNth(8, 1, 1)) // 1st Monday in Sep
+  add("Columbus Day", getNth(9, 1, 2)) // 2nd Monday in Oct
+  add("Thanksgiving", getNth(10, 4, 4)) // 4th Thursday in Nov
+
+  // Easter (Computus)
+  const f = Math.floor
+  const G = year % 19
+  const C = f(year / 100)
+  const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30
+  const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11))
+  const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7
+  const L = I - J
+  const month = 3 + f((L + 40) / 44)
+  const day = L + 28 - 31 * f(month / 4)
+  const em = month < 10 ? `0${month}` : month
+  const ed = day < 10 ? `0${day}` : day
+  add("Easter", `${year}-${em}-${ed}`)
+
+  return holidays.sort((a, b) => a.date.localeCompare(b.date))
 }
 
 /**

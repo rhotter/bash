@@ -31,11 +31,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { toast } from "sonner"
-import { ChevronLeft, ChevronRight, Calendar, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar, Loader2, Info } from "lucide-react"
 import {
   generateRoundRobin,
+  getHolidaysForYear,
   type RoundRobinSlot,
+  type Holiday,
   type GeneratedGame,
 } from "@/lib/schedule-utils"
 
@@ -54,8 +57,6 @@ interface WeekSlot {
   location: string
 }
 
-type GameTypeOption = "regular" | "practice" | "exhibition"
-
 export function RoundRobinWizard({
   open,
   onOpenChange,
@@ -70,29 +71,37 @@ export function RoundRobinWizard({
 
   // Step 1: Parameters
   const [gamesPerWeek, setGamesPerWeek] = useState(Math.floor(teams.length / 2))
-  const [cycles, setCycles] = useState(2)
+  const [lengthMode, setLengthMode] = useState<"cycles" | "gamesPerTeam">("cycles")
+  const [cycles, setCycles] = useState(3)
+  const [gamesPerTeam, setGamesPerTeam] = useState(20)
+
+  // Step 4: Game time defaults
+  const [timeDefaults, setTimeDefaults] = useState<string[]>([])
 
   // Step 2: Start date
   const [startDate, setStartDate] = useState("")
 
-  // Step 3: Skip weeks (set of week numbers to skip)
-  const [skippedWeeks, setSkippedWeeks] = useState<Set<number>>(new Set())
+  // Step 3: Skip dates (set of date indices from start date to skip)
+  const [skippedDateIndices, setSkippedDateIndices] = useState<Set<number>>(new Set())
 
   // Step 4: Per-slot times & locations
   const [weekSlots, setWeekSlots] = useState<Record<number, WeekSlot[]>>({})
-
-  // Step 5: Per-week game types
-  const [weekGameTypes, setWeekGameTypes] = useState<Record<number, GameTypeOption>>({})
 
   // Step 6: Save mode
   const [saveMode, setSaveMode] = useState<"overwrite" | "append">("append")
 
   // ─── Derived data ─────────────────────────────────────────────────────────
 
-  const slots = useMemo(
-    () => generateRoundRobin(teams.length, gamesPerWeek, cycles),
-    [teams.length, gamesPerWeek, cycles]
-  )
+  const slots = useMemo(() => {
+    if (lengthMode === "cycles") {
+      return generateRoundRobin(teams.length, gamesPerWeek, cycles)
+    } else {
+      const totalGames = Math.floor((teams.length * gamesPerTeam) / 2)
+      // Generous max cycles so we have enough games to slice
+      const maxCycles = Math.ceil(gamesPerTeam / Math.max(1, teams.length - 1)) + 1
+      return generateRoundRobin(teams.length, gamesPerWeek, maxCycles, totalGames)
+    }
+  }, [teams.length, gamesPerWeek, lengthMode, cycles, gamesPerTeam])
 
   // Group slots by week/round
   const slotsByWeek = useMemo(() => {
@@ -109,35 +118,77 @@ export function RoundRobinWizard({
     [slotsByWeek]
   )
 
-  // Active weeks (not skipped)
-  const activeWeeks = useMemo(
-    () => weekNumbers.filter((w) => !skippedWeeks.has(w)),
-    [weekNumbers, skippedWeeks]
-  )
+  // Compute holidays for the start year and next year
+  const holidaysList = useMemo(() => {
+    if (!startDate) return []
+    const startYear = parseInt(startDate.split("-")[0])
+    if (isNaN(startYear)) return []
+    return [...getHolidaysForYear(startYear), ...getHolidaysForYear(startYear + 1)]
+  }, [startDate])
 
-  // Calculate dates for active weeks (one week apart from startDate, skipping gaps)
-  const weekDates = useMemo(() => {
-    if (!startDate) return {}
-    const result: Record<number, string> = {}
-    const base = new Date(startDate + "T00:00:00")
-    let weekOffset = 0
-    for (const week of weekNumbers) {
-      if (skippedWeeks.has(week)) continue
-      const d = new Date(base)
-      d.setDate(d.getDate() + weekOffset * 7)
-      result[week] = d.toISOString().split("T")[0]
-      weekOffset++
+  const getNearestHoliday = useCallback((dateStr: string): Holiday | null => {
+    if (!dateStr) return null
+    const targetTime = new Date(dateStr + "T00:00:00").getTime()
+    for (const h of holidaysList) {
+      const hTime = new Date(h.date + "T00:00:00").getTime()
+      const diffDays = Math.abs(hTime - targetTime) / (1000 * 60 * 60 * 24)
+      if (diffDays <= 4) return h
     }
-    return result
-  }, [startDate, weekNumbers, skippedWeeks])
+    return null
+  }, [holidaysList])
 
-  // Build final games for preview (Step 6)
+  // All rounds are active, we only skip dates not games
+  const activeWeeks = weekNumbers
+
+  // Generate date list that accommodates all rounds plus any skipped dates
+  const scheduleDates = useMemo(() => {
+    if (!startDate) return []
+    const base = new Date(startDate + "T00:00:00")
+    const dates: { index: number; dateStr: string; isSkipped: boolean; weekNum: number | null; holiday: Holiday | null }[] = []
+    
+    let dateIndex = 0
+    let assignedWeeks = 0
+    
+    while (assignedWeeks < weekNumbers.length) {
+      const isSkipped = skippedDateIndices.has(dateIndex)
+      
+      const d = new Date(base)
+      d.setDate(d.getDate() + dateIndex * 7)
+      const dateStr = d.toISOString().split("T")[0]
+      
+      dates.push({
+        index: dateIndex,
+        dateStr,
+        isSkipped,
+        weekNum: isSkipped ? null : weekNumbers[assignedWeeks],
+        holiday: getNearestHoliday(dateStr)
+      })
+      
+      if (!isSkipped) {
+        assignedWeeks++
+      }
+      dateIndex++
+    }
+    return dates
+  }, [startDate, weekNumbers, skippedDateIndices, getNearestHoliday])
+
+  // Map weekNum -> dateStr for the rest of the wizard
+  const weekDates = useMemo(() => {
+    const map: Record<number, string> = {}
+    scheduleDates.forEach(d => {
+      if (d.weekNum !== null) {
+        map[d.weekNum] = d.dateStr
+      }
+    })
+    return map
+  }, [scheduleDates])
+
+  // Build final games for preview (Step 4)
   const previewGames = useMemo((): GeneratedGame[] => {
     const result: GeneratedGame[] = []
     for (const week of activeWeeks) {
       const weekGames = slotsByWeek[week] || []
       const slotsForWeek = weekSlots[week] || []
-      const gameType = weekGameTypes[week] || "regular"
       const baseDate = weekDates[week] || ""
 
       for (let i = 0; i < weekGames.length; i++) {
@@ -150,25 +201,23 @@ export function RoundRobinWizard({
           homeTeam: teams[slot.home]?.teamSlug ?? "tbd",
           awayTeam: teams[slot.away]?.teamSlug ?? "tbd",
           location: slotInfo.location || defaultLocation,
-          gameType,
+          gameType: "regular",
           status: "upcoming",
         })
       }
     }
     return result
-  }, [activeWeeks, slotsByWeek, weekSlots, weekGameTypes, weekDates, teams, defaultLocation])
+  }, [activeWeeks, slotsByWeek, weekSlots, weekDates, teams, defaultLocation])
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
-  const totalSteps = 6
+  const totalSteps = 4
   const canGoNext = (): boolean => {
     switch (step) {
-      case 1: return teams.length >= 2 && gamesPerWeek >= 1 && cycles >= 1
-      case 2: return startDate !== ""
-      case 3: return activeWeeks.length > 0
-      case 4: return true
-      case 5: return true
-      case 6: return previewGames.length > 0
+      case 1: return teams.length >= 2 && gamesPerWeek >= 1 && cycles >= 1 && startDate !== ""
+      case 2: return activeWeeks.length > 0
+      case 3: return true
+      case 4: return previewGames.length > 0
       default: return false
     }
   }
@@ -180,16 +229,49 @@ export function RoundRobinWizard({
       for (const week of activeWeeks) {
         const numGames = slotsByWeek[week]?.length || 0
         const baseDate = weekDates[week] || ""
-        initial[week] = Array.from({ length: numGames }, () => ({
-          date: baseDate,
-          time: "TBD",
-          location: defaultLocation,
-        }))
+        initial[week] = Array.from({ length: numGames }, (_, i) => {
+          let defaultTime = "TBD"
+          if (gamesPerWeek === 3) {
+            defaultTime = i === 0 ? "09:00" : i === 1 ? "11:00" : i === 2 ? "13:00" : "TBD"
+          } else if (gamesPerWeek === 2) {
+            defaultTime = i === 0 ? "12:00" : i === 1 ? "14:00" : "TBD"
+          }
+          return {
+            date: baseDate,
+            time: defaultTime,
+            location: defaultLocation,
+          }
+        })
       }
       setWeekSlots((prev) => ({ ...initial, ...prev }))
+      
+      // Initialize default times state based on first active week length
+      const firstWeekGames = slotsByWeek[activeWeeks[0]]?.length || gamesPerWeek
+      const defaultTimesArray = Array.from({ length: firstWeekGames }, (_, i) => {
+        if (gamesPerWeek === 3) return i === 0 ? "09:00" : i === 1 ? "11:00" : i === 2 ? "13:00" : "TBD"
+        if (gamesPerWeek === 2) return i === 0 ? "12:00" : i === 1 ? "14:00" : "TBD"
+        return "TBD"
+      })
+      setTimeDefaults(defaultTimesArray)
     }
     setStep((s) => Math.min(s + 1, totalSteps))
   }
+  
+  const applyTimeDefaults = () => {
+    setWeekSlots((prev) => {
+      const copy = { ...prev }
+      for (const week of Object.keys(copy)) {
+        const weekNum = Number(week)
+        copy[weekNum] = copy[weekNum].map((slot, i) => ({
+          ...slot,
+          time: timeDefaults[i] || slot.time
+        }))
+      }
+      return copy
+    })
+    toast.success("Game times applied to all weeks")
+  }
+  
   const handleBack = () => setStep((s) => Math.max(s - 1, 1))
 
   const handleSave = async (force: boolean = false) => {
@@ -227,9 +309,8 @@ export function RoundRobinWizard({
 
   const handleReset = () => {
     setStep(1)
-    setSkippedWeeks(new Set())
+    setSkippedDateIndices(new Set())
     setWeekSlots({})
-    setWeekGameTypes({})
   }
 
   const updateSlot = (week: number, index: number, field: keyof WeekSlot, value: string) => {
@@ -246,11 +327,9 @@ export function RoundRobinWizard({
   // ─── Render ───────────────────────────────────────────────────────────────
 
   const stepTitles = [
-    "Parameters",
-    "Start Date",
+    "Parameters & Start Date",
     "Skip Weeks",
     "Times & Locations",
-    "Game Types",
     "Review & Save",
   ]
 
@@ -311,21 +390,86 @@ export function RoundRobinWizard({
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 space-y-2">
-                    <Label>Full Cycles</Label>
-                    <Select value={String(cycles)} onValueChange={(v) => setCycles(+v)}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 cycle ({teams.length - 1} rounds)</SelectItem>
-                        <SelectItem value="2">2 cycles ({(teams.length - 1) * 2} rounds)</SelectItem>
-                        <SelectItem value="3">3 cycles ({(teams.length - 1) * 3} rounds)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Schedule Length</Label>
+                      <Select value={lengthMode} onValueChange={(v: "cycles" | "gamesPerTeam") => setLengthMode(v)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cycles">Full Cycles</SelectItem>
+                          <SelectItem value="gamesPerTeam">Total Games per Team</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{lengthMode === "cycles" ? "Cycles" : "Games per Team"}</Label>
+                      {lengthMode === "cycles" ? (
+                        <Select value={String(cycles)} onValueChange={(v) => setCycles(+v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 cycle ({teams.length - 1} rounds)</SelectItem>
+                            <SelectItem value="2">2 cycles ({(teams.length - 1) * 2} rounds)</SelectItem>
+                            <SelectItem value="3">3 cycles ({(teams.length - 1) * 3} rounds)</SelectItem>
+                            <SelectItem value="4">4 cycles ({(teams.length - 1) * 4} rounds)</SelectItem>
+                            <SelectItem value="5">5 cycles ({(teams.length - 1) * 5} rounds)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          type="number"
+                          min={1}
+                          value={gamesPerTeam}
+                          onChange={(e) => setGamesPerTeam(Math.max(1, parseInt(e.target.value) || 20))}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-6 pt-4 border-t space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Choose the date for Week 1. Subsequent weeks will be scheduled 7 days apart.
+                    </p>
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-[200px]"
+                      />
+                    </div>
+                    {startDate && (
+                      <div className="p-3 border rounded-lg text-sm space-y-1">
+                        <div>
+                          <strong>Week 1:</strong>{" "}
+                          {new Date(startDate + "T00:00:00").toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </div>
+                        <div>
+                          <strong>Last week (tentative):</strong>{" "}
+                          {(() => {
+                            const d = new Date(startDate + "T00:00:00")
+                            d.setDate(d.getDate() + (weekNumbers.length - 1) * 7)
+                            return d.toLocaleDateString("en-US", {
+                              weekday: "long",
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="p-3 border rounded-lg text-sm">
+                <div className="p-3 border rounded-lg text-sm bg-muted/10">
                   <strong>Preview:</strong>{" "}
                   {slots.length} total games across {weekNumbers.length} weeks
                   ({gamesPerWeek} games/week)
@@ -333,97 +477,80 @@ export function RoundRobinWizard({
               </div>
             )}
 
-            {/* ─── Step 2: Start Date ─── */}
+            {/* ─── Step 2: Skip Weeks ─── */}
             {step === 2 && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Choose the date for Week 1. Subsequent weeks will be scheduled 7 days apart.
+                  Toggle off any dates you want to skip (holidays, rink closures, etc.).
+                  Games scheduled for skipped dates will automatically shift to the next available date.
                 </p>
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-[200px]"
-                  />
-                </div>
-                {startDate && (
-                  <div className="p-3 border rounded-lg text-sm">
-                    <strong>Week 1:</strong>{" "}
-                    {new Date(startDate + "T00:00:00").toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                    <br />
-                    <strong>Last week:</strong>{" "}
-                    {(() => {
-                      const d = new Date(startDate + "T00:00:00")
-                      d.setDate(d.getDate() + (weekNumbers.length - 1) * 7)
-                      return d.toLocaleDateString("en-US", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ─── Step 3: Skip Weeks ─── */}
-            {step === 3 && (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Toggle off any weeks you want to skip (holidays, rink closures, etc.).
-                  Games from skipped weeks will be removed and subsequent dates will shift earlier.
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto">
-                  {weekNumbers.map((week) => {
-                    const isSkipped = skippedWeeks.has(week)
-                    const dateStr = weekDates[week]
-                    return (
-                      <div
-                        key={week}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          isSkipped ? "bg-muted/50 opacity-50" : "bg-card hover:bg-muted/30"
-                        }`}
-                        onClick={() => {
-                          const next = new Set(skippedWeeks)
-                          if (isSkipped) next.delete(week)
-                          else next.add(week)
-                          setSkippedWeeks(next)
-                        }}
-                      >
-                        <Checkbox
-                          checked={!isSkipped}
-                          onCheckedChange={() => {
-                            const next = new Set(skippedWeeks)
-                            if (isSkipped) next.delete(week)
-                            else next.add(week)
-                            setSkippedWeeks(next)
-                          }}
-                        />
-                        <div>
-                          <div className="font-medium text-sm">Week {week}</div>
-                          {dateStr && (
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </div>
-                          )}
-                          <div className="text-xs text-muted-foreground">
-                            {slotsByWeek[week]?.length || 0} games
+                <div className="border rounded-lg max-h-[300px] overflow-y-auto relative">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-card border-b z-10">
+                      <tr>
+                        <th className="w-16 text-center p-2">Active</th>
+                        <th className="text-left p-2">Week</th>
+                        <th className="text-left p-2">Date</th>
+                        <th className="text-left p-2">
+                          <div className="flex items-center gap-1">
+                            Nearest Holiday
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger type="button" className="cursor-help text-muted-foreground hover:text-foreground">
+                                  <Info className="h-3.5 w-3.5" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[280px]">
+                                  We calculate major US holidays mathematically to support cross-year schedules. 
+                                  You can verify these dates against the <a href="https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/" target="_blank" rel="noreferrer" className="underline font-medium text-primary hover:text-primary/80">US Office of Personnel Management (OPM)</a>.
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                        </th>
+                        <th className="text-right p-2">Games</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scheduleDates.map((dateObj) => {
+                        const { index, isSkipped, dateStr, weekNum, holiday } = dateObj
+                        
+                        return (
+                          <tr 
+                            key={index} 
+                            className={`border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer ${isSkipped ? "bg-muted/50 text-muted-foreground" : ""}`}
+                            onClick={() => {
+                              const next = new Set(skippedDateIndices)
+                              if (isSkipped) next.delete(index)
+                              else next.add(index)
+                              setSkippedDateIndices(next)
+                            }}
+                          >
+                            <td className="p-2 text-center">
+                              <Checkbox checked={!isSkipped} />
+                            </td>
+                            <td className={`p-2 font-medium ${isSkipped ? "italic opacity-60" : ""}`}>
+                              {isSkipped ? "Skipped" : `Week ${weekNum}`}
+                            </td>
+                            <td className="p-2">
+                              {new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+                                weekday: "short", month: "short", day: "numeric"
+                              })}
+                            </td>
+                            <td className="p-2">
+                              {holiday ? (
+                                <div className={`text-xs font-medium ${isSkipped ? "text-muted-foreground" : "text-orange-600 dark:text-orange-400"}`}>
+                                  {holiday.name} <span className="ml-1 font-normal opacity-70">({new Date(holiday.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })})</span>
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="p-2 text-right opacity-70">
+                              {isSkipped ? "-" : (slotsByWeek[weekNum!]?.length || 0)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {activeWeeks.length} of {weekNumbers.length} weeks active
@@ -431,13 +558,40 @@ export function RoundRobinWizard({
               </div>
             )}
 
-            {/* ─── Step 4: Times & Locations ─── */}
-            {step === 4 && (
+            {/* ─── Step 3: Times & Locations ─── */}
+            {step === 3 && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Set the time and location for each game slot. Defaults to the season location.
                 </p>
-                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2">
+
+                <div className="p-3 bg-muted/30 rounded-lg border flex flex-wrap items-end gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground block mb-1">Game Time Defaults (PST)</Label>
+                    <div className="flex gap-2">
+                      {timeDefaults.map((t, i) => (
+                        <div key={i} className="flex flex-col gap-1 w-[130px]">
+                          <span className="text-[10px] uppercase text-muted-foreground">Game {i + 1}</span>
+                          <Input 
+                            type="time" 
+                            className="h-8 text-xs bg-background" 
+                            value={t === "TBD" ? "" : t} 
+                            onChange={(e) => {
+                              const newTimes = [...timeDefaults]
+                              newTimes[i] = e.target.value || "TBD"
+                              setTimeDefaults(newTimes)
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={applyTimeDefaults} className="h-8">
+                    Apply to Schedule
+                  </Button>
+                </div>
+
+                <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2">
                   {activeWeeks.map((week) => {
                     const weekGames = slotsByWeek[week] || []
                     const slotsArr = weekSlots[week] || []
@@ -471,9 +625,10 @@ export function RoundRobinWizard({
                             </div>
                             <div className="col-span-2">
                               <Input
+                                type="time"
                                 placeholder="Time"
-                                value={slotsArr[i]?.time || "TBD"}
-                                onChange={(e) => updateSlot(week, i, "time", e.target.value)}
+                                value={slotsArr[i]?.time === "TBD" ? "" : slotsArr[i]?.time || ""}
+                                onChange={(e) => updateSlot(week, i, "time", e.target.value || "TBD")}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -494,43 +649,8 @@ export function RoundRobinWizard({
               </div>
             )}
 
-            {/* ─── Step 5: Game Types ─── */}
-            {step === 5 && (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Optionally set the game type per week. Most weeks are &quot;Regular Season&quot; but
-                  you can designate opening weeks as exhibitions or practices.
-                </p>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                  {activeWeeks.map((week) => (
-                    <div key={week} className="flex items-center gap-4 p-2 rounded border">
-                      <span className="w-20 text-sm font-medium">Week {week}</span>
-                      <Select
-                        value={weekGameTypes[week] || "regular"}
-                        onValueChange={(v) =>
-                          setWeekGameTypes((prev) => ({ ...prev, [week]: v as GameTypeOption }))
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="regular">Regular Season</SelectItem>
-                          <SelectItem value="practice">Practice</SelectItem>
-                          <SelectItem value="exhibition">Exhibition</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-xs text-muted-foreground">
-                        {slotsByWeek[week]?.length || 0} games
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ─── Step 6: Review & Save ─── */}
-            {step === 6 && (
+            {/* ─── Step 4: Review ─── */}
+            {step === 4 && (
               <div className="space-y-4">
                 <div className="p-4 bg-muted/30 rounded-lg space-y-2">
                   <div className="grid grid-cols-2 gap-y-1 text-sm">
@@ -538,8 +658,8 @@ export function RoundRobinWizard({
                     <span className="font-medium">{previewGames.length}</span>
                     <span className="text-muted-foreground">Active weeks:</span>
                     <span className="font-medium">{activeWeeks.length}</span>
-                    <span className="text-muted-foreground">Skipped weeks:</span>
-                    <span className="font-medium">{skippedWeeks.size}</span>
+                    <span className="text-muted-foreground">Skipped Dates:</span>
+                    <span className="font-medium">{skippedDateIndices.size}</span>
                     <span className="text-muted-foreground">Games per week:</span>
                     <span className="font-medium">{gamesPerWeek}</span>
                   </div>

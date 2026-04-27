@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db, schema, rawSql } from "@/lib/db"
-import { sql } from "drizzle-orm"
+import { sql, eq, and } from "drizzle-orm"
 import { getSession } from "@/lib/admin-session"
 import { revalidateTag } from "next/cache"
 
@@ -33,7 +33,17 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       JOIN teams ht ON g.home_team = ht.slug
       JOIN teams awt ON g.away_team = awt.slug
       WHERE g.season_id = ${id}
-      ORDER BY g.date ASC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END ASC
+      ORDER BY g.date ASC, 
+        CASE 
+          WHEN g.time = 'TBD' THEN '23:59'::time 
+          WHEN g.time ILIKE '%a%' OR g.time ILIKE '%p%' THEN 
+            to_timestamp(
+              replace(replace(lower(g.time), 'a', ' AM'), 'p', ' PM'), 
+              'HH:MI AM'
+            )::time 
+          ELSE 
+            g.time::time 
+        END ASC
     `)
 
     return NextResponse.json(rows)
@@ -107,6 +117,37 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ success: true, gameId })
   } catch (error) {
     console.error("Failed to create game:", error)
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const isAuthenticated = await getSession()
+  if (!isAuthenticated) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { id } = await context.params
+  const url = new URL(request.url)
+  const mode = url.searchParams.get("mode")
+
+  try {
+    if (mode === "upcoming") {
+      await db.delete(schema.games).where(
+        and(eq(schema.games.seasonId, id), eq(schema.games.status, "upcoming"))
+      )
+    } else if (mode === "all") {
+      await db.delete(schema.games).where(eq(schema.games.seasonId, id))
+    } else {
+      return NextResponse.json({ error: "Invalid mode" }, { status: 400 })
+    }
+
+    // @ts-expect-error - Next.js canary changed the signature of revalidateTag
+    revalidateTag("seasons")
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Failed to delete schedule:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
