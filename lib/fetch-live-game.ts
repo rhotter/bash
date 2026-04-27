@@ -44,8 +44,8 @@ export async function fetchLiveGameData(id: string): Promise<LiveGameData | null
   }
   for (const p of state.penalties ?? []) playerIds.add(p.playerId)
 
-  let playerNames: Record<number, string> = {}
-  let goalieIds: number[] = []
+  const playerNames: Record<number, string> = {}
+  const goalieIds: number[] = []
   if (playerIds.size > 0) {
     const ids = [...playerIds]
     const playerResult = await rawSql(sql`SELECT id, name FROM players WHERE id IN ${ids}`)

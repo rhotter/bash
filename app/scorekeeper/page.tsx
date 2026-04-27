@@ -8,7 +8,7 @@ import type { BashGame } from "@/lib/hockey-data"
 export const dynamic = "force-dynamic"
 
 export default async function ScorekeeperIndexPage() {
-  const season = getCurrentSeason()
+  const season = await getCurrentSeason()
 
   const rows = await rawSql(sql`
     SELECT g.id, g.date, g.time, g.status,
@@ -52,6 +52,10 @@ export default async function ScorekeeperIndexPage() {
     liveClockSeconds: r.live_clock_seconds as number | null,
     liveClockRunning: r.live_clock_running as boolean | null,
     liveClockStartedAt: r.live_clock_started_at as number | null,
+    gameType: "regular",
+    hasShootout: false,
+    homePlaceholder: null,
+    awayPlaceholder: null,
   }))
 
   return (

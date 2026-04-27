@@ -1,0 +1,1 @@
+ALTER TABLE "seasons" ALTER COLUMN "playoff_teams" DROP NOT NULL;

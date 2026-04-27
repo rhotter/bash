@@ -60,7 +60,7 @@ Game data is sourced from [Sportability](https://www.sportability.com/). A daily
 The Drizzle schema (`lib/db/schema.ts`) has 15 tables:
 
 - **seasons** / **teams** / **season_teams** — league structure
-- **games** / **game_live** — schedule, scores, overtime/playoff flags, and live game state
+- **games** / **game_live** — schedule, scores, overtime/playoff flags, live game state, and bracket management (`game_type`, `bracket_round`, `series_id`, `next_game_id` for playoff auto-advancement)
 - **players** / **player_seasons** / **player_season_stats** — player identities, per-season team membership, and aggregated stats
 - **player_game_stats** — per-game skater stats (G, A, PTS, PPG, SHG, GWG, PIM, etc.)
 - **goalie_game_stats** — per-game goalie stats (GA, SA, saves, shutouts, result)
@@ -73,6 +73,7 @@ The Drizzle schema (`lib/db/schema.ts`) has 15 tables:
 ```
 app/
   api/bash/          API routes (games, players, sync, admin, scorekeeper, etc.)
+  admin/             Admin dashboard (seasons, players, teams, awards)
   player/[slug]/     Player detail page
   team/[slug]/       Team detail page
   game/[id]/         Game boxscore page
@@ -81,11 +82,12 @@ app/
   scorekeeper/       Live game scorekeeper
 components/
   ui/                shadcn/ui primitives
+  admin/             Admin components (schedule tab, edit-game modal, round-robin & playoff wizards)
   *.tsx              Page-level components (scores-tab, standings-tab, etc.)
 lib/
   db/                Database connection and Drizzle schema
   fetch-*.ts         Server-side data fetching
   hockey-data.ts     SWR hooks for client-side data
-  seasons.ts         Season definitions with Sportability league IDs
+  schedule-utils.ts  Pure schedule generation (round-robin, playoff brackets)
 scripts/             Database seeding and maintenance utilities
 ```
