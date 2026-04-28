@@ -13,11 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { Play, Pause, Plus, Minus, ChevronRight, X, AlertTriangle } from "lucide-react"
+import { Play, Pause, X, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import type {
-  LiveGameState, GoalEvent, PenaltyEvent, TimeoutEvent, RosterPlayer, ShootoutAttempt,
-  ActivePenalty, PowerPlayState, GoaliePullEvent, GoalieChangeEvent,
+  LiveGameState, GoalEvent, PenaltyEvent, TimeoutEvent, RosterPlayer, GoalieChangeEvent,
 } from "@/lib/scorekeeper-types"
 import {
   createInitialState, periodLabel, formatClock, computeCurrentClock,
@@ -28,7 +27,7 @@ import {
   saveToLocalStorage, loadFromLocalStorage, clearLocalStorage,
   createSyncManager, type SyncStatus,
 } from "@/lib/scorekeeper-sync"
-import { INFRACTIONS, fullPeriodLabel } from "@/components/scorekeeper/shared/constants"
+import { INFRACTIONS } from "@/components/scorekeeper/shared/constants"
 import { FieldLabel } from "@/components/scorekeeper/shared/field-label"
 import { AttendanceList } from "@/components/scorekeeper/shared/attendance-list"
 import { GoalieSelect } from "@/components/scorekeeper/shared/goalie-select"
@@ -51,17 +50,19 @@ interface Props {
   homeRoster: RosterPlayer[]
   awayRoster: RosterPlayer[]
   existingState: LiveGameState | null
+  initialAuthenticated?: boolean
 }
 
 export function ScorekeeperApp({
   gameId, date, time, status, isPlayoff,
   homeSlug, awaySlug, homeTeam, awayTeam,
   homeRoster, awayRoster, existingState,
+  initialAuthenticated = false,
 }: Props) {
   // ─── PIN Gate ────────────────────────────────────────────────────────────
   const [pin, setPin] = useState("")
   const [pinError, setPinError] = useState("")
-  const [authenticated, setAuthenticated] = useState(false)
+  const [authenticated, setAuthenticated] = useState(initialAuthenticated)
   const [starting, setStarting] = useState(false)
 
   // ─── Game State ──────────────────────────────────────────────────────────
@@ -91,9 +92,6 @@ export function ScorekeeperApp({
   const [finalizing, setFinalizing] = useState(false)
   const [finalized, setFinalized] = useState(status === "final")
   const [pendingFinalize, setPendingFinalize] = useState(false)
-  const [showAttendance, setShowAttendance] = useState(false)
-  const [showShootout, setShowShootout] = useState(false)
-  const [shootoutTeam, setShootoutTeam] = useState<string>(awaySlug)
   const [showThreeStars, setShowThreeStars] = useState(false)
 
   // Goal form state
@@ -152,6 +150,7 @@ export function ScorekeeperApp({
     tick()
     const id = setInterval(tick, 200)
     return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.clockRunning, state.clockStartedAt, state.clockSeconds])
 
   // ─── Scores ──────────────────────────────────────────────────────────────
@@ -229,7 +228,9 @@ export function ScorekeeperApp({
       if (localStorage.getItem(`bash-finalize-${gameId}`)) {
         setPendingFinalize(true)
       }
-    } catch {}
+    } catch {
+      // LocalStorage might be disabled
+    }
   }, [gameId])
 
   // ─── Auto-finalize when back online ────────────────────────────────────
@@ -363,15 +364,7 @@ export function ScorekeeperApp({
     setClockEditOpen(false)
   }
 
-  function endPeriod() {
-    updateState((prev) => {
-      // Auto-return any pulled goalies at period end (clock = 0:00)
-      const goaliePulls = (prev.goaliePulls ?? []).map((p) =>
-        p.returnedAt === null ? { ...p, returnedAt: "0:00" } : p
-      )
-      return { ...prev, clockRunning: false, clockSeconds: 0, clockStartedAt: null, goaliePulls }
-    })
-  }
+
 
   function startNextPeriod() {
     updateState((prev) => {
@@ -435,7 +428,7 @@ export function ScorekeeperApp({
     })
   }
 
-  function useTimeout(team: "home" | "away") {
+  function handleUseTimeout(team: "home" | "away") {
     const slug = team === "home" ? homeSlug : awaySlug
     updateState((prev) => {
       const remaining = computeCurrentClock(prev)
@@ -783,7 +776,6 @@ export function ScorekeeperApp({
       clockStartedAt: null,
       shootout: { homeAttempts: [], awayAttempts: [] },
     }))
-    setShowShootout(true)
   }
 
   function addShootoutAttempt(team: string, playerId: number, scored: boolean) {
@@ -935,8 +927,6 @@ export function ScorekeeperApp({
 
   const isPreGame = state.period === 0
   const isShootout = state.period === 5
-  const totalHomeShots = state.homeShots.reduce((a, b) => a + b, 0)
-  const totalAwayShots = state.awayShots.reduce((a, b) => a + b, 0)
 
   return (
     <div className="flex-1 bg-background pb-24" style={{ "--accent": "var(--muted)", "--accent-foreground": "var(--foreground)" } as React.CSSProperties}>
@@ -1170,7 +1160,7 @@ export function ScorekeeperApp({
                 <TimeoutButton
                   used={(state.timeouts ?? []).filter((t) => t.team === awaySlug).length}
                   max={state.period >= 4 ? 3 : 2}
-                  onUse={() => useTimeout("away")}
+                  onUse={() => handleUseTimeout("away")}
                 />
                 <ShotCounter
                   label="SOG"
@@ -1197,7 +1187,7 @@ export function ScorekeeperApp({
                 <TimeoutButton
                   used={(state.timeouts ?? []).filter((t) => t.team === homeSlug).length}
                   max={state.period >= 4 ? 3 : 2}
-                  onUse={() => useTimeout("home")}
+                  onUse={() => handleUseTimeout("home")}
                 />
                 <ShotCounter
                   label="SOG"

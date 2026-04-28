@@ -1,13 +1,15 @@
 import { db, schema, rawSql } from "@/lib/db"
 import { sql, eq, desc } from "drizzle-orm"
-import { getCurrentSeason, getSeasonById } from "@/lib/seasons"
+import { getCurrentSeason, getAllSeasons } from "@/lib/seasons"
 import { playerSlug } from "@/lib/player-slug"
 import type { PlayerDetail, SkaterStats, GoalieStats } from "@/app/api/bash/player/[slug]/route"
 
 export type { PlayerDetail }
 
 export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | null> {
-  const currentSeasonId = getCurrentSeason().id
+  const currentSeasonId = (await getCurrentSeason()).id
+  const allSeasons = await getAllSeasons()
+  const seasonMap = new Map(allSeasons.map(s => [s.id, s.name]))
 
   // Look up player by slug (derived from name) — find all players whose slug matches
   const allMatches = await db.select({ id: schema.players.id, name: schema.players.name }).from(schema.players)
@@ -48,23 +50,13 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   let seasonStats: PlayerDetail["seasonStats"] = null
   let allTimeStats: PlayerDetail["allTimeStats"] = null
   let allTimeAllSeasonsStats: PlayerDetail["allTimeAllSeasonsStats"] = null
-  let perSeasonStats: PlayerDetail["perSeasonStats"] = []
   let goalieSeasonStats: PlayerDetail["goalieSeasonStats"] = null
   let allTimeGoalieStats: PlayerDetail["allTimeGoalieStats"] = null
   let allTimeAllSeasonsGoalieStats: PlayerDetail["allTimeAllSeasonsGoalieStats"] = null
-  let perSeasonGoalieStats: PlayerDetail["perSeasonGoalieStats"] = []
-  let games: PlayerDetail["games"] = []
-  let goalieGames: PlayerDetail["goalieGames"] = []
-  let playoffPerSeasonStats: PlayerDetail["playoffPerSeasonStats"] = []
   let playoffAllTimeStats: PlayerDetail["playoffAllTimeStats"] = null
   let playoffAllTimeAllSeasonsStats: PlayerDetail["playoffAllTimeAllSeasonsStats"] = null
-  let playoffGames: PlayerDetail["playoffGames"] = []
-  let playoffPerSeasonGoalieStats: PlayerDetail["playoffPerSeasonGoalieStats"] = []
   let playoffAllTimeGoalieStats: PlayerDetail["playoffAllTimeGoalieStats"] = null
   let playoffAllTimeAllSeasonsGoalieStats: PlayerDetail["playoffAllTimeAllSeasonsGoalieStats"] = null
-  let playoffGoalieGames: PlayerDetail["playoffGoalieGames"] = []
-  let championships: PlayerDetail["championships"] = []
-  let awards: PlayerDetail["awards"] = []
   let hallOfFame: PlayerDetail["hallOfFame"] = null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -519,16 +511,16 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   if (skaterAllSeasonsRows.length > 0 && skaterAllSeasonsRows[0].gp > 0) {
     allTimeAllSeasonsStats = buildSkaterStats(skaterAllSeasonsRows[0])
   }
-  perSeasonStats = skaterPerSeasonRows
+  const perSeasonStats = skaterPerSeasonRows
     .filter((r) => r.gp > 0)
     .map((r) => ({
       seasonId: r.season_id,
-      seasonName: getSeasonById(r.season_id)?.name ?? r.season_id,
+      seasonName: seasonMap.get(r.season_id) ?? r.season_id,
       teamName: r.team_name ?? "",
       teamSlug: r.team_slug ?? "",
       stats: buildSkaterStats(r),
     }))
-  games = skaterGameRows.map((r) => {
+  const games = skaterGameRows.map((r) => {
     const isHome = r.home_team === teamSlug
     const teamScore = isHome ? r.home_score : r.away_score
     const opponentScore = isHome ? r.away_score : r.home_score
@@ -558,16 +550,16 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   if (goalieAllSeasonsRows.length > 0 && goalieAllSeasonsRows[0].gp > 0) {
     allTimeAllSeasonsGoalieStats = buildGoalieStats(goalieAllSeasonsRows[0])
   }
-  perSeasonGoalieStats = goaliePerSeasonRows
+  const perSeasonGoalieStats = goaliePerSeasonRows
     .filter((r) => r.gp > 0)
     .map((r) => ({
       seasonId: r.season_id,
-      seasonName: getSeasonById(r.season_id)?.name ?? r.season_id,
+      seasonName: seasonMap.get(r.season_id) ?? r.season_id,
       teamName: r.team_name ?? "",
       teamSlug: r.team_slug ?? "",
       stats: buildGoalieStats(r),
     }))
-  goalieGames = goalieGameRows.map((r) => {
+  const goalieGames = goalieGameRows.map((r) => {
     const isHome = r.home_team === teamSlug
     return {
       gameId: r.game_id, date: r.date,
@@ -591,16 +583,16 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   if (poSkaterAllSeasonsRows.length > 0 && poSkaterAllSeasonsRows[0].gp > 0) {
     playoffAllTimeAllSeasonsStats = buildSkaterStats(poSkaterAllSeasonsRows[0])
   }
-  playoffPerSeasonStats = poSkaterPerSeasonRows
+  const playoffPerSeasonStats = poSkaterPerSeasonRows
     .filter((r) => r.gp > 0)
     .map((r) => ({
       seasonId: r.season_id,
-      seasonName: getSeasonById(r.season_id)?.name ?? r.season_id,
+      seasonName: seasonMap.get(r.season_id) ?? r.season_id,
       teamName: r.team_name ?? "",
       teamSlug: r.team_slug ?? "",
       stats: buildSkaterStats(r),
     }))
-  playoffGames = poSkaterGameRows.map((r) => {
+  const playoffGames = poSkaterGameRows.map((r) => {
     const isHome = r.home_team === teamSlug
     const teamScore = isHome ? r.home_score : r.away_score
     const opponentScore = isHome ? r.away_score : r.home_score
@@ -627,16 +619,16 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   if (poGoalieAllSeasonsRows.length > 0 && poGoalieAllSeasonsRows[0].gp > 0) {
     playoffAllTimeAllSeasonsGoalieStats = buildGoalieStats(poGoalieAllSeasonsRows[0])
   }
-  playoffPerSeasonGoalieStats = poGoaliePerSeasonRows
+  const playoffPerSeasonGoalieStats = poGoaliePerSeasonRows
     .filter((r) => r.gp > 0)
     .map((r) => ({
       seasonId: r.season_id,
-      seasonName: getSeasonById(r.season_id)?.name ?? r.season_id,
+      seasonName: seasonMap.get(r.season_id) ?? r.season_id,
       teamName: r.team_name ?? "",
       teamSlug: r.team_slug ?? "",
       stats: buildGoalieStats(r),
     }))
-  playoffGoalieGames = poGoalieGameRows.map((r) => {
+  const playoffGoalieGames = poGoalieGameRows.map((r) => {
     const isHome = r.home_team === teamSlug
     return {
       gameId: r.game_id, date: r.date,
@@ -654,16 +646,16 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   })
 
   // Populate championships
-  championships = championshipRows.map((r) => ({
+  const championships = championshipRows.map((r) => ({
     seasonId: r.season_id,
-    seasonName: getSeasonById(r.season_id)?.name ?? r.season_id,
+    seasonName: seasonMap.get(r.season_id) ?? r.season_id,
   }))
 
   // Populate awards
-  awards = awardRows.map((r) => ({
+  const awards = awardRows.map((r) => ({
     awardType: r.awardType,
     seasonId: r.seasonId,
-    seasonName: getSeasonById(r.seasonId)?.name ?? r.seasonId,
+    seasonName: seasonMap.get(r.seasonId) ?? r.seasonId,
   }))
 
   // Populate hall of fame
