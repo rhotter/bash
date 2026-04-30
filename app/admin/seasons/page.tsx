@@ -3,15 +3,7 @@ import { Plus } from "lucide-react"
 import { rawSql } from "@/lib/db"
 import { sql } from "drizzle-orm"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { SeasonsListTable, type SeasonRow } from "@/components/admin/seasons-list-table"
 
 interface SeasonListPageProps {
   searchParams: Promise<{ status?: string; type?: string }>
@@ -40,28 +32,7 @@ async function getSeasons(statusFilter?: string, typeFilter?: string) {
     ORDER BY s.id DESC
   `)
 
-  return rows
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    active: "bg-green-500/10 text-green-700 border-green-500/30",
-    draft: "bg-amber-500/10 text-amber-700 border-amber-500/30",
-    completed: "bg-muted text-muted-foreground border-border",
-  }
-  return (
-    <Badge variant="outline" className={`text-[10px] font-medium ${styles[status] || styles.completed}`}>
-      {status}
-    </Badge>
-  )
-}
-
-function TypeBadge({ type }: { type: string }) {
-  return (
-    <Badge variant="outline" className="text-[10px] font-medium">
-      {type}
-    </Badge>
-  )
+  return rows as SeasonRow[]
 }
 
 export default async function SeasonsListPage({ searchParams }: SeasonListPageProps) {
@@ -130,73 +101,7 @@ export default async function SeasonsListPage({ searchParams }: SeasonListPagePr
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-xs font-semibold">Name</TableHead>
-              <TableHead className="text-xs font-semibold">Type</TableHead>
-              <TableHead className="text-xs font-semibold">Status</TableHead>
-              <TableHead className="text-xs font-semibold text-center">Teams</TableHead>
-              <TableHead className="text-xs font-semibold text-center">Games</TableHead>
-              <TableHead className="text-xs font-semibold text-center">Players</TableHead>
-              <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {seasons.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                  No seasons found
-                </TableCell>
-              </TableRow>
-            ) : (
-              seasons.map((season) => (
-                <TableRow key={season.id}>
-                  <TableCell>
-                    <Link
-                      href={`/admin/seasons/${season.id}`}
-                      className="font-medium hover:text-primary transition-colors"
-                    >
-                      {season.name}
-                    </Link>
-                    {season.isCurrent && (
-                      <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                        Current
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell><TypeBadge type={season.seasonType} /></TableCell>
-                  <TableCell><StatusBadge status={season.status} /></TableCell>
-                  <TableCell className="text-center text-sm text-muted-foreground">{season.teamCount}</TableCell>
-                  <TableCell className="text-center text-sm text-muted-foreground">{season.gameCount}</TableCell>
-                  <TableCell className="text-center text-sm text-muted-foreground">{season.playerCount}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={`/admin/seasons/${season.id}`}
-                        className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors"
-                      >
-                        Edit
-                      </Link>
-                      {season.status !== "draft" && (
-                        <Link
-                          href={`/?season=${season.id}`}
-                          target="_blank"
-                          className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors"
-                        >
-                          View
-                        </Link>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <SeasonsListTable seasons={seasons} />
     </div>
   )
 }

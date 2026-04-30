@@ -6,11 +6,12 @@ import type { BashGame } from "@/lib/hockey-data"
 import type { LiveGameData } from "@/lib/fetch-live-game"
 import type { RosterPlayer } from "@/lib/scorekeeper-types"
 
-export function GamePageContent({ initialDetail, initialLiveData, homeRoster, awayRoster }: {
+export function GamePageContent({ initialDetail, initialLiveData, homeRoster, awayRoster, forceEdit }: {
   initialDetail: BashGameDetail
   initialLiveData?: LiveGameData | null
   homeRoster?: RosterPlayer[]
   awayRoster?: RosterPlayer[]
+  forceEdit?: boolean
 }) {
   const game: BashGame = {
     id: initialDetail.id,
@@ -46,6 +47,7 @@ export function GamePageContent({ initialDetail, initialLiveData, homeRoster, aw
       initialLiveData={initialLiveData ?? undefined}
       homeRoster={homeRoster}
       awayRoster={awayRoster}
+      forceEdit={forceEdit}
     />
   )
 }

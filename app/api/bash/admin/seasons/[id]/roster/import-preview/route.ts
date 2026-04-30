@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
 import { getSession } from "@/lib/admin-session"
 import { inArray, eq, and } from "drizzle-orm"
+import { canonicalizePlayerName, normalizePlayerName } from "@/lib/player-name"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       // Name
       const firstName = row["FirstName"]?.trim() || ""
       const lastName = row["LastName"]?.trim() || ""
-      const playerName = `${firstName} ${lastName}`.trim()
+      const playerName = canonicalizePlayerName(`${firstName} ${lastName}`)
 
       // Team
       const rawTeam = row["Team"]?.trim() || ""
@@ -134,18 +135,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // 2. Database Comparison (Stats)
     const { id: seasonId } = await context.params
-    const playerNames = mappedPlayers.map((p) => p.playerName)
-    let existingPlayers: { id: number, name: string }[] = []
-    
-    if (playerNames.length > 0) {
-      existingPlayers = await db
-        .select({ id: schema.players.id, name: schema.players.name })
-        .from(schema.players)
-        .where(inArray(schema.players.name, playerNames))
+    const allPlayers = await db
+      .select({ id: schema.players.id, name: schema.players.name })
+      .from(schema.players)
+
+    const existingPlayersByNormalized = new Map<string, { id: number; name: string }>()
+    for (const player of allPlayers) {
+      const normalizedName = normalizePlayerName(player.name)
+      if (!existingPlayersByNormalized.has(normalizedName)) {
+        existingPlayersByNormalized.set(normalizedName, player)
+      }
     }
 
-    const existingNamesSet = new Set(existingPlayers.map((p) => p.name))
-    const existingPlayerIds = existingPlayers.map(p => p.id)
+    const existingPlayerIds = Array.from(
+      new Set(
+        mappedPlayers
+          .map((player) => existingPlayersByNormalized.get(normalizePlayerName(player.playerName))?.id)
+          .filter((playerId): playerId is number => typeof playerId === "number")
+      )
+    )
 
     // Check season roster
     let existingSeasonAssignments: { playerId: number }[] = []
@@ -165,13 +173,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const totalInImport = mappedPlayers.length
     
     // Global stats
-    const globalExisting = mappedPlayers.filter(p => existingNamesSet.has(p.playerName)).length
+    const globalExisting = mappedPlayers.filter((player) =>
+      existingPlayersByNormalized.has(normalizePlayerName(player.playerName))
+    ).length
     const globalNew = totalInImport - globalExisting
 
     // Season stats
     let seasonExisting = 0
-    mappedPlayers.forEach(p => {
-      const dbPlayer = existingPlayers.find(ep => ep.name === p.playerName)
+    mappedPlayers.forEach((player) => {
+      const dbPlayer = existingPlayersByNormalized.get(normalizePlayerName(player.playerName))
       if (dbPlayer && seasonAssignedIdsSet.has(dbPlayer.id)) {
         seasonExisting++
       }

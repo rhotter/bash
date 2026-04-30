@@ -165,7 +165,7 @@ export function PlayoffWizard({
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 
-  const totalSteps = wizardMode === "generate" ? 5 : 2
+  const totalSteps = wizardMode === "generate" ? 4 : 2
   const canGoNext = (): boolean => {
     if (step === 1) return true
     if (wizardMode === "resolve") {
@@ -176,8 +176,7 @@ export function PlayoffWizard({
       switch (step) {
         case 2: return numTeams >= 4
         case 3: return usePlaceholders || seeds.filter(Boolean).length >= numTeams
-        case 4: return true
-        case 5: return bracketGames.length > 0
+        case 4: return bracketGames.length > 0
       }
     }
     return false
@@ -276,7 +275,7 @@ export function PlayoffWizard({
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const stepTitlesGenerate = ["Action", "Format & Teams", "Assign Seeds", "Game Details", "Review & Save"]
+  const stepTitlesGenerate = ["Action", "Format & Teams", "Assign Seeds", "Game Details"]
   const stepTitlesResolve = ["Action", "Resolve Seeds"]
   const stepTitles = wizardMode === "generate" ? stepTitlesGenerate : stepTitlesResolve
 
@@ -708,63 +707,18 @@ export function PlayoffWizard({
               </div>
             )}
 
-            {/* ─── Generate Mode: Step 5: Review & Save ─── */}
-            {step === 5 && wizardMode === "generate" && (
-              <div className="space-y-4">
-                {/* Visual bracket */}
-                <div className="p-4 bg-muted/30 rounded-lg space-y-3">
-                  {roundOrder
-                    .filter((r) => gamesByRound[r])
-                    .map((round) => (
-                      <div key={round}>
-                        <div className="font-medium text-sm flex items-center gap-2 mb-1">
-                          {roundLabel(round)}
-                        </div>
-                        {gamesByRound[round].map((g) => {
-                          const details = gameDetails[g.id]
-                          return (
-                            <div key={g.id} className="flex items-center gap-2 ml-4 text-sm py-1">
-                              <Badge variant="outline" className="text-[10px] uppercase">
-                                {g.seriesId} G{g.seriesGameNumber}
-                              </Badge>
-                              <span>{displayTeam(g.awayTeam, g.awayPlaceholder)}</span>
-                              <span className="text-muted-foreground">@</span>
-                              <span>{displayTeam(g.homeTeam, g.homePlaceholder)}</span>
-                              {g.nextGameId && (
-                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                              )}
-                              {details?.date && (
-                                <span className="text-xs text-muted-foreground ml-auto">
-                                  {details.date} {details.time}
-                                </span>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ))}
-                </div>
-
-                <div className="p-3 border rounded-lg text-sm">
-                  <strong>{bracketGames.length}</strong> playoff games will be created.
-                  {" "}This will replace any existing upcoming playoff games for this season.
-                </div>
-              </div>
-            )}
           </div>
 
-          <DialogFooter className="flex justify-between sm:justify-between gap-2">
-            <div>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <div className="flex justify-end gap-2">
               {step > 1 && (
                 <Button variant="outline" onClick={handleBack}>
                   <ChevronLeft className="h-4 w-4 mr-1" /> Back
                 </Button>
               )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
               {step < totalSteps ? (
                 <Button onClick={handleNext} disabled={!canGoNext()}>
                   Next <ChevronRight className="h-4 w-4 ml-1" />

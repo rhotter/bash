@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
 import { eq, ilike, and } from "drizzle-orm"
 import { getSession } from "@/lib/admin-session"
+import { canonicalizePlayerName, normalizePlayerName } from "@/lib/player-name"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -17,8 +18,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   try {
     const { playerName, teamSlug, isGoalie } = await request.json()
+    const canonicalPlayerName = typeof playerName === "string" ? canonicalizePlayerName(playerName) : ""
 
-    if (!playerName || !teamSlug) {
+    if (!canonicalPlayerName || !teamSlug) {
       return NextResponse.json({ error: "Player name and team are required" }, { status: 400 })
     }
 
@@ -39,18 +41,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     // 1. Find or create player. Rookie status is derived on read, not stored.
     let playerId: number
 
-    const existingPlayers = await db
-      .select({ id: schema.players.id })
+    const exactMatch = await db
+      .select({ id: schema.players.id, name: schema.players.name })
       .from(schema.players)
-      .where(ilike(schema.players.name, playerName))
+      .where(ilike(schema.players.name, canonicalPlayerName))
       .limit(1)
 
-    if (existingPlayers.length > 0) {
-      playerId = existingPlayers[0].id
+    const normalizedMatch = exactMatch[0]
+      ? exactMatch[0]
+      : (await db.select({ id: schema.players.id, name: schema.players.name }).from(schema.players))
+          .find((player) => normalizePlayerName(player.name) === normalizePlayerName(canonicalPlayerName))
+
+    if (normalizedMatch) {
+      playerId = normalizedMatch.id
     } else {
       const [newPlayer] = await db
         .insert(schema.players)
-        .values({ name: playerName })
+        .values({ name: canonicalPlayerName })
         .returning({ id: schema.players.id })
       playerId = newPlayer.id
     }
@@ -84,15 +91,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   try {
     const { playerId, oldTeamSlug, playerName, teamSlug, isGoalie } = await request.json()
+    const canonicalPlayerName = typeof playerName === "string" ? canonicalizePlayerName(playerName) : ""
 
-    if (!playerId || !oldTeamSlug || !playerName || !teamSlug) {
+    if (!playerId || !oldTeamSlug || !canonicalPlayerName || !teamSlug) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     // Update global player name
     await db
       .update(schema.players)
-      .set({ name: playerName })
+      .set({ name: canonicalPlayerName })
       .where(eq(schema.players.id, playerId))
 
     // Update player_seasons record

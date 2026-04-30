@@ -51,8 +51,17 @@ INSERT INTO teams (slug, name) VALUES ('tbd', '(TBD)') ON CONFLICT (slug) DO NOT
 -- ─── Constraint name harmonization ──────────────────────────────────────────
 -- Postgres auto-named these with _key suffix at table creation time;
 -- Drizzle now expects _unique suffix. Rename to align so future db:push is a no-op.
-ALTER TABLE player_awards RENAME CONSTRAINT player_awards_player_name_season_id_award_type_key TO player_awards_player_name_season_id_award_type_unique;
-ALTER TABLE hall_of_fame  RENAME CONSTRAINT hall_of_fame_player_name_class_year_key            TO hall_of_fame_player_name_class_year_unique;
-ALTER TABLE players       RENAME CONSTRAINT players_name_key                                    TO players_name_unique;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'player_awards_player_name_season_id_award_type_key') THEN
+    ALTER TABLE player_awards RENAME CONSTRAINT player_awards_player_name_season_id_award_type_key TO player_awards_player_name_season_id_award_type_unique;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'hall_of_fame_player_name_class_year_key') THEN
+    ALTER TABLE hall_of_fame RENAME CONSTRAINT hall_of_fame_player_name_class_year_key TO hall_of_fame_player_name_class_year_unique;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'players_name_key') THEN
+    ALTER TABLE players RENAME CONSTRAINT players_name_key TO players_name_unique;
+  END IF;
+END $$;
 
 COMMIT;

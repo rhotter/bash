@@ -761,18 +761,16 @@ export function RoundRobinWizard({
             )}
           </div>
 
-          <DialogFooter className="flex justify-between sm:justify-between gap-2">
-            <div>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <div className="flex justify-end gap-2">
               {step > 1 && (
                 <Button variant="outline" onClick={handleBack}>
                   <ChevronLeft className="h-4 w-4 mr-1" /> Back
                 </Button>
               )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
               {step < totalSteps ? (
                 <Button onClick={handleNext} disabled={!canGoNext()}>
                   Next <ChevronRight className="h-4 w-4 ml-1" />

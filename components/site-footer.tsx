@@ -1,14 +1,12 @@
 "use client"
 
-import { Suspense, useState } from "react"
+import { Suspense } from "react"
 import Link from "next/link"
 import { useAdmin } from "@/lib/admin-context"
-import { PinDialog } from "@/components/admin-editor/pin-dialog"
 import { SeasonSelector } from "@/components/season-selector"
 
 export function SiteFooter() {
-  const { isAdmin, login, logout } = useAdmin()
-  const [pinDialogOpen, setPinDialogOpen] = useState(false)
+  const { isAdmin, logout } = useAdmin()
 
   return (
     <footer className="mt-auto border-t border-border/40 py-6 px-4">
@@ -22,8 +20,8 @@ export function SiteFooter() {
         </Link>
         {isAdmin ? (
           <>
-            <Link href="/admin" className="text-xs text-primary font-medium hover:text-primary/80 transition-colors">
-              Dashboard
+            <Link href="/admin/seasons" className="text-xs text-primary font-medium hover:text-primary/80 transition-colors">
+              Admin
             </Link>
             <button
               onClick={logout}
@@ -33,23 +31,15 @@ export function SiteFooter() {
             </button>
           </>
         ) : (
-          <button 
-            onClick={() => setPinDialogOpen(true)}
-            className="text-xs text-muted-foreground/30 hover:text-muted-foreground transition-colors cursor-pointer"
+          <Link
+            href="/admin"
+            className="text-xs text-muted-foreground/30 hover:text-muted-foreground transition-colors"
           >
             Admin
-          </button>
+          </Link>
         )}
         </div>
       </div>
-      <PinDialog
-        open={pinDialogOpen}
-        onOpenChange={setPinDialogOpen}
-        onSuccess={(pin) => {
-          login(pin)
-          setPinDialogOpen(false)
-        }}
-      />
     </footer>
   )
 }

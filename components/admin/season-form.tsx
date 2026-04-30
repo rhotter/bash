@@ -147,7 +147,7 @@ export function SeasonForm({ season }: SeasonFormProps) {
         method: "DELETE",
       })
       if (res.ok) {
-        router.push("/admin")
+        router.push("/admin/seasons")
         router.refresh()
       } else {
         const data = await res.json()
@@ -315,17 +315,6 @@ export function SeasonForm({ season }: SeasonFormProps) {
               Activate Season
             </Button>
           )}
-          {season.status === "active" && (
-            <Button
-              onClick={() => promptStatusTransition("completed")}
-              disabled={saving}
-              variant="outline"
-              size="sm"
-              className="text-muted-foreground cursor-pointer"
-            >
-              Mark Completed
-            </Button>
-          )}
           <Button
             onClick={handleSave}
             disabled={saving}
@@ -359,6 +348,32 @@ export function SeasonForm({ season }: SeasonFormProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Complete Season */}
+      {season.status === "active" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Complete Season</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Mark this season as completed</p>
+                <p className="text-xs text-muted-foreground">Closes the books on this season. It will remain the &lsquo;current&rsquo; season on the public site until you activate a new one.</p>
+              </div>
+              <Button
+                onClick={() => promptStatusTransition("completed")}
+                disabled={saving}
+                variant="outline"
+                size="sm"
+                className="text-muted-foreground cursor-pointer shrink-0"
+              >
+                Complete Season
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Danger Zone */}
       <Card className="border-destructive/30">

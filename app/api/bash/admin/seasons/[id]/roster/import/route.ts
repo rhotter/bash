@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
 import { getSession } from "@/lib/admin-session"
 import { eq, inArray } from "drizzle-orm"
+import { canonicalizePlayerName, normalizePlayerName } from "@/lib/player-name"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -26,7 +27,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: true, count: 0 })
     }
 
-    const uniqueNames = Array.from(new Set(players.map((p: { playerName: string }) => p.playerName)))
+    const normalizedPlayers = players
+      .map((player: { playerName: string; teamSlug: string; isGoalie: boolean }) => ({
+        ...player,
+        playerName: canonicalizePlayerName(player.playerName),
+      }))
+      .filter((player) => player.playerName.length > 0)
+
+    const uniqueNamesByNormalized = new Map<string, string>()
+    for (const player of normalizedPlayers) {
+      const normalizedName = normalizePlayerName(player.playerName)
+      if (!uniqueNamesByNormalized.has(normalizedName)) {
+        uniqueNamesByNormalized.set(normalizedName, player.playerName)
+      }
+    }
 
     // 1. If Overwrite, wipe the existing roster for this season
     if (mode === "overwrite") {
@@ -34,18 +48,35 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     // 2. Ensure all players exist globally (upsert — do nothing if name exists)
-    const playerInserts = uniqueNames.map(name => ({ name }))
-    await db.insert(schema.players)
-      .values(playerInserts)
-      .onConflictDoNothing({ target: schema.players.name })
+    const existingPlayers = await db
+      .select({ id: schema.players.id, name: schema.players.name })
+      .from(schema.players)
 
-    // 3. Fetch all relevant player IDs
+    const existingPlayersByNormalized = new Map<string, { id: number; name: string }>()
+    for (const player of existingPlayers) {
+      const normalizedName = normalizePlayerName(player.name)
+      if (!existingPlayersByNormalized.has(normalizedName)) {
+        existingPlayersByNormalized.set(normalizedName, player)
+      }
+    }
+
+    const namesToInsert = Array.from(uniqueNamesByNormalized.entries())
+      .filter(([normalizedName]) => !existingPlayersByNormalized.has(normalizedName))
+      .map(([, name]) => ({ name }))
+
+    if (namesToInsert.length > 0) {
+      await db.insert(schema.players).values(namesToInsert)
+    }
+
+    // 3. Fetch all relevant player IDs after inserting any missing players.
     const dbPlayers = await db
       .select({ id: schema.players.id, name: schema.players.name })
       .from(schema.players)
-      .where(inArray(schema.players.name, uniqueNames))
+      .where(inArray(schema.players.name, Array.from(uniqueNamesByNormalized.values())))
 
-    const nameToIdMap = new Map(dbPlayers.map(p => [p.name, p.id]))
+    const nameToIdMap = new Map(
+      dbPlayers.map((player) => [normalizePlayerName(player.name), player.id])
+    )
 
     // 4. If Append, find who is already assigned so we can skip them
     let existingAssignedIds = new Set<number>()
@@ -61,8 +92,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const seasonInserts = []
     const processedIds = new Set<number>()
 
-    for (const p of players) {
-      const pId = nameToIdMap.get(p.playerName) as number
+    for (const player of normalizedPlayers) {
+      const pId = nameToIdMap.get(normalizePlayerName(player.playerName))
+
+      if (!pId) {
+        continue
+      }
 
       // Skip if already assigned this season, or if we already processed them in this file loop
       if ((mode === "append" && existingAssignedIds.has(pId)) || processedIds.has(pId)) {
@@ -73,8 +108,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       seasonInserts.push({
         playerId: pId,
         seasonId,
-        teamSlug: p.teamSlug,
-        isGoalie: p.isGoalie,
+        teamSlug: player.teamSlug,
+        isGoalie: player.isGoalie,
       })
     }
 
@@ -82,7 +117,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       await db.insert(schema.playerSeasons).values(seasonInserts)
     }
 
-    return NextResponse.json({ ok: true, count: players.length })
+    return NextResponse.json({ ok: true, count: seasonInserts.length })
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)

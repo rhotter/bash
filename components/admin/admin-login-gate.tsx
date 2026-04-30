@@ -52,7 +52,7 @@ export function AdminLoginGate() {
               BASH Admin
             </CardTitle>
             <CardDescription className="text-xs">
-              Enter your commissioner PIN to continue
+              Enter your PIN to continue
             </CardDescription>
           </div>
         </CardHeader>

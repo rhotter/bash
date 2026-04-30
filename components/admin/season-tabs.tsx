@@ -1,20 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { SeasonOverview } from "./season-overview"
 import { SeasonForm } from "./season-form"
 import { PlaceholderCard } from "./placeholder-card"
 import { SeasonTeamsTab } from "./season-teams-tab"
 import { SeasonRosterTab } from "./season-roster-tab"
 import { SeasonScheduleTab } from "./season-schedule-tab"
 
-type Tab = "Overview" | "Settings" | "Teams" | "Roster" | "Schedule" | "Draft" | "Registration"
+type Tab = "Settings" | "Teams" | "Roster" | "Schedule" | "Draft" | "Registration"
 
 function getTabsForStatus(status: string): Tab[] {
   if (status === "draft") {
-    return ["Overview", "Schedule", "Teams", "Registration", "Draft", "Roster", "Settings"]
+    return ["Schedule", "Teams", "Registration", "Draft", "Roster", "Settings"]
   }
-  return ["Overview", "Schedule", "Teams", "Roster", "Settings"]
+  return ["Schedule", "Teams", "Roster", "Settings"]
 }
 
 interface SeasonTabsProps {
@@ -33,17 +32,12 @@ interface SeasonTabsProps {
     isCurrent: boolean
     teams: { teamSlug: string; teamName: string }[]
     roster: { playerId: number; playerName: string; teamSlug: string; isGoalie: boolean; isRookie: boolean }[]
-    gameCount: number
-    completedGameCount: number
-    playerCount: number
-    recentGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[]
-    upcomingGames?: { id: number; date: string; time: string | null; awayTeam: string; homeTeam: string; location: string | null; officials: { name: string; role: string }[] }[]
   }
 }
 
 export function SeasonTabs({ season }: SeasonTabsProps) {
   const tabs = getTabsForStatus(season.status)
-  const [activeTab, setActiveTab] = useState<Tab>("Overview")
+  const [activeTab, setActiveTab] = useState<Tab>(tabs[0])
 
   return (
     <div className="space-y-4">
@@ -66,7 +60,6 @@ export function SeasonTabs({ season }: SeasonTabsProps) {
 
       {/* Tab Content */}
       <div>
-        {activeTab === "Overview" && <SeasonOverview season={season} onEditSettings={() => setActiveTab("Settings")} />}
         {activeTab === "Settings" && <SeasonForm season={season} />}
         {activeTab === "Teams" && <SeasonTeamsTab seasonId={season.id} seasonStatus={season.status} initialTeams={season.teams} />}
         {activeTab === "Roster" && <SeasonRosterTab seasonId={season.id} seasonStatus={season.status} roster={season.roster} teams={season.teams} />}

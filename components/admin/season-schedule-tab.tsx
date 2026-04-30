@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Loader2, Plus, Calendar, Trash2, Edit, ClipboardList, Shuffle, Trophy, LayoutList, LayoutGrid } from "lucide-react"
+import { Loader2, Plus, Calendar, Trash2, Edit, Shuffle, Trophy } from "lucide-react"
 import Link from "next/link"
 import { TeamLogo } from "@/components/team-logo"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -24,20 +24,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { EditGameModal, GameFormData } from "./edit-game-modal"
+import { EditGameModal } from "./edit-game-modal"
 import { RoundRobinWizard } from "./round-robin-wizard"
 import { PlayoffWizard } from "./playoff-wizard"
 import { formatGameTime } from "@/lib/format-time"
@@ -81,14 +72,12 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
   const [teamFilter, setTeamFilter] = useState("all")
   
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingGame, setEditingGame] = useState<GameFormData | null>(null)
-  
+
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const [deleteScheduleModalOpen, setDeleteScheduleModalOpen] = useState(false)
   const [deleteScheduleMode, setDeleteScheduleMode] = useState<"upcoming" | "all">("upcoming")
-  const [viewMode, setViewMode] = useState<"card" | "table">("card")
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   const [rrWizardOpen, setRrWizardOpen] = useState(false)
@@ -166,29 +155,6 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
   }
 
   const openAddGame = () => {
-    setEditingGame(null)
-    setModalOpen(true)
-  }
-
-  const openEditGame = (game: ScheduleGame) => {
-    setEditingGame({
-      id: game.id,
-      date: game.date,
-      time: game.time,
-      homeTeam: game.homeSlug,
-      awayTeam: game.awaySlug,
-      location: game.location,
-      gameType: game.gameType,
-      status: game.status,
-      homeScore: game.homeScore,
-      awayScore: game.awayScore,
-      isOvertime: game.isOvertime,
-      hasShootout: game.hasShootout,
-      isForfeit: game.isForfeit,
-      notes: game.notes,
-      homeNotes: game.homeNotes,
-      awayNotes: game.awayNotes,
-    })
     setModalOpen(true)
   }
 
@@ -229,10 +195,7 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div className="flex gap-2 flex-1">
-          <Select value={teamFilter} onValueChange={(val) => {
-            setTeamFilter(val)
-            if (val !== "all") setViewMode("table")
-          }}>
+          <Select value={teamFilter} onValueChange={setTeamFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by team" />
             </SelectTrigger>
@@ -243,20 +206,6 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
               ))}
             </SelectContent>
           </Select>
-          <ToggleGroup
-            type="single"
-            value={viewMode}
-            onValueChange={(val) => { if (val) setViewMode(val as "card" | "table") }}
-            variant="outline"
-            size="sm"
-          >
-            <ToggleGroupItem value="card" aria-label="Card view">
-              <LayoutGrid className="h-4 w-4" />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="table" aria-label="Table view">
-              <LayoutList className="h-4 w-4" />
-            </ToggleGroupItem>
-          </ToggleGroup>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isEditable && (
@@ -279,12 +228,6 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Schedule</CardTitle>
-          <CardDescription>
-            {isLoading ? "Loading schedule..." : `${games.length} games total`}
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center p-8">
@@ -301,95 +244,6 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
               )}
             </div>
           ) : (
-            viewMode === "table" ? (
-              <div className="border rounded-md overflow-hidden bg-background">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead className="text-right">Away</TableHead>
-                      <TableHead className="text-center w-8"></TableHead>
-                      <TableHead>Home</TableHead>
-                      <TableHead>Status</TableHead>
-                      {isEditable && <TableHead className="text-right w-28">Actions</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredGames.map(g => (
-                      <TableRow key={g.id}>
-                        <TableCell className="whitespace-nowrap font-medium text-xs">
-                          {new Date(g.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })} 
-                          <span className="text-muted-foreground ml-2">{formatGameTime(g.time)}</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="font-bold text-base">
-                              {g.awayScore !== null ? g.awayScore : ""}
-                            </span>
-                            <span className={g.awaySlug === "tbd" ? "text-muted-foreground italic" : ""}>
-                              {getTeamDisplay(g.awayTeam, g.awayPlaceholder)}
-                            </span>
-                            {g.awaySlug !== "tbd" && <TeamLogo slug={g.awaySlug} name={g.awayTeam} size={18} />}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-[10px] text-muted-foreground font-medium">VS</span>
-                            {(g.isOvertime || g.hasShootout || g.isForfeit) && (
-                              <div className="flex gap-1">
-                                {g.isOvertime && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 min-w-0">OT</Badge>}
-                                {g.hasShootout && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 min-w-0">SO</Badge>}
-                                {g.isForfeit && <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4 min-w-0">Forfeit</Badge>}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            {g.homeSlug !== "tbd" && <TeamLogo slug={g.homeSlug} name={g.homeTeam} size={18} />}
-                            <span className={g.homeSlug === "tbd" ? "text-muted-foreground italic" : ""}>
-                              {getTeamDisplay(g.homeTeam, g.homePlaceholder)}
-                            </span>
-                            <span className="font-bold text-base">
-                              {g.homeScore !== null ? g.homeScore : ""}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            <Badge variant={g.status === "live" ? "destructive" : g.status === "final" ? "secondary" : "default"} className="capitalize text-[10px]">
-                              {g.status}
-                            </Badge>
-                            {g.gameType !== "regular" && (
-                              <Badge variant="outline" className="capitalize text-[10px]">
-                                {g.gameType}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        {isEditable && (
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Open Scorekeeper">
-                                <Link href={`/scorekeeper/${g.id}`} target="_blank">
-                                  <ClipboardList className="h-3.5 w-3.5" />
-                                </Link>
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditGame(g)} title="Edit Game">
-                                <Edit className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => setDeleteId(g.id)} title="Delete Game">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
             <div className="space-y-8">
               {sortedDates.map(date => (
                 <div key={date}>
@@ -459,13 +313,10 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
                         
                         {isEditable && (
                           <div className="flex items-center gap-1 mt-3 sm:mt-0 ml-4">
-                            <Button variant="ghost" size="icon" asChild title="Open Scorekeeper">
-                              <Link href={`/scorekeeper/${g.id}`} target="_blank">
-                                <ClipboardList className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" asChild title="Edit Game">
+                              <Link href={`/admin/games/${g.id}/edit`}>
+                                <Edit className="h-4 w-4" />
                               </Link>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEditGame(g)} title="Edit Game">
-                              <Edit className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => setDeleteId(g.id)} title="Delete Game">
                               <Trash2 className="h-4 w-4" />
@@ -478,7 +329,6 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
                 </div>
               ))}
             </div>
-            )
           )}
         </CardContent>
       </Card>
@@ -492,10 +342,10 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
         </div>
       )}
 
-      <EditGameModal 
-        open={modalOpen} 
+      <EditGameModal
+        open={modalOpen}
         onOpenChange={setModalOpen}
-        game={editingGame}
+        game={null}
         teams={initialTeams}
         seasonId={seasonId}
         defaultLocation={defaultLocation}
