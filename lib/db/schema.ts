@@ -25,6 +25,7 @@ export const seasons = pgTable("seasons", {
   defaultLocation: text("default_location"),
   adminNotes: text("admin_notes"),
   statsOnly: boolean("stats_only").notNull().default(false),
+  playoffTeams: integer("playoff_teams").default(4),
 })
 
 // ─── Teams ──────────────────────────────────────────────────────────────────
@@ -72,9 +73,21 @@ export const games = pgTable(
     isOvertime: boolean("is_overtime").notNull().default(false),
     isPlayoff: boolean("is_playoff").notNull().default(false),
     isForfeit: boolean("is_forfeit").notNull().default(false),
-    location: text("location").default("James Lick Arena"),
+    location: text("location").default("The Lick"),
     hasBoxscore: boolean("has_boxscore").notNull().default(false),
     notes: text("notes"),
+    // ─── Schedule Management (additive) ─────────────────────────────────
+    gameType: text("game_type").notNull().default("regular"),
+    hasShootout: boolean("has_shootout").notNull().default(false),
+    awayNotes: text("away_notes"),
+    homeNotes: text("home_notes"),
+    homePlaceholder: text("home_placeholder"),
+    awayPlaceholder: text("away_placeholder"),
+    nextGameId: text("next_game_id"),
+    nextGameSlot: text("next_game_slot"),
+    bracketRound: text("bracket_round"),
+    seriesId: text("series_id"),
+    seriesGameNumber: integer("series_game_number"),
   },
   (t) => [
     index("idx_games_season").on(t.seasonId),

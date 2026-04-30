@@ -26,6 +26,10 @@ export interface BashGame {
   liveClockSeconds: number | null
   liveClockRunning: boolean | null
   liveClockStartedAt: number | null
+  gameType: string
+  hasShootout: boolean
+  homePlaceholder: string | null
+  awayPlaceholder: string | null
 }
 
 export interface Standing {
@@ -102,6 +106,11 @@ function computeStandings(games: BashGame[]): Standing[] {
     t.gd = t.gf - t.ga
   }
 
+  // TODO: Remove seed-* filtering once legacy seed teams are cleaned from production
+  teamMap.delete("tbd")
+  const seedKeys = [...teamMap.keys()].filter(k => k.startsWith("seed-"))
+  seedKeys.forEach(k => teamMap.delete(k))
+
   return [...teamMap.values()].sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf)
 }
 
@@ -109,12 +118,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const seasonParam = searchParams.get("season")
-    const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : getCurrentSeason().id
+    const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : (await getCurrentSeason()).id
 
     const rows = await rawSql(sql`
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime, g.is_playoff, g.is_forfeit, g.location, g.has_boxscore,
+        g.game_type, g.has_shootout, g.home_placeholder, g.away_placeholder,
         ht.name as home_team, ht.slug as home_slug,
         awt.name as away_team, awt.slug as away_slug,
         (gl.game_id IS NOT NULL) as has_live_stats,
@@ -149,6 +159,10 @@ export async function GET(request: Request) {
       liveClockSeconds: r.live_state?.clockSeconds ?? null,
       liveClockRunning: r.live_state?.clockRunning ?? null,
       liveClockStartedAt: r.live_state?.clockStartedAt ?? null,
+      gameType: r.game_type ?? "regular",
+      hasShootout: r.has_shootout ?? false,
+      homePlaceholder: r.home_placeholder ?? null,
+      awayPlaceholder: r.away_placeholder ?? null,
     }))
 
     const standings = computeStandings(games)

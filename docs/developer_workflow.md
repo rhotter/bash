@@ -55,6 +55,8 @@ Push the Drizzle Schema directly to your database by running:
 pnpm db:push
 ```
 
+> **Note:** If you pull changes that include new schema columns (e.g., additive schedule management fields), re-run `pnpm db:push` to apply them. Drizzle will only add new columns — it won't drop or modify existing data.
+
 ### 4. Seed the Database
 To populate the database with real team and game data from the Sportability API:
 ```bash
@@ -75,9 +77,20 @@ Navigate to `http://localhost:3000` in your browser. The app should now be runni
   pnpm lint
   ```
 
+- **Type Checking**: To verify full type safety across the project (catches errors not caught by lint):
+  ```bash
+  npx tsc --noEmit
+  ```
+  > **Note:** There are a small number of pre-existing type errors in legacy files. When adding new code, ensure your changes introduce zero new errors.
+
 - **Building for Production**: To verify that the build succeeds before pushing to main:
   ```bash
   pnpm build
+  ```
+
+- **Full Quality Gate**: Run all three checks before pushing:
+  ```bash
+  pnpm lint && npx tsc --noEmit && pnpm build
   ```
 
 - **Running Scripts requiring DB access**: 
@@ -102,3 +115,31 @@ The production site automatically syncs data via a daily Vercel cron job calling
    curl -X POST http://localhost:3000/api/bash/sync
    ```
 *(Note: The sync process scrapes Sportability and can take a minute to complete.)*
+
+## Testing the Admin Dashboard
+
+The admin dashboard (`/admin`) provides season management, schedule generation, and player/team administration.
+
+1. Ensure your local server is running (`pnpm dev`).
+2. Navigate to `http://localhost:3000/admin`. Authentication uses a session cookie — you'll need valid admin credentials.
+3. Key admin features to test:
+   - **Schedule Tab** (`/admin/seasons/[id]` → Schedule tab): View, add, edit, and delete games. Launch the **Round-Robin Wizard** or **Playoff Bracket Wizard** to generate schedules.
+   - **Round-Robin Wizard**: Generates a full season schedule using the Berger tables algorithm. Supports configurable games-per-week, skip weeks, and per-slot times/locations.
+   - **Playoff Bracket Wizard**: Generates a linked bracket for 4–8 teams with standard seeding, configurable series lengths (best-of-1 or best-of-3), and auto play-in for odd team counts.
+   - **Roster Import**: Upload a CSV player file (exported from Sportability, saved as `.csv`) via the Sportability Import button on the Roster tab. The two-step preview → confirm flow supports Overwrite and Append modes.
+4. Generated schedules call the API routes under `/api/bash/admin/seasons/[id]/schedule/`. The wizards run generation logic entirely client-side (`lib/schedule-utils.ts`) and only POST the final payload to the server.
+
+## Known Gotchas
+
+### No `db.transaction()` Support
+The project uses Neon's **HTTP driver** (`drizzle-orm/neon-http`), which is stateless and **does not support transactions**. Any route that wraps writes in `db.transaction()` will throw:
+
+```
+No transactions support in neon-http driver
+```
+
+**Workaround**: Use sequential `await db.*` calls instead. This is acceptable for admin operations on draft data. If true ACID transactions are ever needed, the project would need to switch to the `neon-serverless` WebSocket driver.
+
+### Roster Import Requires CSV (Not XLSX)
+Sportability exports player lists as `.xlsx`. The import route uses a **built-in CSV parser** instead of the `xlsx` npm package, because `xlsx` depends on Node.js native APIs (`Buffer`, `fs`) that break under Next.js webpack bundling. Admins must convert the file to CSV before uploading.
+

@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
-import { eq, and, sql } from "drizzle-orm"
-import type { LiveGameState, GoalEvent, PenaltyEvent, GoalieChangeEvent } from "@/lib/scorekeeper-types"
+import { eq } from "drizzle-orm"
+import type { LiveGameState, GoalEvent } from "@/lib/scorekeeper-types"
 import { computePulledSeconds, clockToElapsed, parseClockString } from "@/lib/scorekeeper-types"
+import { getSession } from "@/lib/admin-session"
 
-function validatePin(request: Request): boolean {
+async function validateAuth(request: Request): Promise<boolean> {
   const pin = request.headers.get("x-pin")
-  return !!pin && pin === process.env.SCOREKEEPER_PIN
+  if (pin && pin === process.env.SCOREKEEPER_PIN) return true
+  return await getSession()
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!validatePin(request)) {
-    return NextResponse.json({ error: "Invalid PIN" }, { status: 401 })
+  if (!(await validateAuth(request))) {
+    return NextResponse.json({ error: "Invalid PIN or session" }, { status: 401 })
   }
 
   const { id } = await params
@@ -204,7 +206,6 @@ export async function POST(
     const homeWon = homeScore > awayScore
     // Compute total game time: 3 periods of 1200s + OT periods
     // Regular season OT = 300s, Playoff OT = 1200s per period
-    const gameRow = gameRows[0]
     const gameIsPlayoff = !!(await db.select({ isPlayoff: schema.games.isPlayoff }).from(schema.games).where(eq(schema.games.id, id)))[0]?.isPlayoff
     const maxPeriod = Math.max(...state.goals.map((g) => g.period), state.period ?? 3)
     const otPeriods = Math.max(0, Math.min(maxPeriod, isShootout ? maxPeriod - 1 : maxPeriod) - 3)

@@ -31,6 +31,8 @@ The BASH Hockey repository is a full-stack Next.js application designed to displ
 - **Client Data Fetching**: SWR hooks for client-side caching and revalidation
 - **Deployment**: Vercel
 
+> **⚠️ Neon HTTP Driver Constraint:** The project uses the **stateless HTTP** driver (`@neondatabase/serverless` → `neon-http`), which **does not support `db.transaction()`**. All multi-step writes must use sequential `await db.*` calls. This is safe for admin operations on draft data but should be noted when writing new routes that modify multiple tables.
+
 ## Key Data Structures (Database Schema)
 
 Here is a high-level entity-relationship (ER) diagram of the database:
@@ -42,6 +44,7 @@ erDiagram
     seasons ||--o{ games : "schedules"
     teams ||--o{ games : "home_team"
     teams ||--o{ games : "away_team"
+    games ||--o{ games : "next_game (bracket)"
     players ||--o{ player_seasons : "plays_in"
     seasons ||--o{ player_seasons : "includes"
     teams ||--o{ player_seasons : "rosters"
@@ -61,12 +64,17 @@ erDiagram
 The Drizzle schema (`lib/db/schema.ts`) is designed around 15 core tables:
 
 1. **League Structure**
-   - `seasons`: Defines seasons (e.g., "Fall 2025") and links to Sportability league IDs.
+   - `seasons`: Defines seasons (e.g., "Fall 2025") and links to Sportability league IDs. Stores configuration like `status` (draft/active/completed), `season_type` (fall/summer), and `playoff_teams`.
    - `teams`: Global team identities.
    - `season_teams`: Junction table linking teams to specific seasons.
 
 2. **Games & Scheduling**
-   - `games`: Stores game details, dates, times, home/away teams, scores, and status (`upcoming` vs `final`). Also flags overtime and playoff games.
+   - `games`: Stores game details, dates, times, home/away teams, scores, and status (`upcoming` vs `final`). Flags for overtime, shootout, and forfeit. Includes schedule management columns:
+     - `game_type`: Categorizes games as `regular`, `playoff`, `practice`, `exhibition`, `championship`, or `jamboree`. The legacy `is_playoff` boolean is kept for stats queries.
+     - `home_placeholder` / `away_placeholder`: Display labels for unresolved teams (e.g., "Seed 1", "Winner SF-A"). When set, `home_team`/`away_team` reference a sentinel `"tbd"` slug.
+     - `bracket_round`: Playoff round identifier (`play-in`, `quarterfinal`, `semifinal`, `final`).
+     - `series_id` / `series_game_number`: Groups games into matchup series (e.g., `sf-a` game 1 of 3).
+     - `next_game_id` / `next_game_slot`: Self-referential FK linking bracket games for auto-advancement.
    - `game_live`: Stores real-time scorekeeping state for live updates.
    - `game_officials`: Records referees and linesmen for each game.
 
@@ -89,6 +97,13 @@ The Drizzle schema (`lib/db/schema.ts`) is designed around 15 core tables:
 ### 1. Data Sync (`app/api/bash/sync/route.ts`)
 Game data is primarily sourced from Sportability. A daily cron job (configured in `vercel.json`) calls the `/api/bash/sync` POST endpoint. This script scrapes Sportability HTML pages and upserts the latest schedule, scores, and boxscores into the Postgres database. The sync process intelligently skips any games that are being actively managed by the Live Scorekeeper to prevent overwriting manually entered live data.
 
+### 1a. Roster Import (`/api/bash/admin/seasons/[id]/roster/import-preview` + `import`)
+Admins import player rosters via **CSV** files exported from Sportability. The two-step flow:
+1. **Preview** (`import-preview`): Parses the CSV using a built-in RFC 4180 parser (no external dependencies), maps `FirstName`/`LastName`/`Team`/`ExpPos`/`Rookie` columns, validates team slugs, and returns stats (new vs existing players).
+2. **Import** (`import`): Upserts players into the global `players` table, then inserts `player_seasons` entries. Supports **Overwrite** (wipes season roster first) and **Append** (skips already-assigned players) modes.
+
+> **Note:** Sportability exports `.xlsx` files. Admins must convert to `.csv` before uploading (Excel → Save As CSV, or Google Sheets → Download as CSV). This avoids a heavy `xlsx` dependency that is incompatible with the Next.js server bundler.
+
 ### 2. Server-Side Data Fetching (`lib/fetch-*.ts`)
 The application heavily uses Next.js async Server Components. When a page loads, it fetches data using functions located in `lib/fetch-*.ts`, which execute Drizzle ORM queries against Neon Postgres. 
 
@@ -98,8 +113,19 @@ The application heavily uses Next.js async Server Components. When a page loads,
 ### 3. Client-Side Hydration & Live Updates (`lib/hockey-data.ts`)
 While initial page loads are server-rendered, the application uses SWR hooks (e.g., `useBashData`) to maintain fresh data. The server passes `fallbackData` to the client, and SWR periodically polls the API (every 60-120s) to refresh the UI without full page reloads, ensuring live scores are updated seamlessly.
 
-### 4. Routing Structure
+### 4. Schedule Generation (`lib/schedule-utils.ts`)
+Pure utility functions (no side effects, no DB calls) used by the admin wizards:
+- **`generateRoundRobin()`**: Berger tables algorithm for fair round-robin pairings with configurable games-per-week and multi-cycle support.
+- **`mapRoundRobinToGames()`**: Maps generic slot pairings to real teams and dates.
+- **`generateBracket()`**: Builds a linked playoff bracket for 4–8 teams using standard seeding (#1v#8, #4v#5, #2v#7, #3v#6) with byes and auto play-in for odd counts. Supports per-round series lengths (best-of-1 or best-of-3).
+- **`checkSeriesClinch()`**: Determines if a best-of-N series has been decided.
+
+> **Topological Generation Constraints**: When playoff brackets are generated, child nodes (like Finals) are topologically sorted and inserted before parent nodes (like Semi-finals) to ensure correct `nextGameId` reference ordering. Note: `nextGameId` is a **soft reference** (application-enforced, not a DB-level FK) to simplify game deletion workflows. Dynamic `gen-[UUID]` IDs prevent cross-season primary-key collisions, and a sentinel `"tbd"` team slug is automatically upserted to safely support Placeholder Mode before real team seedings are resolved.
+
+### 5. Routing Structure
 The App Router maps URLs directly to server components:
 - `/` -> Home page (Scoreboard)
 - `/standings`, `/stats` -> Leaderboards and league tables
 - `/player/[slug]`, `/team/[slug]`, `/game/[id]` -> Detail views
+- `/admin/seasons/[id]` -> Season management (Schedule, Standings, Teams tabs)
+- `/scorekeeper/[gameId]` -> Live game scorekeeper

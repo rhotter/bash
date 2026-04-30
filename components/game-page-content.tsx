@@ -6,11 +6,12 @@ import type { BashGame } from "@/lib/hockey-data"
 import type { LiveGameData } from "@/lib/fetch-live-game"
 import type { RosterPlayer } from "@/lib/scorekeeper-types"
 
-export function GamePageContent({ initialDetail, initialLiveData, homeRoster, awayRoster }: {
+export function GamePageContent({ initialDetail, initialLiveData, homeRoster, awayRoster, forceEdit }: {
   initialDetail: BashGameDetail
   initialLiveData?: LiveGameData | null
   homeRoster?: RosterPlayer[]
   awayRoster?: RosterPlayer[]
+  forceEdit?: boolean
 }) {
   const game: BashGame = {
     id: initialDetail.id,
@@ -29,10 +30,14 @@ export function GamePageContent({ initialDetail, initialLiveData, homeRoster, aw
     location: initialDetail.location,
     hasBoxscore: initialDetail.homePlayers.length > 0 || initialDetail.awayPlayers.length > 0,
     hasLiveStats: !!initialLiveData,
-    livePeriod: (initialLiveData?.state as any)?.period ?? null,
-    liveClockSeconds: (initialLiveData?.state as any)?.clockSeconds ?? null,
-    liveClockRunning: (initialLiveData?.state as any)?.clockRunning ?? null,
-    liveClockStartedAt: (initialLiveData?.state as any)?.clockStartedAt ?? null,
+    livePeriod: (initialLiveData?.state as { period?: number })?.period ?? null,
+    liveClockSeconds: (initialLiveData?.state as { clockSeconds?: number })?.clockSeconds ?? null,
+    liveClockRunning: (initialLiveData?.state as { clockRunning?: boolean })?.clockRunning ?? null,
+    liveClockStartedAt: Number((initialLiveData?.state as { clockStartedAt?: string | number })?.clockStartedAt) || null,
+    gameType: "regular",
+    hasShootout: false,
+    homePlaceholder: null,
+    awayPlaceholder: null,
   }
 
   return (
@@ -42,6 +47,7 @@ export function GamePageContent({ initialDetail, initialLiveData, homeRoster, aw
       initialLiveData={initialLiveData ?? undefined}
       homeRoster={homeRoster}
       awayRoster={awayRoster}
+      forceEdit={forceEdit}
     />
   )
 }

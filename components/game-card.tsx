@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { Pencil } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useAdmin } from "@/lib/admin-context"
 import { TeamLogo } from "@/components/team-logo"
 import { periodLabel, formatClock } from "@/lib/scorekeeper-types"
 import { formatGameDate, formatGameTime } from "@/lib/format-time"
@@ -32,23 +30,16 @@ export function useLiveClock(game: BashGame) {
 
 export function GameCard({ game, href }: { game: BashGame; href?: string }) {
   const router = useRouter()
-  const { isAdmin } = useAdmin()
   const isFinal = game.status === "final"
   const isLive = game.status === "live"
   const awayWon = isFinal && game.awayScore != null && game.homeScore != null && game.awayScore > game.homeScore
   const homeWon = isFinal && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore
   const liveClock = useLiveClock(game)
 
-  const showAdminEdit = isAdmin && isFinal && game.hasLiveStats
   const target = href ?? `/game/${game.id}`
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-border/40 bg-card select-none overflow-hidden",
-        showAdminEdit && "border-amber-500/30"
-      )}
-    >
+    <div className="rounded-lg border border-border/40 bg-card select-none overflow-hidden">
       {/* Card body — clickable */}
       <div
         className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -114,17 +105,6 @@ export function GameCard({ game, href }: { game: BashGame; href?: string }) {
           </div>
         </div>
       </div>
-
-      {/* Admin edit bar — separate hover zone */}
-      {showAdminEdit && (
-        <button
-          className="w-full border-t border-amber-500/20 bg-amber-500/10 px-3 py-1.5 flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition-colors cursor-pointer"
-          onClick={() => router.push(`/game/${game.id}?edit=1`)}
-        >
-          <Pencil className="h-3 w-3 text-amber-600" />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Edit</span>
-        </button>
-      )}
     </div>
   )
 }

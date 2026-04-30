@@ -5,13 +5,13 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { useGameDetail, useLiveGame, type BashGame, type BashGameDetail } from "@/lib/hockey-data"
 import { formatGameDate, formatGameTime } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
-import { Loader2, Star, Pencil } from "lucide-react"
+import { Loader2, Star } from "lucide-react"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import { formatGoalieTime } from "@/lib/format-goalie-time"
 import type { PlayerBoxScore, GoalieBoxScore } from "@/app/api/bash/game/[id]/route"
 import { useSort, SortableTh, SectionHeader } from "@/components/stats-table"
-import type { LiveGameState, GoalEvent, PenaltyEvent, RosterPlayer } from "@/lib/scorekeeper-types"
+import type { LiveGameState, GoalEvent, RosterPlayer } from "@/lib/scorekeeper-types"
 import { periodLabel, formatClock, computeCurrentClock, parseClockString, clockToElapsedDisplay } from "@/lib/scorekeeper-types"
 import { AdminGameEditor } from "@/components/admin-editor/admin-game-editor"
 import { useAdmin } from "@/lib/admin-context"
@@ -26,9 +26,10 @@ interface GameDetailProps {
   initialLiveData?: { state: unknown; homeScore: number | null; awayScore: number | null; playerNames: Record<number, string>; goalieIds: number[] }
   homeRoster?: RosterPlayer[]
   awayRoster?: RosterPlayer[]
+  forceEdit?: boolean
 }
 
-export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, awayRoster }: GameDetailProps) {
+export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, awayRoster, forceEdit }: GameDetailProps) {
   const { detail, isLoading, isError } = useGameDetail(game.id, initialDetail)
   const isLive = game.status === "live"
   const isFinal = game.status === "final"
@@ -58,12 +59,12 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
   // Show edit button only for admin + scorekeeper games (those with liveState) that are final
   const canEdit = isAdmin && isFinal && liveState && homeRoster && awayRoster
 
-  // Auto-enter edit mode when ?edit=1 is in the URL and conditions are met
+  // Auto-enter edit mode when ?edit=1 is in the URL or forceEdit is set, and conditions are met
   useEffect(() => {
-    if (searchParams.get("edit") === "1" && canEdit && !editMode) {
+    if ((forceEdit || searchParams.get("edit") === "1") && canEdit && !editMode) {
       setEditMode(true)
     }
-  }, [searchParams, canEdit, editMode])
+  }, [searchParams, canEdit, editMode, forceEdit])
 
   // Exit edit mode when admin mode is turned off
   useEffect(() => {
@@ -140,16 +141,6 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
               </span>
             </Link>
           </div>
-          {/* Edit button — only for admin + scorekeeper games */}
-          {canEdit && !editMode && (
-            <button
-              onClick={() => setEditMode(true)}
-              className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/90 text-amber-950 text-[10px] font-bold uppercase tracking-wider hover:bg-amber-500 transition-colors"
-            >
-              <Pencil className="h-3 w-3" />
-              Edit
-            </button>
-          )}
         </div>
       </div>
 
@@ -513,7 +504,7 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
   )
 }
 
-function PenaltyLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }: {
+function PenaltyLog({ state, homeSlug, awaySlug: _awaySlug, homeTeam, awayTeam, playerNames }: {
   state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
   playerNames: Record<number, string>
 }) {
