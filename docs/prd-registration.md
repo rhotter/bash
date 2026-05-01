@@ -42,6 +42,12 @@ This module delivers the player self-service registration portal — account cre
 
 ## 2. Architecture
 
+### 2.0 Design System
+
+All player-facing and admin-facing UI uses **shadcn/ui** components (already in `components/ui/`) styled in the **Vercel design language** the rest of the site uses: oklch-based color tokens from `app/globals.css`, generous whitespace, dense but readable typography, monochrome with one accent color for primary actions. No bespoke component libraries, no Tailwind UI marketplace components, no animated gradients. Forms use shadcn's `Form`/`Input`/`Select`/`Checkbox`/`Label`/`Button` primitives. Modals use `Dialog`. Confirmations use `AlertDialog`. Tables use `Table`. Toasts via `sonner` (already wired). Icons from `lucide-react`.
+
+The registration funnel is a multi-step form, not a wizard with chrome — minimal progress indicator, single primary action per step, back link in the corner. Match the visual density of `/admin/seasons/[id]` rather than something marketing-y.
+
 ### 2.1 Auth Strategy
 
 The current admin system uses a PIN-based session cookie (`admin_session`). Player auth requires individual accounts. We'll use **NextAuth.js v5** (Auth.js) with the Drizzle adapter, supporting:
@@ -80,12 +86,16 @@ sequenceDiagram
 
 ### 2.2 Layout & Routing
 
+The canonical entry point is **`bash.fan/register`** — short, memorable, easy to put on flyers and in Slack. **Only one registration period is ever open at a time** (BASH runs sequentially: fall, then summer, etc.), so `/register` is just the funnel for whichever period is currently open. No picker, no period IDs in URLs that players see. The `[periodId]` route exists for confirmation links and historical deep links only.
+
+If no period is currently open, `/register` shows a "Registration is closed — next season opens [date]" message with a link to `/account` for past registrations.
+
 ```
 app/
   register/
-    page.tsx                ← Registration landing (active periods)
+    page.tsx                ← Funnel for the single currently-open period
     [periodId]/
-      page.tsx              ← Multi-step registration funnel (13 steps)
+      page.tsx              ← Funnel by explicit period (used by confirmation links)
       confirmation/
         page.tsx            ← Post-payment confirmation
   account/
@@ -232,7 +242,9 @@ export const registrations = pgTable(
     birthdate: text("birthdate"),
     gender: text("gender"),
     tshirtSize: text("tshirt_size"),       // Adult S/M/L/XL/XXL
-    isRookie: boolean("is_rookie").notNull().default(false),
+    // NOTE: rookie status is NOT stored here — it's derived from
+    // prior `paid` registrations + prior fall `player_seasons` rows.
+    // See §3.9. Single source of truth, no drift risk.
 
     // ─── Emergency / Medical ────────────────────────────────────────────
     emergencyName: text("emergency_name"),
@@ -456,28 +468,45 @@ Accessible at `/admin/registration/periods/[periodId]`. Integrated into the exis
 
 ### 3.3 Registration Funnel (Player-Facing)
 
-Multi-step wizard at `/register/[periodId]`. Progress is auto-saved to the `registrations` table as `status: "draft"` so players can resume later. This flow mirrors the Sportability registration walkthrough.
+Multi-step wizard at `/register` (or `/register/[periodId]` for deep links). Progress is auto-saved to the `registrations` table as `status: "draft"` so players can resume later.
 
-**Steps**:
+The funnel branches at the very first decision: **do we recognize you?** Returning players don't re-enter information we already have; new players get the full intake form.
+
+#### Returning player flow (5 steps)
+
+If the player logs in and we have at least one prior paid registration linked to their account, autofill happens immediately — before any form step.
 
 | Step | Name | Description |
 |---|---|---|
-| 1 | **Gating** | Age restriction check (birthdate entry) + Custom restriction (e.g. "Are you a BASH rookie?" dropdown). Blocks ineligible players with clear messaging. |
-| 2 | **Start** | Shows registration type and fee ("Open Player Registration: $150"). Login or create account. Returning players can log in to auto-fill from previous registration. |
-| 3 | **Notices** | Admin-configured notices displayed in sequence. Basic notices show "I have read this notice" checkbox. Legal waivers show "I have read and agree to be legally bound" checkbox. |
-| 4 | **Overview** | Preview of all information sections that will be collected. Privacy/security disclaimers. |
-| 5 | **Copy Previous** | If returning player: select from past registration history to pre-fill all subsequent fields. Option to add a new player instead. |
-| 6 | **Contact Info** | Name, address, phone, email. Custom questions appear inline under "General Notes". Misc notes textarea at bottom. |
-| 7 | **Personal Data** | Birthdate (read-only, carried from gating), gender, t-shirt size dropdown. |
-| 8 | **Emergency & Medical** | Health plan (with ID# hint), doctor name/phone, medical notes textarea. Shown only if `requiresEmergencyInfo`. |
-| 9 | **Experience** | Years played (number), skill level (dropdown), position(s) (free text), last league + last team (free text). |
-| 10 | **Waiver** | Full legal waiver text (e.g. BASH Participation Waiver). Legally binding checkbox required. |
-| 11 | **Extras** | Optional add-on checkboxes (e.g. BASH Donation $0+, Tournament Fee). Only shown if extras are assigned to this period. |
-| 12 | **Cost & Discount** | Shows base fee, applied extras, discount code entry field. Calculated total displayed prominently. Warning: "Admins monitor these transactions." |
-| 13 | **Review & Finalize** | Consolidated summary organized by section, each with "Edit" link back. "Complete Payment" button proceeds to Stripe Checkout. |
+| 1 | **Login** | Email + password / Google / magic link. We identify the player and surface their prior registrations. |
+| 2 | **Pick prior registration to copy** | If they have multiple, show a one-screen picker (last team, season, summary). Auto-skipped if there's only one. |
+| 3 | **Confirm & update** | Single consolidated screen with every field pre-filled (contact, personal, emergency, experience). Player edits anything that changed. Custom questions for *this* period are required. |
+| 4 | **Sign waivers** | Notices + legal waivers for this period. Always required (versions are tracked, ack rows are per-registration). |
+| 5 | **Review → Pay** | Cost summary (base + extras − discount), discount code entry, → Stripe Checkout. |
+
+A returning player whose data hasn't changed can finish in under a minute.
+
+#### New player flow (full intake)
+
+For players with no claimable prior registration. Birthdate and rookie status are collected here; rookie status is *also* derived from `registrations` history once they're linked, so the form value is just a hint to the funnel for gating.
+
+| Step | Name | Description |
+|---|---|---|
+| 1 | **Gating** | Age check (birthdate) + custom restriction (e.g. "Are you a BASH rookie?"). Blocks ineligible players. |
+| 2 | **Account** | Create account (email/password, Google, or magic link). |
+| 3 | **Contact info** | Name, address, phone, email. Custom questions for this period. Misc notes. |
+| 4 | **Personal** | Gender, t-shirt size (if collected for this period). Birthdate carried from gating. |
+| 5 | **Emergency & Medical** | Health plan, doctor, medical notes. Shown only if `requiresEmergencyInfo`. |
+| 6 | **Experience** | Years played, skill level, position(s), last league, last team. |
+| 7 | **Sign waivers** | Notices + legal waivers. |
+| 8 | **Review → Pay** | Cost summary, discount entry, → Stripe Checkout. |
 
 > [!IMPORTANT]
-> **Rookies**: Players who self-identify as rookies in Step 1 follow a deferred payment flow. They complete all form steps but use a special discount code to skip payment. After the draft, admins send payment reminders. Registration status: `registered_unpaid` until payment is completed. See §3.9.
+> **Rookies**: Players who self-identify as rookies (new flow Step 1) follow a deferred payment flow. They complete all form steps but use a special discount code to skip payment. After the draft, admins send payment reminders. Registration status: `registered_unpaid` until payment is completed. See §3.9.
+
+#### Why this ordering
+
+The original 13-step Sportability flow asked for gating data, then login, then waivers, then *finally* offered to copy prior data — by which point the player had already entered information we already had. Putting login first for the returning case lets us short-circuit gating entirely (we know their birthdate, we know if they're a rookie from prior registrations) and reduce the visible form to "confirm what we have, sign, pay."
 
 ### 3.4 Digital Waivers & Notices
 
@@ -576,14 +605,15 @@ Admin-configurable email sent to the player after successful payment. Configured
 
 BASH rookies are not guaranteed a roster spot until the draft. Their registration flow diverges:
 
-1. Player identifies as rookie in gating step (Step 1)
-2. `registrations.isRookie` set to `true`
-3. Player completes all form steps normally (data is still collected)
-4. On the Cost step, instructions direct rookies to enter a specific discount code (e.g. "xrook" for $25 deferral or full comp code) to skip payment
-5. Registration saved with `status: "registered_unpaid"`
-6. After draft, admin sends payment reminder
-7. Player returns to complete payment via Stripe Checkout
-8. Status transitions to `paid`
+1. Rookie status is **derived**, not stored: a player is a rookie iff they have no prior `paid` registration (or no prior fall-season `player_seasons` row, when player record claiming has happened). This mirrors the inference pattern used in `app/admin/seasons/[id]/page.tsx` for roster display — single source of truth, no drift.
+2. **New player flow**: gating step asks "Are you a BASH rookie?" so the funnel can show appropriate copy and warnings; the answer is *not* persisted as a registration column.
+3. **Returning player flow**: rookie status is determined automatically from the user's prior registration history — no question asked.
+4. Player completes all form steps normally (data is still collected).
+5. On the Review/Pay step, rookies see instructions to enter a specific discount code (e.g. "xrook" for $25 deferral or full comp code) that bypasses Stripe.
+6. Registration saved with `status: "registered_unpaid"`.
+7. After draft, admin sends payment reminder.
+8. Player returns to complete payment via Stripe Checkout.
+9. Status transitions to `paid`.
 
 ### 3.10 Admin Registration Dashboard
 
@@ -806,12 +836,13 @@ All registration API routes require authenticated user sessions (NextAuth). Admi
 ### Phase B — Registration Config & Funnel
 - Registration period admin configuration
 - Import Previous Setup with Bump Year
-- Custom restrictions (age + rookie gating)
-- Multi-step registration wizard (steps 1–13)
-- Copy previous registration flow
+- Custom restrictions (age gating only — rookie status is derived)
+- **Returning player flow** (5 steps): login → pick prior → confirm/update → sign waivers → pay
+- **New player flow** (full intake): gating → account → contact → personal → emergency → experience → waivers → pay
 - Custom questions
 - Extras selection
 - Discount code validation
+- All steps built on shadcn/ui per §2.0
 
 ### Phase C — Payments & Launch
 - Stripe Checkout integration
