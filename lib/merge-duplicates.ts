@@ -47,6 +47,8 @@ const NICKNAMES: Record<string, string[]> = {
   timothy: ["tim", "timmy"],
   vincent: ["vince", "vinny"],
   walter: ["walt"],
+  terrence: ["terry", "terence"],
+  terence: ["terry", "terrence"],
   zachary: ["zach", "zack"],
   elizabeth: ["liz", "beth", "lizzy"],
   margaret: ["maggie", "meg", "peggy"],
