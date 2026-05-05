@@ -570,7 +570,6 @@ The following BASH rules (Rulebook 2019) directly inform draft wizard behavior:
 | **Rule 203: Keeper / Protected Lists** | 1–8 keepers per team, captains in rounds 1–2 | `draftPool.isKeeper`, `keeperRound` fields; keeper entry in admin presentation view (pre-draft phase) with per-player round assignment |
 | **Rule 204: Draft Order** | Last place picks first, champion last | P2: auto-calculation from standings. P0: manual ordering |
 | **Rule 204: Preliminary vs Regular Rounds** | Until equal roster sizes, then fill to 14 | Draft rounds handle variable team picks via the keeper slotting system |
-| **Rule 206: Supplemental Draft** | Separate draft instance, captain vote required | Supported via multiple draft instances per season |
 | **Rule 202: Pickup Eligibility** | Must attend ≥1 pickup | Not enforced by software; commissioner's discretion |
 
 ---
