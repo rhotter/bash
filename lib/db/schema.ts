@@ -599,6 +599,7 @@ export const draftInstances = pgTable("draft_instances", {
   seasonId: text("season_id")
     .notNull()
     .references(() => seasons.id),
+  seasonType: text("season_type").notNull().default("fall"), // snapshot from seasons.seasonType at creation
   name: text("name").notNull(),
   status: text("status").notNull().default("draft"),
   isSimulating: boolean("is_simulating").notNull().default(false),
@@ -610,6 +611,11 @@ export const draftInstances = pgTable("draft_instances", {
   location: text("location"),
   currentRound: integer("current_round"),
   currentPick: integer("current_pick"),
+  // Timer state — same pattern as LiveGameState in scorekeeper-types.ts
+  // Client computes: remaining = timerCountdown - (Date.now() - timerStartedAt) / 1000
+  timerCountdown: integer("timer_countdown"),
+  timerRunning: boolean("timer_running").notNull().default(false),
+  timerStartedAt: timestamp("timer_started_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 })
@@ -652,10 +658,15 @@ export const draftPool = pgTable(
   (t) => [
     primaryKey({ columns: [t.draftId, t.playerId] }),
     index("idx_draft_pool_keepers").on(t.draftId, t.keeperTeamSlug),
+    index("idx_draft_pool_draft_player").on(t.draftId, t.playerId),
   ]
 )
 
 // ─── Draft Picks ────────────────────────────────────────────────────────────
+// PICK PRE-GENERATION: When the draft transitions to `live`, all pick slots
+// are pre-generated as rows with `playerId = null`. For snake drafts, even
+// rounds reverse the team order. Keeper picks are immediately filled.
+// The "current pick" = first row where `playerId IS NULL`, ordered by `pickNumber`.
 
 export const draftPicks = pgTable(
   "draft_picks",
@@ -681,6 +692,7 @@ export const draftPicks = pgTable(
   (t) => [
     index("idx_draft_picks_draft").on(t.draftId),
     index("idx_draft_picks_team").on(t.draftId, t.teamSlug),
+    unique("uq_draft_picks_slot").on(t.draftId, t.round, t.pickNumber),
   ]
 )
 
@@ -704,6 +716,8 @@ export const draftTrades = pgTable("draft_trades", {
 })
 
 // ─── Draft Trade Items (what was exchanged) ─────────────────────────────────
+// For pre-draft trades (before picks are generated), `pickId` is null and
+// `round` + `position` identify the pick slot. Resolved to `pickId` at draft start.
 
 export const draftTradeItems = pgTable(
   "draft_trade_items",
@@ -720,6 +734,8 @@ export const draftTradeItems = pgTable(
       .references(() => teams.slug),
     pickId: text("pick_id")
       .references(() => draftPicks.id),
+    round: integer("round"),
+    position: integer("position"),
     playerId: integer("player_id")
       .references(() => players.id),
   }

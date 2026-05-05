@@ -92,6 +92,11 @@ A dedicated, interactive draft system for managing the BASH league draft process
 - **Draft Instance Lifecycle**: A draft instance progresses through these states:
   - `draft` — Visible only to admins for configuration and simulation/preview
   - `published` — Visible at a public URL for captains, players, and fans
+  - `live` — Draft is actively in progress
+  - `paused` — Commissioner has temporarily paused the draft (must resume before completing)
+  - `completed` — All rounds finished, results available
+
+  Valid transitions: `draft → published` (purge simulation), `published → live` (start draft), `live → paused`, `paused → live` (resume only — cannot transition directly to `completed` from `paused`), `live → completed`.
 
 - **Simulation / Preview Mode**: While in the `draft` state, the commissioner can open the admin presentation view and run a full simulated draft:
   - All admin controls are functional: pick entry, trades, timer, order editing, undo
@@ -104,31 +109,53 @@ A dedicated, interactive draft system for managing the BASH league draft process
 
 - **Live Draft Board (Public)**: A real-time presentation view displaying:
   - The draft grid/board showing all teams and their picks. Traded picks display the franchise color of the team that now owns the pick, making trade activity immediately visible on the board.
+  - **Placeholder cards**: Future rounds (below the current round) display faded/dimmed placeholder cells for each team. Picks that have been traded to a different team show a trade indicator on the placeholder card (e.g., "Trade #2: Loons pick here") so viewers can see upcoming trade impacts before the pick happens.
   - Which team is currently on the clock, plus the next 3 teams on deck with upcoming picks
   - Full history of picks as they happen
   - Which team made each pick (team name and branding)
   - Pick timer countdown
+  - **Available Players tab**: A secondary tab alongside the draft board showing all players in the eligible pool who have **not** yet been drafted. Includes a search input to filter by name. Selecting a player who has already been drafted shows their draft team and round in the player card. Players who are keepers display a "K" badge; goalies display a "G" badge (both badges shown simultaneously for keeper goalies).
   - Works well on desktop and mobile
+  - **Mobile layout**: The mobile view uses a tab-based interface with "Draft Results" (not "Draft Board") as the primary tab showing team-grouped pick cards, and an "Available Players" tab with the same search/filter functionality as desktop
 
 - **Commissioner Controls (Admin Presentation View)**: The admin view includes all public presentation content plus:
-  - **Pick Entry**: Select a player for the current team with a confirmation window (5-second revert ability before finalizing)
+  - **Available Players tab** — Same as the public tab (searchable undrafted list with badges), but the commissioner uses it to locate players for pick entry
+  - **Pick Entry**: Select a player for the current team. Pick is confirmed immediately — no multi-second revert window. If the commissioner makes a mistake, they use "Undo Last Pick" or "Go to Pick #" to correct it.
+  - **Undo Last Pick**: Quick undo that reverts the most recent pick without corrupting draft order. The undone player returns to the available pool.
   - **Pick Swap**: Swap draft picks between teams (e.g., Team A's Round 2 Pick 4 for Team B's Round 3 Pick 1)
   - **Player Trades**: Move a player already drafted from one team to another
   - **Timer Controls**: Pause/resume the pick timer at any time; adjust the timer duration mid-draft
   - **Draft Order Editing**: Modify the draft order during the draft
   - **Navigate to Previous Pick**: Return to any previous pick and edit it at any time
-  - **Undo Last Pick**: Quick undo without corrupting draft order
 
-- **Draft Timer**: Visual countdown clock for the current pick. When time expires, a **visual indicator** (flash/pulse on the board) signals that time is up — no audible buzzer. Since the board is presented to all viewers, everyone sees the visual signal simultaneously.
+- **Draft Timer**: Visual countdown clock for the current pick. Timer behavior:
+  - When time expires, the timer displays **"0:00"** with a **blinking red indicator** and the board flashes/pulses. No audible buzzer.
+  - The timer **stays at 0:00** ("EXPIRED" state) — the commissioner can still make the pick at their leisure. The timer is advisory, not a hard cutoff.
+  - The timer **only resets and starts** when the next pick is entered/confirmed by the commissioner. It does not auto-start.
+  - Timer state is **persisted server-side** using the same pattern as the live scorekeeping tool: `timerSeconds` (countdown remaining), `timerRunning` (boolean), and `timerStartedAt` (timestamp). The client computes the current countdown as `remaining = timerSeconds - (now - timerStartedAt)`. This ensures crash recovery — if the commissioner's browser disconnects, reopening the admin view resumes the timer exactly where it was.
 
 - **Post-Draft**:
   - **Roster Export**: Export the full draft results as a list of player names and team assignments (CSV/clipboard)
-  - **Roster Push**: One-click sync of draft results to populate the active season's official rosters in the database (`player_seasons` + `season_teams`)
+  - **Roster Push**: One-click sync of draft results to populate the active season's official rosters in the database (`player_seasons` + `season_teams`). Uses `INSERT ... ON CONFLICT DO UPDATE` (upsert) to handle players who may already have `player_seasons` records for the current season.
+
+- **Draft Backup & Restore**: Available from a 3-dot menu on the draft management page:
+  - **Download Config**: Export the full draft configuration (settings, teams, order, keepers, pool) as a JSON snapshot for disaster recovery
+  - **Restore from Config**: Upload a previously exported JSON snapshot to restore draft state. Requires confirmation dialog. Available only in `draft` state.
+
+- **Keeper Minimum**: Every team must have at least 1 keeper (their captain). Captains are always the first keeper for their team. The keeper entry phase auto-populates captains as keepers; the commissioner can add additional keepers up to `maxKeepers`.
+
+- **Summer Draft Variant**: Summer seasons use a simplified draft format. The season type (Fall or Summer) is set during season creation and automatically adjusts the draft wizard behavior:
+  - **Keepers: Captains only** — Each team keeps only their captain(s). The max keepers setting is still configurable but defaults to the number of captains (typically 1 per team for summer). The keeper entry phase auto-populates captains and the commissioner confirms.
+  - **No trades** — Pre-draft trades (Step 4) and mid-draft trades are disabled. The Trade button is hidden from the admin presentation view. Step 4 of the wizard shows only draft order (the pre-draft trades section is hidden).
+  - **1 captain per team** — Summer teams typically designate only 1 captain (Step 3 still supports 1–2 but defaults to 1 for summer seasons).
+  - **Random draft order** — Summer draft order is typically decided randomly rather than by previous standings. Step 4 still shows the same drag-to-reorder interface, but adds a **"Randomize Order"** button that shuffles the team order with a visual animation. The commissioner can randomize, then manually adjust if needed, or skip randomization entirely and drag teams into a custom order. A second "Randomize Order" button is also available in the pre-draft keeper phase (just before clicking "Start Draft") for last-minute order decisions on draft day.
+  - **Player pool**: Uses the same import methods as fall drafts (database, CSV, manual entry).
+  - **All other features** (draft grid, timer, public board, simulation, roster push) work identically to fall drafts.
 
 ### Should Have (P1)
 
 - **Pick Trades Management**: Detailed UI for complex multi-pick trades with trade history log
-- **Live Updates**: The public board auto-refreshes for all viewers using the same SWR polling pattern as the existing live scorekeep tool (`useLiveGame` hook — 10-second `refreshInterval` with `revalidateOnFocus`). A dedicated `/api/bash/draft/[id]/live` endpoint serves the current board state as optimized JSON.
+- **Live Updates**: The public board auto-refreshes using SWR polling. Polling intervals: **5-second** for the live draft board, **10-second** for the pre-draft countdown page. Uses the same SWR pattern as the existing live scorekeep tool (`revalidateOnFocus: true`). A dedicated `/api/bash/draft/[id]/live` endpoint serves the current board state as optimized JSON.
 
 ### Could Have (P2)
 
@@ -186,7 +213,16 @@ The Commissioner's command center during **simulation** (draft state), **keeper 
   - Left: Team A picks/players
   - Right: Team B picks/players
   - Drag or select items to swap, confirm trade
-- **Draft Log**: Scrolling activity feed of all picks, trades, and undos with timestamps
+- **Tabbed Content Area**: The Big Board and Draft Log are organized as tabs in the main content area (left panel):
+  - **Board tab** (default) — The full draft grid as described above
+  - **Draft Log tab** — A full-height, chronological activity feed of every draft event with timestamps. Entry types:
+    - **Pick**: "10:42 AM — R5P2: Cherry Bombs select Sarah Kim (Skater)" with franchise color dot
+    - **Keeper**: "10:00 AM — R1P1: Red Army keep James Wilson (K)" in orange-tinted row
+    - **Trade**: "10:35 AM — Trade #2: Red Army R7P1 ↔ Loons R9P3" in amber-tinted row
+    - **Undo**: "10:43 AM — Undo: R5P2 pick reverted" in red-tinted row with strikethrough
+    - **Timer**: "10:41 AM — Timer expired for Loons (R5P3)" in muted text
+  - The log is scrollable with newest entries at top. A filter dropdown allows showing All / Picks only / Trades only / Undos only.
+  - A small draft log summary (last 3 entries) remains visible in the Control Panel sidebar regardless of which tab is active, so the commissioner always has context.
 
 **Simulation Controls** (visible only in `draft` state, available in both phases):
 - **"SIMULATION MODE"** banner across the top of the view
@@ -206,35 +242,52 @@ A dedicated public page accessible via a shareable, season-based URL (e.g., `/dr
 - **The Big Board** — Real-time grid of all teams and their picks
   - Team columns/rows are tinted with franchise colors for instant visual identification
   - The "on the clock" team's section pulses with an intensified franchise color glow
+  - Future rounds show faded placeholder cells; traded picks display a trade indicator (e.g., "Trade #2: Loons pick here") on the placeholder
+  - Keeper picks show a "K" badge; keeper goalies show both "K" and "G" badges
+- **Available Players tab** — Tabbed alongside the board, showing all undrafted players with a search bar. Tapping a drafted player shows their assigned team. Goalies are badged.
 - Current team "on the clock" with visual highlight and timer
 - Pick-by-pick ticker showing most recent selections with team attribution
 - Responsive layout: grid view on desktop, stacked card view on mobile
+- **Mobile**: Uses a **bottom tab bar only** (no duplicate top tabs) with two tabs: "Draft Results" and "Available Players". Layout from top to bottom:
+  - **Player ticker** — A horizontally scrolling strip at the very top showing the most recent picks (e.g., "R5P2: Cherry Bombs → Sarah Kim"). Provides at-a-glance activity without leaving the current tab.
+  - **On-the-clock card** — Fixed below the ticker with team name, franchise color accent, round/pick info, and countdown timer.
+  - **Draft Results tab** — Displays picks in a **compact table format** grouped by team (not loose stacked cards). Each team section has a franchise-colored header row, and picks are listed as tight table rows with round number, player name, and badges (K/G). This table format is more scannable on small screens than individual cards.
+  - **Available Players tab** — Searchable undrafted player list with position badges.
+  - **Bottom tab bar** — Fixed at bottom with "Draft Results" and "Available Players" tabs.
 - **Presentation mode**: A toggle that maximizes the board into a fullscreen, chrome-free layout optimized for casting to a TV at the draft party (hides nav, footer, and non-essential UI)
 - **Visual timer expiry signal** — board flashes/pulses when time runs out
 
 **After the draft** (completed):
 - Final board showing all picks by team and round
 - Link to the season roster page
+- **Mobile completed view**: Uses the same compact table format as the live view (team-grouped with franchise-colored headers), but without the ticker or on-the-clock card. Bottom tab bar shows "Draft Results" (default) and "Available Players" (showing full player list with draft team assignments).
 
 ### User Workflows
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Draft: Commissioner creates draft instance
-    Draft --> Draft: Configure settings
-    Draft --> Simulating: Commissioner previews admin view
-    Simulating --> Simulating: Test picks, trades, timer
-    Simulating --> Draft: Reset simulation
-    Draft --> Published: Commissioner publishes (auto-purges simulation data)
-    Published --> PreDraft: Before draft date
-    PreDraft --> KeeperEntry: Commissioner opens admin view on draft day
-    KeeperEntry --> KeeperEntry: Enter keepers team-by-team
-    KeeperEntry --> Live: Commissioner clicks Start Draft (locks keepers)
-    Published --> Live: Commissioner starts draft (no keepers)
-    Live --> Live: Picks, trades, pauses
-    Live --> Completed: All rounds finished
-    Completed --> RosterPush: Export / push to season
-    RosterPush --> [*]
+    [*] --> draft: Create draft instance
+
+    draft --> draft: Edit settings / pool / teams / order
+    draft --> simulating: Open admin presentation view
+    simulating --> simulating: Test picks, trades, timer
+    simulating --> draft: Reset simulation / Exit
+
+    draft --> published: Publish (purge simulation data)
+
+    published --> keeper_entry: Commissioner opens admin view
+    published --> live: Start draft (no keepers)
+
+    keeper_entry --> keeper_entry: Enter keepers team-by-team
+    keeper_entry --> live: Click Start Draft (lock keepers)
+
+    live --> paused: Commissioner pauses
+    paused --> live: Commissioner resumes
+
+    live --> live: Pick confirmed / Trade / Undo
+    live --> completed: All picks filled
+
+    completed --> [*]: Export / Push rosters
 ```
 
 ### Draft Instance States
@@ -311,17 +364,23 @@ export const draftInstances = pgTable("draft_instances", {
   seasonId: text("season_id")
     .notNull()
     .references(() => seasons.id),
+  seasonType: text("season_type").notNull().default("fall"), // snapshot from seasons.seasonType at creation time
   name: text("name").notNull(),                      // e.g. "2026-2027 BASH Draft"
   status: text("status").notNull().default("draft"), // draft | published | live | paused | completed
   isSimulating: boolean("is_simulating").notNull().default(false), // true when admin is running a simulation
   draftType: text("draft_type").notNull().default("snake"), // snake | linear
   rounds: integer("rounds").notNull().default(14),
-  timerSeconds: integer("timer_seconds").notNull().default(120), // default pick timer
+  timerSeconds: integer("timer_seconds").notNull().default(120), // default pick timer duration
   maxKeepers: integer("max_keepers").notNull().default(8),        // max keepers per team
   draftDate: timestamp("draft_date", { withTimezone: true }),
   location: text("location"),                        // e.g. "The Connecticut Yankee"
   currentRound: integer("current_round"),
   currentPick: integer("current_pick"),
+  // Timer state — follows same pattern as LiveGameState in scorekeeper-types.ts
+  // Client computes: remaining = timerCountdown - (Date.now() - timerStartedAt) / 1000
+  timerCountdown: integer("timer_countdown"),         // seconds remaining when timer was last started/paused
+  timerRunning: boolean("timer_running").notNull().default(false),
+  timerStartedAt: timestamp("timer_started_at", { withTimezone: true }), // when clock was last started
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 })
@@ -363,10 +422,16 @@ export const draftPool = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.draftId, t.playerId] }),
+    index("idx_draft_pool_draft_player").on(t.draftId, t.playerId), // for undrafted player lookup
   ]
 )
 
 // ─── Draft Picks ────────────────────────────────────────────────────────────
+// PICK PRE-GENERATION: When the draft transitions to `live`, all pick slots are
+// pre-generated as rows with `playerId = null`. For snake drafts, even rounds
+// reverse the team order. Keeper picks are immediately filled with `playerId` set
+// and `isKeeper = true`. The "current pick" is the first row where
+// `playerId IS NULL`, ordered by `pickNumber`.
 
 export const draftPicks = pgTable(
   "draft_picks",
@@ -392,6 +457,7 @@ export const draftPicks = pgTable(
   (t) => [
     index("idx_draft_picks_draft").on(t.draftId),
     index("idx_draft_picks_team").on(t.draftId, t.teamSlug),
+    unique("uq_draft_picks_slot").on(t.draftId, t.round, t.pickNumber), // prevent duplicate pick slots
   ]
 )
 
@@ -415,6 +481,9 @@ export const draftTrades = pgTable("draft_trades", {
 })
 
 // ─── Draft Trade Items (what was exchanged) ─────────────────────────────────
+// For pre-draft trades (before picks are generated), `pickId` is null and
+// `round` + `position` identify the pick slot. When picks are pre-generated
+// at draft start, these are resolved to actual `pickId`s.
 
 export const draftTradeItems = pgTable(
   "draft_trade_items",
@@ -429,8 +498,10 @@ export const draftTradeItems = pgTable(
     toTeamSlug: text("to_team_slug")
       .notNull()
       .references(() => teams.slug),
-    pickId: text("pick_id")                           // for pick swaps
+    pickId: text("pick_id")                           // for live pick swaps (null for pre-draft)
       .references(() => draftPicks.id),
+    round: integer("round"),                          // for pre-draft trades: which round
+    position: integer("position"),                    // for pre-draft trades: which position in that round
     playerId: integer("player_id")                    // for player trades
       .references(() => players.id),
   }
@@ -545,18 +616,22 @@ app/
 | Scenario | Handling |
 |---|---|
 | **Uneven teams** | Some teams may have more/fewer picks due to keeper counts or trades. The grid handles irregular row counts per team. |
-| **Pick revert** | After selecting a player, a 5-second confirmation countdown allows the commissioner to cancel. After 5s, the pick is final (but can still be edited via "Go to Pick #"). |
+| **Pick correction** | "Undo Last Pick" button immediately reverts the most recent pick. For older picks, "Go to Pick #" navigates back to edit. No multi-second revert window — mistakes are corrected via explicit undo. |
 | **Mid-draft trades** | Pick swaps update `draftPicks.teamSlug` for the affected picks. Player trades update the player's team assignment and are logged in `draftTrades`. |
 | **Commissioner misclick** | "Undo Last Pick" button immediately available. For older picks, "Go to Pick #" navigates back to edit. |
-| **Browser disconnect** | Admin presentation view auto-reconnects. Draft state is fully server-side — reconnecting resumes exactly where it was. |
-| **Mobile viewers** | Public view uses responsive design: card-based layout on mobile, grid on desktop. Timer and "on the clock" team are always above the fold. |
+| **Browser disconnect** | Admin presentation view auto-reconnects. Draft state (including timer) is fully server-side — reconnecting resumes exactly where it was. Timer uses `timerCountdown` + `timerRunning` + `timerStartedAt` fields for crash-proof state. |
+| **Mobile viewers** | Public view uses responsive design: table-format layout on mobile, grid on desktop. Ticker and "on the clock" team are always above the fold. |
 | **Draft with keepers** | Keeper players are pre-slotted into their designated rounds (default: sequential from R1, or commissioner-assigned). When the draft reaches a keeper pick, it is auto-confirmed with no timer. The board shows a "K" badge on keeper picks. |
 | **Keeper in late round** | A keeper slotted into Round 12 means that team's Round 12 pick is pre-filled. All other rounds for that team proceed as normal draft picks. The grid correctly shows the gap (e.g., Rounds 3–11 are open picks, Round 12 is a keeper). |
-| **Keeper count varies by team** | Teams may have 1–8 keepers. The board and draft order engine handle asymmetric keeper counts gracefully — teams with fewer keepers simply have more open picks in early rounds. |
-| **Captain not kept** | If a team's captain(s) for the upcoming season (designated during draft setup Step 2) are not included in the keeper list, a validation warning is shown: "Team A's captain(s) [Name] are not in the keeper list. Captains must be kept per BASH rules. Continue anyway?" The commissioner can override (in case the captain declared free agency or other special circumstances). |
+| **Keeper on traded round** | During keeper entry, the round assignment dropdown only shows rounds the team currently owns (accounting for trades). If a team traded away R3, that round is not available for keeper assignment. Validation message: "Round 3 is owned by [Team] (Trade #1). Choose a different round." |
+| **Keeper count varies by team** | Teams may have 1–8 keepers (minimum 1 — the captain). The board and draft order engine handle asymmetric keeper counts gracefully — teams with fewer keepers simply have more open picks in early rounds. |
+| **Captain not kept** | Captains are auto-populated as keepers. If manually removed, a validation error prevents proceeding: "Each team must keep at least their captain(s) per BASH rules." The commissioner cannot override this — captains must always be keepers. |
 | **No registration module yet** | Draft pool can be populated manually (CSV upload or admin entry) without requiring the registration module to be built first. |
-| **Simulation data leaking** | All simulation picks/trades are tagged with `isSimulation: true`. Publishing auto-deletes all rows where `isSimulation = true`. Reset button does the same. No simulation data ever appears on the public view. |
+| **Simulation data leaking** | All simulation picks/trades are tagged with `isSimulation: true`. Publishing auto-deletes all rows where `isSimulation = true`. Reset button does the same. All queries on `draftPicks`, `draftTrades`, and `draftLog` must include `WHERE isSimulation = false` by default (use `withoutSimulation` helper). |
 | **Accidental publish during simulation** | Publishing requires an `AlertDialog` confirmation ("This will clear all simulation data and make the draft page public. Continue?"). |
+| **Timer expiry** | Timer shows "0:00" with blinking red indicator. Commissioner can still make the pick (advisory timer). Timer resets only when next pick is confirmed. |
+| **Roster push conflicts** | Roster push uses `INSERT ... ON CONFLICT DO UPDATE` (upsert) to handle players who already have `player_seasons` records. Discrepancies are logged. |
+| **Route visibility** | `/draft/[season]` returns 404 if the draft status is `draft` (admin-only). Implemented as middleware check. |
 
 ---
 
@@ -576,39 +651,67 @@ The following BASH rules (Rulebook 2019) directly inform draft wizard behavior:
 
 ## 9. Implementation Phases
 
-### Phase A — Draft Setup & Data Model (recommended first PR)
-- Database schema migration: create `franchises` table, add `franchise_slug` to `season_teams`, add `is_captain` to `player_seasons`, create all new draft tables
-- Franchise seed data (map existing teams to franchises with colors)
-- Draft creation wizard (5-step form)
+### PR 1 — Schema + PRD ✅ (completed — `torres_draft` branch)
+- Database schema migration: `franchises` table, `franchise_slug` on `season_teams`, `is_captain` on `player_seasons`, all new draft tables (`draftInstances`, `draftTeamOrder`, `draftPool`, `draftPicks`, `draftTrades`, `draftTradeItems`, `draftLog`)
+- Draft PRD document (`docs/prd-draft.md`)
+- Schema validation script (`scripts/test-draft-schema.ts`)
+- **Status**: Pending PR merge
+
+### PR 2 — Draft Wizard (Steps 1-5) + CRUD
+- Draft creation wizard (5-step form): Settings, Player Pool, Teams & Captains, Draft Order & Pre-Draft Trades, Review & Create
 - Draft instance CRUD (create, edit, delete)
 - Draft pool management (manual player entry + CSV import)
-- Draft state machine (draft → published) with simulation support
-- Simulation mode: preview admin presentation view, make test picks, reset
-- Replace admin Draft tab placeholder with real draft management
+- Draft state machine: `draft → published` transitions
+- Franchise management view in admin (view season_teams list, assign/edit/remove franchise associations)
+- Add `seasonType`, `timerCountdown`, `timerRunning`, `timerStartedAt` columns to `draftInstances` (additive schema migration)
+- Add `round`, `position` columns to `draftTradeItems` (additive)
+- Add `uq_draft_picks_slot` unique constraint, `idx_draft_pool_draft_player` index
+- Replace admin Draft tab placeholder with real draft management page
+- **Smoke test**: Create a draft via wizard, verify pool import, edit/delete draft
 
-### Phase B — Live Draft Board
-- Admin presentation view with pick entry + confirmation
-- Pre-draft keeper entry phase (team-by-team, round assignment, board preview)
-- Public presentation view (read-only)
-- Pick timer with visual expiry signal
-- Short-polling for real-time updates
+### PR 3 — Admin Presentation View (Simulation + Keeper Entry)
+- Simulation mode: full admin presentation view in `draft` state with "SIMULATION MODE" banner
+- Simulation reset (clear all `isSimulation = true` rows)
+- Pre-draft keeper entry phase (team-by-team, round assignment with trade-aware validation, board preview)
+- Pick pre-generation logic (generate all pick slots when transitioning to `live`)
+- Keeper auto-population (captains as mandatory first keepers)
+- Draft backup/restore (JSON export/import from 3-dot menu)
+- `withoutSimulation` query helper
+- **Smoke test**: Run full simulation, reset, enter keepers, verify board preview
+
+### PR 4 — Live Draft Board (Admin + Public)
+- Live pick entry (immediate confirm, no revert window)
 - Undo last pick
 - Navigate to / edit previous picks
+- Pick timer (server-side persistence via `timerCountdown`/`timerRunning`/`timerStartedAt`, matching scorekeeper pattern)
+- Timer expiry: blinking 0:00, advisory only, resets on next pick confirm
 - Pause / resume controls
+- Public presentation view (read-only) with 404 guard for `draft` state
+- Short-polling (5-second for live, 10-second for pre-draft) using `stateHash` diffing via `updatedAt`
+- Available Players tab (admin + public)
+- Mobile layout: ticker, on-the-clock card, compact table format, bottom tab bar
+- Mobile completed view: same table format without ticker
+- **Smoke test**: Full draft (15 rounds, 4 teams), verify timer, public view, mobile layout
 
-### Phase C — Trades & Export
-- Pick swap functionality
+### PR 5 — Trades, Export & Roster Push
+- Pick swap functionality (update `teamSlug` on pre-generated picks)
 - Player trade functionality
-- Trade history log
-- Draft activity log (audit trail)
+- Trade history log + Draft Log tab (admin, with filter dropdown)
 - CSV export of results
-- Roster push to `player_seasons` / `season_teams`
+- Roster push to `player_seasons` / `season_teams` (upsert pattern)
+- Presentation mode toggle (fullscreen, chrome-free)
+- **Smoke test**: Execute trade during draft, verify CSV export, push rosters, check `player_seasons`
 
-### Phase D — Advanced (P2)
+### 🎯 Milestone: Draft Day Rehearsal
+- Full end-to-end simulation with real player data on staging
+- Test on multiple devices (laptop, phone, TV via presentation mode)
+- Commissioner dry-run of keeper entry → live draft → trades → roster push
+
+### PR 6+ — Advanced (P2)
 - Auto draft order from standings
 - Draft history public page
 - Supplemental draft mode
-- WebSocket upgrade (if needed)
+- WebSocket upgrade (if polling proves insufficient)
 
 ---
 
@@ -618,4 +721,10 @@ The following BASH rules (Rulebook 2019) directly inform draft wizard behavior:
 - [x] **Player pool source**: Sportability Roster CSV import is preferred when no registration period exists. Manual entry also supported.
 - [x] **Public URL structure**: Season-based URLs (e.g., `/draft/2026-2027`).
 - [x] **TV casting**: Presentation mode toggle on the public view — fullscreen, chrome-free layout for TV casting.
-- [x] **Draft day logistics**: WiFi available at draft location. Standard 10-second SWR polling is sufficient.
+- [x] **Draft day logistics**: WiFi available at draft location. 5-second SWR polling for live draft.
+- [x] **Pick confirmation**: No multi-second revert window. Picks are confirmed immediately; mistakes corrected via Undo.
+- [x] **Timer expiry**: Advisory only — stays at 0:00 (blinking red), commissioner picks at their leisure. Resets on next pick confirm.
+- [x] **Keeper minimum**: 1 per team (captain). Captains are mandatory keepers.
+- [x] **Franchise mapping**: Manual via admin franchise management view (not auto-seeded).
+- [x] **Season type snapshot**: `seasonType` is denormalized onto `draftInstances` at creation time.
+- [x] **Timer persistence**: Same pattern as live scorekeeping (`timerCountdown` + `timerRunning` + `timerStartedAt`).
