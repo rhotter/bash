@@ -17,6 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.bayareastreethockey.com'),
   title: {
     default: 'BASH - Bay Area Street Hockey',
     template: '%s | BASH',
