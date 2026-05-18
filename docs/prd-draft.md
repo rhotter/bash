@@ -178,7 +178,8 @@ A dedicated, interactive draft system for managing the BASH league draft process
   - **Restore from Config**: Upload a previously exported JSON snapshot to restore draft state. Requires confirmation dialog. Available only in `draft` state.
 
 - **Keeper Minimum**: Every team must have at least 1 keeper (their captain). Captains are always the first keeper for their team. The keeper entry phase auto-populates captains as keepers; the commissioner can add additional keepers up to `maxKeepers`.
-
+  - **Slot Captains in Last Pick**: An optional toggle in the keeper entry phase allows the commissioner to automatically slot all designated captains into their team's final pick of the draft (handling asymmetric rounds gracefully), instead of their regular keeper round (typically Round 1).
+  - **Draft Board Polish**: The draft boards feature fixed-width, responsive table columns for consistent alignment across devices. Team logos are integrated centrally into the draft board headers and the "Pick is In" announcement overlays for strong visual branding.
 - **Summer Draft Variant**: Summer seasons use a simplified draft format. The season type (Fall or Summer) is set during season creation and automatically adjusts the draft wizard behavior:
   - **Keepers: Captains only** — Each team keeps only their captain(s). The max keepers setting is still configurable but defaults to the number of captains (typically 1 per team for summer). The keeper entry phase auto-populates captains and the commissioner confirms.
   - **No trades** — Pre-draft trades (Step 4) and mid-draft trades are disabled. The Trade button is hidden from the admin presentation view. Step 4 of the wizard shows only draft order (the pre-draft trades section is hidden).
