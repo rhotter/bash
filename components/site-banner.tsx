@@ -55,10 +55,10 @@ export function SiteBanner() {
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set())
   const [hydrated, setHydrated] = useState(false)
 
-  // Fetch draft status
   const { data: draftStatus } = useSWR<{
     status: string | null
     seasonSlug?: string
+    draftDate?: string | null
   }>("/api/bash/draft-status", fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 30000,
@@ -88,11 +88,19 @@ export function SiteBanner() {
       dismissKey: `bash-draft-banner-dismissed-${draftSeasonSlug}-${draftStatus?.status ?? ""}`,
       label: isLive
         ? "BASH Draft is LIVE — Watch the picks unfold"
-        : "BASH Draft Board is now available",
+        : "Announcing BASH's new Live Draft tool.",
       href: `/draft/${draftSeasonSlug}`,
       variant: isLive ? "live" : "default",
       isActive: draftActive && !!draftSeasonSlug,
       hideOnPaths: ["/admin", "/draft"],
+      suffix: !isLive && draftStatus?.draftDate ? (() => {
+        const daysUntil = Math.max(0, Math.ceil((new Date(draftStatus.draftDate).getTime() - Date.now()) / 86400000))
+        return (
+          <span className="text-muted-foreground/70">
+            {" · "}{daysUntil === 0 ? "Live today" : <>Live in <span className="tabular-nums">{daysUntil}</span> day{daysUntil === 1 ? "" : "s"}</>}
+          </span>
+        )
+      })() : undefined,
     },
 
     // Priority 2: Registration (TODO: remove after Summer 2026)

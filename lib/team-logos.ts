@@ -25,6 +25,8 @@ const logoMapping: Record<string, string> = {
   "coxswain-bawls-hockey-club": "coxswain_bawls_1024.png",
   "team-usa": "team-usa_1024.png",
   "team-canada": "team-canada_1024.png",
+  "dolo-minions": "dolo_minions_logo_only_1024.png",
+  "lazy-skater-dangle": "lazy_skater_dangle_1024.png",
 }
 
 // Season-specific logo overrides (takes priority over default)

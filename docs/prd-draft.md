@@ -913,6 +913,32 @@ The following BASH rules (Rulebook 2019) directly inform draft wizard behavior:
 - [ ] **Draft Log Persistence**: Currently the Draft Log tab is built client-side from picks/trades props. A future enhancement could query the `draft_log` database table directly for a richer history including undo actions and simulation resets.
 - [ ] **Player Trades**: Trade drafted players between teams (not just picks). Currently deferred — only pick swaps are supported.
 
+### 11.1 Upcoming Features
+
+Features scoped and documented but not yet implemented:
+
+#### Publish Location Publicly (Draft Announcement Page)
+
+**Goal**: Allow admins to control whether the draft location is shown on the public announcement page (`/draft/[season]` in `published` status).
+
+**Why**: The commissioner may not want to publicly share the draft venue (e.g., a private residence or a venue with limited capacity). Location should be shared through other channels (email, group chat) rather than on a public page.
+
+**Scope**:
+
+| Layer | Change |
+|---|---|
+| **Schema** | Add `publish_location` boolean column to `draft_instances` (default `false`) |
+| **Migration** | `ALTER TABLE draft_instances ADD COLUMN publish_location boolean NOT NULL DEFAULT false;` |
+| **Draft Wizard (Step 1)** | Add a checkbox/toggle: "Show location on public draft page" below the Location input |
+| **Draft Settings API** | Accept `publishLocation` in `PUT /api/bash/admin/draft/[id]` |
+| **Draft Creation API** | Accept `publishLocation` in `POST /api/bash/admin/draft` |
+| **Public Page (server)** | Pass `publishLocation` flag through `initialData` to `PublicDraftBoard` |
+| **Public Page (client)** | In `public-draft-board.tsx`, conditionally render location row and Google Maps link only when `publishLocation` is `true` |
+| **OpenGraph metadata** | Conditionally include location in `generateMetadata()` description |
+| **Google Calendar CTA** | Conditionally include location in calendar event details |
+
+**Estimated effort**: Small (1–2 hours). Single boolean flag threaded through 6 touchpoints.
+
 ---
 
 ## 12. Retrospective: Simulation Mode (Removed)

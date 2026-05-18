@@ -46,9 +46,16 @@ export function SeasonActivationChecklist({ season }: SeasonActivationChecklistP
 
   const checks = [
     {
+      id: "explore",
+      label: "Schedule Exploration",
+      description: "Don't know the teams yet? Don't create/assign any. The Schedule wizard can accept a team count for testing schedules. Add Tryout dates at any time.",
+      passed: true,
+      optional: true,
+    },
+    {
       id: "teams",
       label: "Create Teams",
-      description: "Add participating teams to the season.",
+      description: "Once captains confirm team names, create in teams tab.",
       passed: hasTeams,
     },
     {
@@ -65,26 +72,26 @@ export function SeasonActivationChecklist({ season }: SeasonActivationChecklistP
     },
     {
       id: "schedule",
-      label: season.statsOnly ? "Stats-Only Mode" : "Generate Schedule",
-      description: season.statsOnly ? "Season is set to stats-only. No schedule required." : "Create the regular season game schedule.",
+      label: season.statsOnly ? "Stats-Only Mode" : "Finalize Schedule",
+      description: season.statsOnly ? "Season is set to stats-only. No schedule required." : "Run Schedule Wizard with final teams and confirm dates.",
       passed: hasGames,
     },
   ]
 
-  const readyToActivate = checks.every(c => c.passed)
+  const readyToActivate = checks.filter(c => !c.optional).every(c => c.passed)
 
   async function handleActivate() {
     setConfirmDialog(false)
     setSaving(true)
     setError("")
-    
+
     try {
       const res = await fetch(`/api/bash/admin/seasons/${season.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "active" }),
       })
-      
+
       if (res.ok) {
         router.refresh()
       } else {
@@ -102,8 +109,8 @@ export function SeasonActivationChecklist({ season }: SeasonActivationChecklistP
     <>
       <Card className="border-green-500/20 bg-green-500/5 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
-        <CardHeader className="py-3 sm:px-4 flex flex-row items-center justify-between space-y-0 border-b border-green-500/10">
-          <div className="flex flex-col gap-0.5">
+        <CardHeader className="py-2 px-3 sm:px-4 flex flex-row items-center justify-between space-y-0 border-b border-green-500/10">
+          <div className="flex flex-col">
             <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
               <Flag className="h-4 w-4 text-green-600" />
               Season Activation
@@ -111,9 +118,9 @@ export function SeasonActivationChecklist({ season }: SeasonActivationChecklistP
           </div>
           <div className="flex items-center gap-3">
             {error && (
-              <span className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3"/> {error}</span>
+              <span className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {error}</span>
             )}
-            <Button 
+            <Button
               onClick={() => setConfirmDialog(true)}
               disabled={!readyToActivate || saving}
               size="sm"
@@ -125,22 +132,24 @@ export function SeasonActivationChecklist({ season }: SeasonActivationChecklistP
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-3 sm:px-4">
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <CardContent className="px-3 sm:px-4 py-2">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
             {checks.map((check) => (
-              <div key={check.id} className="flex items-start gap-2.5">
+              <div key={check.id} className="flex items-start gap-2">
                 <div className="mt-0.5 shrink-0">
-                  {check.passed ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                  {check.optional ? (
+                    <Check className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  ) : check.passed ? (
+                    <Check className="h-3.5 w-3.5 text-green-600" />
                   ) : (
-                    <Circle className="h-4 w-4 text-muted-foreground/30" />
+                    <Circle className="h-3.5 w-3.5 text-muted-foreground/30" />
                   )}
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className={`text-xs font-semibold ${check.passed ? "text-foreground" : "text-muted-foreground"}`}>
+                <div className="flex flex-col">
+                  <span className={`text-[11px] font-semibold leading-tight ${check.passed ? "text-foreground" : "text-muted-foreground"}`}>
                     {check.label}
                   </span>
-                  <span className="text-[11px] text-muted-foreground leading-tight">
+                  <span className="text-[10px] text-muted-foreground leading-snug">
                     {check.description}
                   </span>
                 </div>

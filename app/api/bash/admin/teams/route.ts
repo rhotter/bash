@@ -1,22 +1,62 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
-import { asc, eq, ne, not, like, and } from "drizzle-orm"
+import { asc, eq, ne, not, like, and, inArray } from "drizzle-orm"
 import { getSession } from "@/lib/admin-session"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const isAuthenticated = await getSession()
   if (!isAuthenticated) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const allTeams = await db
-    .select()
-    .from(schema.teams)
-    .where(
-      and(
-        ne(schema.teams.slug, "tbd"),
-        not(like(schema.teams.slug, "seed-%"))
+  const seasonType = request.nextUrl.searchParams.get("seasonType")
+
+  let allTeams
+  if (seasonType) {
+    // Return only teams that have been assigned to at least one season of this type
+    const seasonRows = await db
+      .select({ id: schema.seasons.id })
+      .from(schema.seasons)
+      .where(eq(schema.seasons.seasonType, seasonType))
+
+    const seasonIds = seasonRows.map(s => s.id)
+
+    if (seasonIds.length === 0) {
+      return NextResponse.json({ teams: [] })
+    }
+
+    const stRows = await db
+      .select({ teamSlug: schema.seasonTeams.teamSlug })
+      .from(schema.seasonTeams)
+      .where(inArray(schema.seasonTeams.seasonId, seasonIds))
+
+    const slugs = [...new Set(stRows.map(r => r.teamSlug))]
+
+    if (slugs.length === 0) {
+      return NextResponse.json({ teams: [] })
+    }
+
+    allTeams = await db
+      .select()
+      .from(schema.teams)
+      .where(
+        and(
+          inArray(schema.teams.slug, slugs),
+          ne(schema.teams.slug, "tbd"),
+          not(like(schema.teams.slug, "seed-%"))
+        )
       )
-    )
-    .orderBy(asc(schema.teams.name))
+      .orderBy(asc(schema.teams.name))
+  } else {
+    allTeams = await db
+      .select()
+      .from(schema.teams)
+      .where(
+        and(
+          ne(schema.teams.slug, "tbd"),
+          not(like(schema.teams.slug, "seed-%"))
+        )
+      )
+      .orderBy(asc(schema.teams.name))
+  }
 
   return NextResponse.json({ teams: allTeams })
 }

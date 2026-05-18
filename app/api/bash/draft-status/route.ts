@@ -17,6 +17,7 @@ export async function GET() {
       .select({
         status: schema.draftInstances.status,
         seasonId: schema.draftInstances.seasonId,
+        draftDate: schema.draftInstances.draftDate,
       })
       .from(schema.draftInstances)
       .where(notInArray(schema.draftInstances.status, ["draft", "archived"]))
@@ -36,10 +37,10 @@ export async function GET() {
       })
     }
 
-    const { status, seasonId } = draft[0]
+    const { status, seasonId, draftDate } = draft[0]
 
     return NextResponse.json(
-      { status, seasonSlug: seasonId },
+      { status, seasonSlug: seasonId, draftDate: draftDate?.toISOString() ?? null },
       {
         headers: {
           "Cache-Control": status === "live"
