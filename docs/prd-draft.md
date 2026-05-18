@@ -178,7 +178,8 @@ A dedicated, interactive draft system for managing the BASH league draft process
   - **Restore from Config**: Upload a previously exported JSON snapshot to restore draft state. Requires confirmation dialog. Available only in `draft` state.
 
 - **Keeper Minimum**: Every team must have at least 1 keeper (their captain). Captains are always the first keeper for their team. The keeper entry phase auto-populates captains as keepers; the commissioner can add additional keepers up to `maxKeepers`.
-
+  - **Slot Captains in Last Pick**: An optional toggle in the keeper entry phase allows the commissioner to automatically slot all designated captains into their team's final pick of the draft (handling asymmetric rounds gracefully), instead of their regular keeper round (typically Round 1).
+  - **Draft Board Polish**: The draft boards feature fixed-width, responsive table columns for consistent alignment across devices. Team logos are integrated centrally into the draft board headers and the "Pick is In" announcement overlays for strong visual branding.
 - **Summer Draft Variant**: Summer seasons use a simplified draft format. The season type (Fall or Summer) is set during season creation and automatically adjusts the draft wizard behavior:
   - **Keepers: Captains only** — Each team keeps only their captain(s). The max keepers setting is still configurable but defaults to the number of captains (typically 1 per team for summer). The keeper entry phase auto-populates captains and the commissioner confirms.
   - **No trades** — Pre-draft trades (Step 4) and mid-draft trades are disabled. The Trade button is hidden from the admin presentation view. Step 4 of the wizard shows only draft order (the pre-draft trades section is hidden).
@@ -912,6 +913,32 @@ The following BASH rules (Rulebook 2019) directly inform draft wizard behavior:
 - [x] **Timer Persistence**: ~~Connect the server-side `timerStartedAt` to the client-side countdown for accurate cross-device timer sync.~~ Server-side timer state (`timerCountdown` + `timerRunning` + `timerStartedAt`) drives client countdown via `remaining = timerCountdown - elapsed`. Supports pause/resume/reset via `POST /api/.../timer`.
 - [ ] **Draft Log Persistence**: Currently the Draft Log tab is built client-side from picks/trades props. A future enhancement could query the `draft_log` database table directly for a richer history including undo actions and simulation resets.
 - [ ] **Player Trades**: Trade drafted players between teams (not just picks). Currently deferred — only pick swaps are supported.
+
+### 11.1 Upcoming Features
+
+Features scoped and documented but not yet implemented:
+
+#### Publish Location Publicly (Draft Announcement Page)
+
+**Goal**: Allow admins to control whether the draft location is shown on the public announcement page (`/draft/[season]` in `published` status).
+
+**Why**: The commissioner may not want to publicly share the draft venue (e.g., a private residence or a venue with limited capacity). Location should be shared through other channels (email, group chat) rather than on a public page.
+
+**Scope**:
+
+| Layer | Change |
+|---|---|
+| **Schema** | Add `publish_location` boolean column to `draft_instances` (default `false`) |
+| **Migration** | `ALTER TABLE draft_instances ADD COLUMN publish_location boolean NOT NULL DEFAULT false;` |
+| **Draft Wizard (Step 1)** | Add a checkbox/toggle: "Show location on public draft page" below the Location input |
+| **Draft Settings API** | Accept `publishLocation` in `PUT /api/bash/admin/draft/[id]` |
+| **Draft Creation API** | Accept `publishLocation` in `POST /api/bash/admin/draft` |
+| **Public Page (server)** | Pass `publishLocation` flag through `initialData` to `PublicDraftBoard` |
+| **Public Page (client)** | In `public-draft-board.tsx`, conditionally render location row and Google Maps link only when `publishLocation` is `true` |
+| **OpenGraph metadata** | Conditionally include location in `generateMetadata()` description |
+| **Google Calendar CTA** | Conditionally include location in calendar event details |
+
+**Estimated effort**: Small (1–2 hours). Single boolean flag threaded through 6 touchpoints.
 
 ---
 

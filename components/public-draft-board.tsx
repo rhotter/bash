@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Search, Maximize2, Minimize2, Clock, MapPin, Users, ArrowUpDown, ArrowUp, ArrowDown, Volume2, VolumeX, CalendarPlus, Layers, X, ChevronsRight, Eye, EyeOff } from "lucide-react"
+import { Search, Maximize2, Minimize2, Clock, Users, ArrowUpDown, ArrowUp, ArrowDown, Volume2, VolumeX, CalendarPlus, Layers, X, ChevronsRight, Eye, EyeOff } from "lucide-react"
 import { PlayerCardModal } from "@/components/player-card-modal"
+import { TeamLogo } from "@/components/team-logo"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 // "The Pick Is In" banner data
 interface PickAnnouncement {
   teamName: string
+  teamSlug: string
   teamColor: string
   playerName: string
   round: number
@@ -129,20 +131,21 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
   // ─── Draft Chime Sound ──────────────────────────────────────────────────
   const chimeRef = useRef<HTMLAudioElement | null>(null)
   const isMutedRef = useRef(false)
-  const [isMuted, setIsMuted] = useState(() => {
-    if (typeof window === "undefined") return false
-    const stored = localStorage.getItem("bash-draft-muted") === "true"
-    isMutedRef.current = stored
-    return stored
-  })
+  const [isMuted, setIsMuted] = useState(false)
 
   const isAnimationsMutedRef = useRef(false)
-  const [isAnimationsMuted, setIsAnimationsMuted] = useState(() => {
-    if (typeof window === "undefined") return false
-    const stored = localStorage.getItem("bash-draft-animations-muted") === "true"
-    isAnimationsMutedRef.current = stored
-    return stored
-  })
+  const [isAnimationsMuted, setIsAnimationsMuted] = useState(false)
+
+  // Sync persisted preferences from localStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    const muted = localStorage.getItem("bash-draft-muted") === "true"
+    isMutedRef.current = muted
+    setIsMuted(muted)
+
+    const animMuted = localStorage.getItem("bash-draft-animations-muted") === "true"
+    isAnimationsMutedRef.current = animMuted
+    setIsAnimationsMuted(animMuted)
+  }, [])
 
   useEffect(() => {
     chimeRef.current = new Audio("/sounds/nhl-draft-chime.mp3")
@@ -352,6 +355,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
             // Trigger banner
             setAnnouncement({
               teamName: team.teamName,
+              teamSlug: team.teamSlug,
               teamColor: team.color || "#f97316",
               playerName: newest.playerName || "Unknown",
               round: newest.round,
@@ -465,7 +469,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
         text: `BASH ${draft.name}`,
         dates: `${start}/${end}`,
         details: `BASH ${draft.name}.${teams.length > 0 ? ` ${draft.rounds} rounds, ${teams.length} teams.` : ""}`,
-        location: draft.location ? `${draft.location}, San Francisco, CA` : "",
+        location: "",
       })
       return `https://calendar.google.com/calendar/render?${params.toString()}`
     })() : null
@@ -504,48 +508,39 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
           {draftDate && (
             <div className="space-y-1">
               <div className="text-6xl sm:text-7xl font-bold tabular-nums text-primary">
-                {daysUntil}
+                {mounted ? daysUntil : "-"}
               </div>
               <div className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                {daysUntil === 1 ? "day" : "days"} until draft day
+                {mounted && daysUntil === 1 ? "day" : "days"} until draft day
               </div>
             </div>
           )}
 
           {/* Date & Location — stacked rows */}
-          {(draftDate || draft.location) && (
+          {draftDate && (
             <div className="inline-flex flex-col gap-2 text-sm">
-              {draftDate && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="font-medium text-foreground">
-                    {draftDate.toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                    {" at "}
-                    {draftDate.toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-              )}
-              {draft.location && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                  <a
-                    href={`https://www.google.com/maps/search/${encodeURIComponent(draft.location + " San Francisco")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-foreground hover:text-primary transition-colors underline underline-offset-2 decoration-muted-foreground/40 hover:decoration-primary"
-                  >
-                    {draft.location}, San Francisco
-                  </a>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4 shrink-0 text-primary" />
+                <span className="font-medium text-foreground">
+                  {mounted ? (
+                    <>
+                      {draftDate.toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                      {" at "}
+                      {draftDate.toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </>
+                  ) : (
+                    <span className="inline-block w-48 h-5 bg-muted rounded animate-pulse" />
+                  )}
+                </span>
+              </div>
             </div>
           )}
 
@@ -568,14 +563,11 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
               Participating Teams
             </h2>
             {teams.length > 0 ? (
-              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-4">
                 {teams.map((team) => (
-                  <div key={team.teamSlug} className="flex items-center gap-2">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: team.color || "#94a3b8" }}
-                    />
-                    <span className="text-sm font-medium">{team.teamName}</span>
+                  <div key={team.teamSlug} className="flex flex-col items-center gap-1.5 w-28">
+                    <TeamLogo slug={team.teamSlug} name={team.teamName} size={96} />
+                    <span className="text-[11px] font-medium text-center leading-tight">{team.teamName}</span>
                   </div>
                 ))}
               </div>
@@ -700,14 +692,14 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                 {/* Desktop: dark vignette backdrop */}
                 <div className="hidden md:flex absolute inset-0 bg-black/70 items-center justify-center p-8" onClick={() => setAnnouncementVisible(false)}>
                   <div
-                    className="relative w-full max-w-2xl rounded-xl px-8 py-10 text-white text-center shadow-2xl"
+                    className="relative w-full max-w-2xl rounded-xl px-8 py-10 text-white text-center shadow-2xl overflow-hidden"
                     style={{ backgroundColor: announcement.teamColor }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Draft logo */}
-                    <div className="flex justify-center mb-4">
-                      <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-md">
-                        <Image src="/images/draft-logo.jpg" alt="BASH Draft" width={48} height={48} className="object-contain" />
+                    {/* Team logo — hero centerpiece */}
+                    <div className="flex justify-center mb-5">
+                      <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-lg ring-4 ring-white/30">
+                        <TeamLogo slug={announcement.teamSlug} name={announcement.teamName} size={80} />
                       </div>
                     </div>
                     <div className="text-lg font-extrabold uppercase tracking-[0.2em] text-white/90 mb-1">The Pick Is In</div>
@@ -719,7 +711,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                   </div>
                 </div>
 
-                {/* Mobile: full-screen orange overlay */}
+                {/* Mobile: full-screen team color overlay */}
                 <div
                   className="md:hidden absolute inset-0 flex flex-col items-center justify-center px-6 text-white text-center"
                   style={{ backgroundColor: announcement.teamColor }}
@@ -733,14 +725,13 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                     <X className="h-4 w-4" />
                   </button>
 
-                  {/* Draft logo */}
-                  <div className="mb-4">
-                    <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-md mx-auto">
-                      <Image src="/images/draft-logo.jpg" alt="BASH Draft" width={48} height={48} className="object-contain" />
+                  {/* Team logo — hero centerpiece */}
+                  <div className="mb-5">
+                    <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-lg ring-4 ring-white/30 mx-auto">
+                      <TeamLogo slug={announcement.teamSlug} name={announcement.teamName} size={80} />
                     </div>
                   </div>
 
-                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/70 mb-2">BASH Summer Draft</div>
                   <div className="text-base font-extrabold uppercase tracking-[0.2em] text-white/90 mb-3">The Pick Is In</div>
                   <div className="text-sm uppercase tracking-[0.1em] text-white/60 mb-2 border border-white/30 rounded-full px-4 py-1">{announcement.teamName} select</div>
                   <div className="text-4xl font-extrabold tracking-tight leading-tight mb-5">{announcement.playerName}</div>
@@ -1030,21 +1021,18 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
             <TabsContent value="board" className={`mt-0 ${!isCompleted ? "md:!block" : ""}`}>
               <Card>
                 <CardContent className="p-0 overflow-x-auto">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs md:table-fixed">
                     <thead>
                       <tr className="border-b bg-muted/50">
                         <th className="px-2 py-2 text-left font-bold text-[10px] uppercase tracking-[0.06em] text-muted-foreground w-10 sticky left-0 bg-muted z-20" style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.1)' }}>Rd</th>
                         {teams.map((team) => (
                           <th
                             key={team.teamSlug}
-                            className="px-2 py-2 text-left font-semibold min-w-[120px] border-t-[3px]"
+                            className="px-2 py-2 text-left font-semibold min-w-[120px] md:min-w-0 border-t-[3px] overflow-hidden"
                             style={{ borderTopColor: team.color || "#94a3b8" }}
                           >
                             <div className="flex items-center gap-1.5">
-                              <div
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ backgroundColor: team.color || "#94a3b8" }}
-                              />
+                              <TeamLogo slug={team.teamSlug} name={team.teamName} size={18} />
                               <span className="truncate">{team.teamName}</span>
                             </div>
                           </th>

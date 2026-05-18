@@ -166,10 +166,10 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
         />
       )}
 
-      {/* Exhibition / Tryout game logs */}
+      {/* Exhibition game logs */}
       {player.exhibitionGames.length > 0 && (
         <SkaterGameLogTable
-          title={isDualRole ? "Exhibition & Tryout Skater Games" : "Exhibition & Tryout Games"}
+          title={isDualRole ? "Exhibition Skater Games" : "Exhibition Games"}
           games={player.exhibitionGames}
           showGameTypeBadge
         />
@@ -177,7 +177,7 @@ export function PlayerPageContent({ player }: { player: PlayerDetail }) {
 
       {player.exhibitionGoalieGames.length > 0 && (
         <GoalieGameLogTable
-          title={isDualRole ? "Exhibition & Tryout Goalie Games" : "Exhibition & Tryout Games"}
+          title={isDualRole ? "Exhibition Goalie Games" : "Exhibition Games"}
           games={player.exhibitionGoalieGames}
           showGameTypeBadge
         />

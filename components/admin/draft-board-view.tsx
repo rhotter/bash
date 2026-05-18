@@ -13,11 +13,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RotateCcw, Play, Pause, Loader2, Crown, Search, X, Check, Download, Upload, MoreVertical, LogOut, ExternalLink, Timer, Info } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { PlayerCardModal } from "@/components/player-card-modal"
 import { resolvePreDraftTrades, type PreDraftTradeInput } from "@/lib/draft-trade-resolver"
 import { generatePickSlots } from "@/lib/draft-helpers"
+import { TeamLogo } from "@/components/team-logo"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -232,6 +234,37 @@ export function DraftBoardView({
   // Keeper entry state
   const [selectedTeam, setSelectedTeam] = useState<string>(teams[0]?.teamSlug || "")
   const [keeperSearch, setKeeperSearch] = useState("")
+  const [captainSlotLast, setCaptainSlotLast] = useState(false)
+
+  // Compute each team's last pick round (handles partial final rounds)
+  const lastPickRoundByTeam = useMemo(() => {
+    const numTeams = teams.length
+    if (numTeams === 0) return new Map<string, number>()
+    const totalPlayers = pool.length
+    const fullRounds = Math.floor(totalPlayers / numTeams)
+    const remainder = totalPlayers % numTeams
+
+    const result = new Map<string, number>()
+    // Teams in draft order (position 1→N)
+    const teamsByPos = [...teams].sort((a, b) => a.position - b.position)
+    const slugs = teamsByPos.map(t => t.teamSlug)
+
+    for (let i = 0; i < numTeams; i++) {
+      const slug = slugs[i]
+      if (remainder === 0) {
+        // Every team has a pick in every round
+        result.set(slug, fullRounds)
+      } else {
+        // Partial last round: determine which teams get a pick
+        const partialRound = fullRounds + 1
+        const isReversed = draft.draftType === "snake" && partialRound % 2 === 0
+        const orderForPartial = isReversed ? [...slugs].reverse() : [...slugs]
+        const teamsWithPick = new Set(orderForPartial.slice(0, remainder))
+        result.set(slug, teamsWithPick.has(slug) ? partialRound : fullRounds)
+      }
+    }
+    return result
+  }, [teams, pool.length, draft.draftType])
 
   const isDraft = draft.status === "draft"
   const isPreDraft = draft.status === "published"
@@ -313,10 +346,17 @@ export function DraftBoardView({
       const teamExistingKeepers = keeperPayload.filter((k) => k.teamSlug === cap.teamSlug)
       if (teamExistingKeepers.length >= draft.maxKeepers) continue
 
-      // Find next available round for this team
+      // Find next available round for this team (first or last based on setting)
       const takenRounds = new Set(teamExistingKeepers.map((k) => k.round))
-      let nextRound = 1
-      while (takenRounds.has(nextRound)) nextRound++
+      let nextRound: number
+      if (captainSlotLast) {
+        nextRound = lastPickRoundByTeam.get(cap.teamSlug) || draft.rounds
+        while (takenRounds.has(nextRound) && nextRound > 0) nextRound--
+        if (nextRound <= 0) nextRound = 1 // fallback
+      } else {
+        nextRound = 1
+        while (takenRounds.has(nextRound)) nextRound++
+      }
 
       keeperPayload.push({
         playerId: cap.playerId,
@@ -351,7 +391,7 @@ export function DraftBoardView({
     })
 
     setAutoPopulated(true)
-  }, [autoPopulated, isDraft, isLive, draft.status, draft.id, draft.maxKeepers, initialPool, captains, seasonId])
+  }, [autoPopulated, isDraft, isLive, draft.status, draft.id, draft.maxKeepers, initialPool, captains, seasonId, captainSlotLast, lastPickRoundByTeam, draft.rounds, draft.draftType])
 
   // ─── Keeper helpers ─────────────────────────────────────────────────────
 
@@ -569,10 +609,18 @@ export function DraftBoardView({
         return
       }
 
-      // Find next unused round for this team
+      // Find next unused round for this team (respects captain slot setting)
+      const isCaptainForTeam = captains.some(c => c.playerId === playerId && c.teamSlug === teamSlug)
       const usedRounds = new Set(team.map((k) => k.keeperRound))
-      let nextRound = 1
-      while (usedRounds.has(nextRound)) nextRound++
+      let nextRound: number
+      if (isCaptainForTeam && captainSlotLast) {
+        nextRound = lastPickRoundByTeam.get(teamSlug) || draft.rounds
+        while (usedRounds.has(nextRound) && nextRound > 0) nextRound--
+        if (nextRound <= 0) nextRound = 1
+      } else {
+        nextRound = 1
+        while (usedRounds.has(nextRound)) nextRound++
+      }
 
       // Optimistic update
       setPool((prev) =>
@@ -620,7 +668,7 @@ export function DraftBoardView({
         toast.error("Failed to save keeper")
       }
     },
-    [currentKeepers, keepersForTeam, draft.id, draft.maxKeepers, seasonId]
+    [currentKeepers, keepersForTeam, draft.id, draft.maxKeepers, seasonId, captains, captainSlotLast, lastPickRoundByTeam, draft.rounds]
   )
 
   const removeKeeper = useCallback(
@@ -1250,6 +1298,82 @@ export function DraftBoardView({
                     ? "Select a team, then search and assign keeper players and their rounds. Captains are auto-assigned. Once keepers are set, press Start Draft to go live."
                     : "Manage keeper assignments for each team. Keepers are locked into their assigned round."}
                 </p>
+                <div className="flex items-center gap-2 pt-1">
+                  <Switch
+                    id="captain-slot"
+                    checked={captainSlotLast}
+                    onCheckedChange={async (checked) => {
+                      setCaptainSlotLast(checked)
+
+                      // Re-slot existing captain keepers to their new round
+                      const captainIds = new Set(captains.map(c => c.playerId))
+                      const captainKeepers = pool.filter(p => p.isKeeper && captainIds.has(p.playerId))
+                      if (captainKeepers.length === 0) {
+                        setAutoPopulated(false)
+                        return
+                      }
+
+                      // Build updated keeper list with re-slotted captains
+                      const allKeepers = pool
+                        .filter(p => p.isKeeper)
+                        .map(k => {
+                          if (!captainIds.has(k.playerId)) {
+                            return { playerId: k.playerId, teamSlug: k.keeperTeamSlug!, round: k.keeperRound! }
+                          }
+                          // Re-compute this captain's round
+                          const teamSlug = k.keeperTeamSlug!
+                          const otherKeepersInTeam = pool.filter(
+                            p => p.isKeeper && p.keeperTeamSlug === teamSlug && p.playerId !== k.playerId
+                          )
+                          const takenRounds = new Set(otherKeepersInTeam.map(p => p.keeperRound))
+                          let newRound: number
+                          if (checked) {
+                            newRound = lastPickRoundByTeam.get(teamSlug) || draft.rounds
+                            while (takenRounds.has(newRound) && newRound > 0) newRound--
+                            if (newRound <= 0) newRound = 1
+                          } else {
+                            newRound = 1
+                            while (takenRounds.has(newRound)) newRound++
+                          }
+                          return { playerId: k.playerId, teamSlug, round: newRound }
+                        })
+
+                      // Optimistic update
+                      setPool(prev => prev.map(p => {
+                        const updated = allKeepers.find(k => k.playerId === p.playerId && p.isKeeper)
+                        if (updated) return { ...p, keeperRound: updated.round }
+                        return p
+                      }))
+
+                      // Persist
+                      try {
+                        const res = await fetch(
+                          `/api/bash/admin/seasons/${seasonId}/draft/${draft.id}/keepers`,
+                          { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keepers: allKeepers }) }
+                        )
+                        if (res.ok) {
+                          const slotLabel = checked ? "last" : "first"
+                          toast.success(`Captain keepers re-slotted to ${slotLabel} pick`)
+                        } else {
+                          toast.error("Failed to update keeper rounds")
+                        }
+                      } catch {
+                        toast.error("Failed to update keeper rounds")
+                      }
+                    }}
+                  />
+                  <Label htmlFor="captain-slot" className="text-xs font-normal text-muted-foreground cursor-pointer">
+                    Slot captains in last pick
+                    {captainSlotLast && teams.length > 0 && (
+                      <span className="text-[10px] ml-1 text-muted-foreground/70">
+                        ({[...new Set(teams.map(t => {
+                          const r = lastPickRoundByTeam.get(t.teamSlug)
+                          return r ? `R${r}` : null
+                        }).filter(Boolean))].join("/")})
+                      </span>
+                    )}
+                  </Label>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setShowClearKeepersConfirm(true)}>
@@ -1314,6 +1438,7 @@ export function DraftBoardView({
                       style={teamColor && !isSelected ? { borderLeftWidth: '3px', borderLeftColor: teamColor } : undefined}
                       onClick={() => setSelectedTeam(t.teamSlug)}
                     >
+                      <TeamLogo slug={t.teamSlug} name={t.teamName} size={16} />
                       <span>{t.teamName}</span>
                       <span className={`text-[10px] font-mono ${isFull ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
                         {t.count}/{draft.maxKeepers}
@@ -1355,7 +1480,7 @@ export function DraftBoardView({
                                   value={k.keeperRound?.toString()}
                                   onValueChange={(val) => updateKeeperRound(k.playerId, parseInt(val, 10))}
                                 >
-                                  <SelectTrigger className="h-6 w-[52px] px-1.5 text-[10px] font-mono border-muted-foreground/20">
+                                  <SelectTrigger className="h-6 w-[62px] px-1.5 text-[10px] font-mono border-muted-foreground/20">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1451,7 +1576,7 @@ export function DraftBoardView({
                   </CardHeader>
                   <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
+            <table className="w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
               <thead>
                 <tr>
                   <th className="sticky left-0 z-10 bg-background border p-2 text-xs font-medium text-muted-foreground w-12">
@@ -1460,14 +1585,17 @@ export function DraftBoardView({
                   {teams.map((t) => (
                     <th
                       key={t.teamSlug}
-                      className="border p-2 text-xs font-semibold min-w-[120px]"
+                      className="border p-2 text-xs font-semibold overflow-hidden"
                       style={{
                         backgroundColor: t.color ? `${t.color}15` : undefined,
                         borderBottomColor: t.color || undefined,
                         borderBottomWidth: t.color ? "3px" : undefined,
                       }}
                     >
-                      {t.teamName}
+                      <div className="flex items-center gap-1.5">
+                        <TeamLogo slug={t.teamSlug} name={t.teamName} size={18} />
+                        <span className="truncate">{t.teamName}</span>
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -1826,7 +1954,7 @@ export function DraftBoardView({
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="w-full border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
                     <thead>
                       <tr>
                         <th className="sticky left-0 z-10 bg-background border p-2 text-xs font-medium text-muted-foreground w-12">
@@ -1835,14 +1963,17 @@ export function DraftBoardView({
                         {teams.map((t) => (
                           <th
                             key={t.teamSlug}
-                            className="border p-2 text-xs font-semibold min-w-[120px]"
+                            className="border p-2 text-xs font-semibold overflow-hidden"
                             style={{
                               backgroundColor: t.color ? `${t.color}15` : undefined,
                               borderBottomColor: t.color || undefined,
                               borderBottomWidth: t.color ? "3px" : undefined,
                             }}
                           >
-                            {t.teamName}
+                            <div className="flex items-center gap-1.5">
+                              <TeamLogo slug={t.teamSlug} name={t.teamName} size={18} />
+                              <span className="truncate">{t.teamName}</span>
+                            </div>
                           </th>
                         ))}
                       </tr>
@@ -2042,7 +2173,7 @@ export function DraftBoardView({
           <AlertDialogHeader>
             <AlertDialogTitle>Start the Draft?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will lock all keeper picks, generate {draft.rounds * teams.length} pick slots, and transition the draft to live.
+              This will lock all keeper picks, generate {pool.length} pick slots (for {pool.length} players across {draft.rounds} rounds), and transition the draft to live.
               {currentKeepers.length > 0
                 ? ` ${currentKeepers.length} keeper picks will be pre-filled.`
                 : " No keepers have been assigned — all picks will be open."}

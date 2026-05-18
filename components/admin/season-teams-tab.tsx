@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, Loader2, Plus, X, ShieldAlert } from "lucide-react"
+import { Search, Loader2, Plus, X, ShieldAlert, Pencil, Check, PanelRightOpen, PanelRightClose, Leaf } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,6 +52,12 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
   const [createTeamError, setCreateTeamError] = useState("")
   const [isCreatingTeam, setIsCreatingTeam] = useState(false)
 
+  const [editingTeamSlug, setEditingTeamSlug] = useState<string | null>(null)
+  const [editingTeamName, setEditingTeamName] = useState("")
+
+  const [directoryOpen, setDirectoryOpen] = useState(false)
+  const [fallOnly, setFallOnly] = useState(true)
+
   const isEditable = seasonStatus === "draft"
 
   useEffect(() => {
@@ -67,13 +73,16 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
   }, [initialTeams])
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchData(fallOnly)
+  }, [fallOnly])
 
-  const fetchData = async () => {
+  const fetchData = async (filterFall: boolean) => {
     try {
+      const teamsUrl = filterFall
+        ? "/api/bash/admin/teams?seasonType=fall"
+        : "/api/bash/admin/teams"
       const [teamsRes, franchisesRes] = await Promise.all([
-        fetch("/api/bash/admin/teams"),
+        fetch(teamsUrl),
         fetch("/api/bash/admin/franchises"),
       ])
       if (teamsRes.ok) {
@@ -210,6 +219,43 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
       setIsSavingFranchises(false)
     }
   }
+  const renameTeam = async (slug: string) => {
+    const trimmed = editingTeamName.trim()
+    if (!trimmed) {
+      setEditingTeamSlug(null)
+      return
+    }
+    // Skip if unchanged
+    const current = assignedTeams.find(t => t.teamSlug === slug)
+    if (current && current.teamName === trimmed) {
+      setEditingTeamSlug(null)
+      return
+    }
+    try {
+      const res = await fetch(`/api/bash/admin/teams/${slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      if (res.ok) {
+        const updated = assignedTeams.map(t =>
+          t.teamSlug === slug ? { ...t, teamName: trimmed } : t
+        )
+        setAssignedTeams(updated)
+        onTeamsChange?.(updated)
+        // Also update the allTeams list so the global directory stays in sync
+        setAllTeams(prev => prev.map(t => t.slug === slug ? { ...t, name: trimmed } : t))
+        toast.success(`Renamed to ${trimmed}`)
+      } else {
+        const err = await res.json()
+        toast.error(err.error || "Failed to rename team")
+      }
+    } catch {
+      toast.error("Connection error")
+    } finally {
+      setEditingTeamSlug(null)
+    }
+  }
 
 
   const handleCreateTeam = async () => {
@@ -272,8 +318,10 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
   return (
     <>
       <div className="space-y-4">
-        {/* Teams Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Teams Layout */}
+        <div className="flex gap-6">
+          {/* Participating Teams — fills available space */}
+          <div className={`flex-1 min-w-0 transition-all ${directoryOpen && isEditable ? '' : ''}`}>
           {/* Assigned Teams Panel */}
           <Card>
             <CardHeader className="pb-3 border-b">
@@ -353,7 +401,33 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
                             </PopoverContent>
                           </Popover>
                           <TeamLogo slug={team.teamSlug} name={team.teamName} size={24} className="opacity-90 shrink-0" />
-                          <span className="font-medium text-sm truncate">{team.teamName}</span>
+                          {editingTeamSlug === team.teamSlug ? (
+                            <form
+                              className="flex items-center gap-1 min-w-0"
+                              onSubmit={(e) => { e.preventDefault(); renameTeam(team.teamSlug) }}
+                            >
+                              <Input
+                                autoFocus
+                                value={editingTeamName}
+                                onChange={(e) => setEditingTeamName(e.target.value)}
+                                onBlur={() => renameTeam(team.teamSlug)}
+                                onKeyDown={(e) => { if (e.key === 'Escape') setEditingTeamSlug(null) }}
+                                className="h-6 text-sm font-medium px-1.5 py-0 w-[160px]"
+                              />
+                              <Button type="submit" variant="ghost" size="icon" className="h-6 w-6 text-primary">
+                                <Check className="h-3 w-3" />
+                              </Button>
+                            </form>
+                          ) : (
+                            <span
+                              className="font-medium text-sm truncate group/name inline-flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors"
+                              onClick={() => { setEditingTeamSlug(team.teamSlug); setEditingTeamName(team.teamName) }}
+                              title="Click to rename"
+                            >
+                              {team.teamName}
+                              <Pencil className="h-3 w-3 opacity-0 group-hover/name:opacity-60 transition-opacity" />
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Select
@@ -405,9 +479,39 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
               </div>
             </CardContent>
           </Card>
+          </div>
 
-          {/* Available Global Teams Panel */}
+          {/* Toggle button for directory panel */}
           {isEditable && (
+            <div className="flex items-start pt-2">
+              {directoryOpen ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                  onClick={() => setDirectoryOpen(false)}
+                  title="Collapse directory"
+                >
+                  <PanelRightClose className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs gap-1.5 text-muted-foreground hover:text-primary"
+                  onClick={() => setDirectoryOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Assign Teams
+                  <PanelRightOpen className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Available Global Teams Panel — collapsible */}
+          {isEditable && directoryOpen && (
+            <div className="w-[400px] shrink-0 transition-all">
             <Card className="bg-muted/30 border-dashed">
               <CardHeader className="pb-3 border-b border-dashed">
                 <div className="flex items-center justify-between">
@@ -419,8 +523,8 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
                 <CardDescription>
                   Assign teams to this season. If a team doesn&apos;t exist, please create one.
                 </CardDescription>
-                <div className="pt-2">
-                  <div className="relative">
+                <div className="pt-2 flex gap-2">
+                  <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
                       placeholder="Filter available teams..." 
@@ -429,6 +533,16 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
                       onChange={e => setSearch(e.target.value)}
                     />
                   </div>
+                  <Button
+                    variant={fallOnly ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs shrink-0 gap-1"
+                    onClick={() => { setIsLoading(true); setFallOnly(prev => !prev) }}
+                    title={fallOnly ? "Showing fall league teams only" : "Showing all teams"}
+                  >
+                    <Leaf className="h-3 w-3" />
+                    Fall
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="pt-4 h-[400px] overflow-y-auto pr-2">
@@ -467,6 +581,7 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
                 )}
               </CardContent>
             </Card>
+            </div>
           )}
         </div>
       </div>
@@ -476,6 +591,10 @@ export function SeasonTeamsTab({ seasonId, seasonStatus, initialTeams, onTeamsCh
           <DialogHeader>
             <DialogTitle>Create New Team</DialogTitle>
           </DialogHeader>
+          <div className="flex items-start gap-2 p-2.5 bg-amber-50 text-amber-800 text-xs rounded-md border border-amber-200">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>Team name IDs are <strong>permanent</strong> and visible across the site. Only create a team once you have the final/near final name. You do not need teams entered here to experiment with the schedule tab/wizard.</span>
+          </div>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Team Name</Label>

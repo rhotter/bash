@@ -486,7 +486,7 @@ export async function GET(
         WHERE player_id = ${player.id}
         LIMIT 1
       `),
-      // Exhibition/tryout skater game log
+      // Exhibition skater game log
       rawSql(sql`
         SELECT
           pgs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score, g.is_overtime,
@@ -495,13 +495,13 @@ export async function GET(
           pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim,
           g.game_type
         FROM player_game_stats pgs
-        JOIN games g ON pgs.game_id = g.id AND g.game_type IN ('exhibition', 'tryout')
+        JOIN games g ON pgs.game_id = g.id AND g.game_type = 'exhibition'
         LEFT JOIN teams ht ON g.home_team = ht.slug
         LEFT JOIN teams awt ON g.away_team = awt.slug
         WHERE pgs.player_id = ${player.id}
         ORDER BY g.date DESC
       `),
-      // Exhibition/tryout goalie game log
+      // Exhibition goalie game log
       rawSql(sql`
         SELECT
           ggs.game_id, g.date, g.home_team, g.away_team, g.home_score, g.away_score,
@@ -510,7 +510,7 @@ export async function GET(
           ggs.shutouts, ggs.goalie_assists, ggs.result,
           g.game_type
         FROM goalie_game_stats ggs
-        JOIN games g ON ggs.game_id = g.id AND g.game_type IN ('exhibition', 'tryout')
+        JOIN games g ON ggs.game_id = g.id AND g.game_type = 'exhibition'
         LEFT JOIN teams ht ON g.home_team = ht.slug
         LEFT JOIN teams awt ON g.away_team = awt.slug
         WHERE ggs.player_id = ${player.id}
@@ -673,7 +673,7 @@ export async function GET(
       }
     }
 
-    // Populate exhibition/tryout game logs
+    // Populate exhibition game logs
     exhibitionGames = exhSkaterGameRows.map((r) => {
       const isHome = player.team_slug ? r.home_team === player.team_slug : true
       const teamScore = isHome ? r.home_score : r.away_score
