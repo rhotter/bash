@@ -88,16 +88,20 @@ export function SiteBanner() {
       dismissKey: `bash-draft-banner-dismissed-${draftSeasonSlug}-${draftStatus?.status ?? ""}`,
       label: isLive
         ? "BASH Draft is LIVE — Watch the picks unfold"
-        : "Announcing BASH's new Live Draft tool.",
+        : "Announcing BASH's New Live Draft Tool! Live @7pm",
       href: `/draft/${draftSeasonSlug}`,
       variant: isLive ? "live" : "default",
       isActive: draftActive && !!draftSeasonSlug,
       hideOnPaths: ["/admin", "/draft"],
       suffix: !isLive && draftStatus?.draftDate ? (() => {
-        const daysUntil = Math.max(0, Math.ceil((new Date(draftStatus.draftDate).getTime() - Date.now()) / 86400000))
+        const draftDate = new Date(draftStatus.draftDate)
+        const now = new Date()
+        const isSameDay = now.toDateString() === draftDate.toDateString()
+        const daysUntil = isSameDay ? 0 : Math.max(0, Math.ceil((draftDate.getTime() - now.getTime()) / 86400000))
+        if (daysUntil === 0) return null
         return (
           <span className="text-muted-foreground/70">
-            {" · "}{daysUntil === 0 ? "Live today" : <>Live in <span className="tabular-nums">{daysUntil}</span> day{daysUntil === 1 ? "" : "s"}</>}
+            {" · "}Live in <span className="tabular-nums">{daysUntil}</span> day{daysUntil === 1 ? "" : "s"}
           </span>
         )
       })() : undefined,
