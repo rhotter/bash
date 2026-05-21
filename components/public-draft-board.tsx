@@ -457,7 +457,8 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
     const draftDate = draft.draftDate ? new Date(draft.draftDate) : null
     const now = mounted ? new Date() : (draftDate ?? new Date())
     const diffMs = draftDate ? draftDate.getTime() - now.getTime() : 0
-    const daysUntil = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+    const isSameDay = draftDate && now.toDateString() === draftDate.toDateString()
+    const daysUntil = isSameDay ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
 
     // Build Google Calendar URL
     const calendarUrl = draftDate ? (() => {
@@ -563,11 +564,21 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
               Participating Teams
             </h2>
             {teams.length > 0 ? (
-              <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-4">
+              <div 
+                className="grid items-start justify-items-center gap-x-2 sm:gap-x-4 md:gap-x-6 max-w-3xl mx-auto w-full"
+                style={{ gridTemplateColumns: `repeat(${teams.length}, minmax(0, 1fr))` }}
+              >
                 {teams.map((team) => (
-                  <div key={team.teamSlug} className="flex flex-col items-center gap-1.5 w-28">
-                    <TeamLogo slug={team.teamSlug} name={team.teamName} size={96} />
-                    <span className="text-[11px] font-medium text-center leading-tight">{team.teamName}</span>
+                  <div key={team.teamSlug} className="flex flex-col items-center gap-1.5 w-full">
+                    <TeamLogo 
+                      slug={team.teamSlug} 
+                      name={team.teamName} 
+                      size={96} 
+                      className="w-12 h-12 sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain" 
+                    />
+                    <span className="text-[10px] sm:text-[11px] font-medium text-center leading-tight break-words max-w-full">
+                      {team.teamName}
+                    </span>
                   </div>
                 ))}
               </div>
