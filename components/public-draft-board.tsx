@@ -451,14 +451,33 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
 
   // Mounted guard for client-only date computations (avoids hydration mismatch)
   const [mounted, setMounted] = useState(false)
+  const [now, setNow] = useState(() => new Date())
   useEffect(() => { setMounted(true) }, [])
+
+  // Live countdown tick — update every second when < 24h away
+  useEffect(() => {
+    if (!mounted) return
+    const draftDate = draft.draftDate ? new Date(draft.draftDate) : null
+    if (!draftDate) return
+    const diffMs = draftDate.getTime() - Date.now()
+    if (diffMs <= 0 || diffMs > 24 * 60 * 60 * 1000) return
+    const interval = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(interval)
+  }, [mounted, draft.draftDate])
 
   if (draft.status === "published") {
     const draftDate = draft.draftDate ? new Date(draft.draftDate) : null
-    const now = mounted ? new Date() : (draftDate ?? new Date())
-    const diffMs = draftDate ? draftDate.getTime() - now.getTime() : 0
-    const isSameDay = draftDate && now.toDateString() === draftDate.toDateString()
+    const currentTime = mounted ? now : (draftDate ?? new Date())
+    const diffMs = draftDate ? draftDate.getTime() - currentTime.getTime() : 0
+    const isUnder24h = diffMs > 0 && diffMs <= 24 * 60 * 60 * 1000
+    const isPast = diffMs <= 0
+    const isSameDay = draftDate && currentTime.toDateString() === draftDate.toDateString()
     const daysUntil = isSameDay ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
+
+    // HH:MM:SS for < 24h countdown
+    const countdownH = Math.floor(diffMs / (1000 * 60 * 60))
+    const countdownM = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+    const countdownS = Math.floor((diffMs % (1000 * 60)) / 1000)
 
     // Build Google Calendar URL
     const calendarUrl = draftDate ? (() => {
@@ -508,12 +527,29 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
           {/* Countdown */}
           {draftDate && (
             <div className="space-y-1">
-              <div className="text-6xl sm:text-7xl font-bold tabular-nums text-primary">
-                {mounted ? daysUntil : "-"}
-              </div>
-              <div className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-                {mounted && daysUntil === 1 ? "day" : "days"} until draft day
-              </div>
+              {!mounted ? (
+                <div className="text-6xl sm:text-7xl font-bold tabular-nums text-primary">-</div>
+              ) : isPast ? (
+                <div className="text-4xl sm:text-5xl font-bold text-primary">Draft Day! 🏒</div>
+              ) : isUnder24h ? (
+                <>
+                  <div className="text-6xl sm:text-7xl font-bold tabular-nums text-primary">
+                    {String(countdownH).padStart(2, "0")}:{String(countdownM).padStart(2, "0")}:{String(countdownS).padStart(2, "0")}
+                  </div>
+                  <div className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+                    until draft
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-6xl sm:text-7xl font-bold tabular-nums text-primary">
+                    {daysUntil}
+                  </div>
+                  <div className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+                    {daysUntil === 1 ? "day" : "days"} until draft day
+                  </div>
+                </>
+              )}
             </div>
           )}
 
