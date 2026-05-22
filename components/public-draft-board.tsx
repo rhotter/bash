@@ -1036,7 +1036,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                         {teams.map((team) => (
                           <th
                             key={team.teamSlug}
-                            className="text-left font-medium py-2.5 px-2 align-bottom normal-case tracking-tight border-b border-border/50 border-l border-border/20"
+                            className="text-left font-medium py-2.5 px-3 align-bottom normal-case tracking-tight border-b border-border/50 border-l border-border/20"
                           >
                             <div className="flex items-center gap-1.5">
                               <TeamLogo slug={team.teamSlug} name={team.teamName} size={20} className="shrink-0" />
@@ -1067,7 +1067,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                             const pick = boardGrid[round]?.[team.teamSlug]
                             if (!pick) {
                               return (
-                                <td key={team.teamSlug} className="px-2 py-2 text-muted-foreground/30 text-center border-b border-border/20 border-l border-border/20">—</td>
+                                <td key={team.teamSlug} className="px-3 py-2 text-muted-foreground/30 text-center border-b border-border/20 border-l border-border/20">—</td>
                               )
                             }
                             const isTradedSlot = pick.teamSlug !== pick.originalTeamSlug
@@ -1078,7 +1078,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                             const isRookie = meta?.isRookie === true
 
                             return (
-                              <td key={team.teamSlug} className="px-2 py-2 align-middle border-b border-border/20 border-l border-border/20">
+                              <td key={team.teamSlug} className="px-3 py-2 align-middle border-b border-border/20 border-l border-border/20">
                                 {pick.playerId ? (
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <button
