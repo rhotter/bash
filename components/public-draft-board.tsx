@@ -668,13 +668,9 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-y-1">
             <div className="flex items-center gap-2">
-              {!isCompleted && (
-                <>
-                  <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
-                  <span className="text-lg font-extrabold tracking-tight">BASH</span>
-                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
-                </>
-              )}
+              <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
+              <span className="text-lg font-extrabold tracking-tight">BASH</span>
+              <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
             </div>
             <div className="flex items-center gap-2">
               {isLive && (
@@ -684,11 +680,12 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                   <Badge className="bg-green-500 text-white animate-pulse text-[10px] px-2 py-0.5">LIVE</Badge>
                 )
               )}
-              {!isCompleted && (
-                <span className="text-xs text-muted-foreground tabular-nums font-medium">
-                  {madePicks}/{totalPicks} picks ({progress}%)
-                </span>
+              {isCompleted && (
+                <Badge className="bg-green-600 text-white text-[10px] px-2 py-0.5">COMPLETE</Badge>
               )}
+              <span className="text-xs text-muted-foreground tabular-nums font-medium">
+                {madePicks}/{totalPicks} picks ({progress}%)
+              </span>
               {isLive && (
                 <div className="flex gap-1.5">
                   <Button
@@ -717,7 +714,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
             </div>
           </div>
           {/* Orange accent separator */}
-          {!isCompleted && <div className="w-full h-1 bg-primary rounded-full" />}
+          <div className="w-full h-1 bg-primary rounded-full" />
           <h1 className="text-xl font-bold tracking-tight">{season.name} Draft{isCompleted ? " Results" : ""}</h1>
         </div>
 
