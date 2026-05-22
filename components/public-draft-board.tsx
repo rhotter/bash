@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import Image from "next/image"
+import Link from "next/link"
 import useSWR from "swr"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Search, Maximize2, Minimize2, Clock, Users, ArrowUpDown, ArrowUp, ArrowDown, Volume2, VolumeX, CalendarPlus, Layers, X, ChevronsRight, Eye, EyeOff } from "lucide-react"
+import { Search, Clock, Users, Volume2, VolumeX, CalendarPlus, Layers, X, ChevronsRight, Eye, EyeOff, Trophy, LayoutList, LayoutGrid } from "lucide-react"
 import { PlayerCardModal } from "@/components/player-card-modal"
 import { TeamLogo } from "@/components/team-logo"
 
@@ -101,14 +103,12 @@ interface PickAnnouncement {
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardProps) {
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [playerSearch, setPlayerSearch] = useState("")
   const [positionFilter, setPositionFilter] = useState<string[]>([])
   const [sidebarTab, setSidebarTab] = useState<"recent" | "available">("recent")
   const [mobileTab, setMobileTab] = useState(() =>
     (initialData.draft.status === "completed" || initialData.draft.status === "archived") ? "byteam" : "board"
   )
-  const containerRef = useRef<HTMLDivElement>(null)
 
   // Player card modal state
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null)
@@ -195,7 +195,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
     }
   )
 
-  const { draft, season, teams, picks, pool, trades, captainPlayerIds } = (data?.draft ? data : initialData)
+  const { draft, season, teams, picks, pool, captainPlayerIds } = (data?.draft ? data : initialData)
 
   // Captain set for badge rendering
   const captainSet = useMemo(() => {
@@ -387,24 +387,6 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
     prevPickCountRef.current = currentCount
   }, [picks, teams, draft.status, playChime])
 
-  // ─── Fullscreen Toggle ─────────────────────────────────────────────────
-
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen()
-      setIsFullscreen(true)
-    } else {
-      document.exitFullscreen()
-      setIsFullscreen(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener("fullscreenchange", handler)
-    return () => document.removeEventListener("fullscreenchange", handler)
-  }, [])
-
   // ─── Completion Stats ──────────────────────────────────────────────────
 
   const totalSlots = picks.length
@@ -412,38 +394,6 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
   // Use pool size as denominator when pool is smaller than total slots (not enough players for all rounds)
   const totalPicks = pool.length > 0 && pool.length < totalSlots ? pool.length : totalSlots
   const progress = totalPicks > 0 ? Math.round((madePicks / totalPicks) * 100) : 0
-
-  // ─── Team Roster Sort (completed view) ──────────────────────────────────
-  type TeamSortKey = "pick" | "skill" | "pos" | "playoffs"
-  const [teamSortKey, setTeamSortKey] = useState<TeamSortKey>("pick")
-  const [teamSortDir, setTeamSortDir] = useState<"asc" | "desc">("asc")
-
-  const toggleTeamSort = useCallback((key: TeamSortKey) => {
-    if (teamSortKey === key) {
-      setTeamSortDir((d) => (d === "asc" ? "desc" : "asc"))
-    } else {
-      setTeamSortKey(key)
-      setTeamSortDir("asc")
-    }
-  }, [teamSortKey])
-
-  const sortTeamPicks = useCallback((teamPicks: typeof picks) => {
-    return [...teamPicks].sort((a, b) => {
-      const poolA = a.playerId ? pool.find((p) => p.playerId === a.playerId) : null
-      const poolB = b.playerId ? pool.find((p) => p.playerId === b.playerId) : null
-      const metaA = poolA?.registrationMeta as Record<string, unknown> | null
-      const metaB = poolB?.registrationMeta as Record<string, unknown> | null
-      const cmp =
-        teamSortKey === "skill"
-          ? ((metaA?.skillLevel as string) || "").localeCompare((metaB?.skillLevel as string) || "")
-          : teamSortKey === "pos"
-            ? ((metaA?.positions as string) || "").localeCompare((metaB?.positions as string) || "")
-            : teamSortKey === "playoffs"
-              ? ((metaA?.playoffAvail as string) || "").localeCompare((metaB?.playoffAvail as string) || "")
-              : a.pickNumber - b.pickNumber
-      return teamSortDir === "desc" ? -cmp : cmp
-    })
-  }, [teamSortKey, teamSortDir, pool])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PRE-DRAFT VIEW
@@ -661,65 +611,72 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
   const isCompleted = draft.status === "completed" || draft.status === "archived"
 
   return (
-    <div ref={containerRef} className={`min-h-screen bg-background ${isFullscreen ? "p-4" : ""}`}>
-      <div className={`${isFullscreen ? "" : "mx-auto px-4 py-6"} space-y-4`}>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-6xl px-4 py-6 space-y-4">
 
         {/* Branded Header */}
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-y-1">
-            <div className="flex items-center gap-2">
-              {!isCompleted && (
-                <>
+          {isCompleted ? (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h1 className="text-2xl font-black tracking-tight">{season.name} Draft Results</h1>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-[10px] px-2 py-0.5 gap-1 font-semibold">
+                  <Trophy className="h-3 w-3" />
+                  Complete
+                </Badge>
+                <span className="text-xs text-muted-foreground tabular-nums font-medium">
+                  {madePicks}/{totalPicks} picks ({progress}%)
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-y-1">
+                <div className="flex items-center gap-2">
                   <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
                   <span className="text-lg font-extrabold tracking-tight">BASH</span>
                   <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {isLive && (
-                !draft.timerRunning && timerRemaining > 0 && timerRemaining < (draft.timerCountdown ?? draft.timerSeconds) ? (
-                  <Badge className="bg-amber-500 text-white text-[10px] px-2 py-0.5">PAUSED</Badge>
-                ) : (
-                  <Badge className="bg-green-500 text-white animate-pulse text-[10px] px-2 py-0.5">LIVE</Badge>
-                )
-              )}
-              {isCompleted && (
-                <Badge className="bg-green-600 text-white text-[10px] px-2 py-0.5">COMPLETE</Badge>
-              )}
-              <span className="text-xs text-muted-foreground tabular-nums font-medium">
-                {madePicks}/{totalPicks} picks ({progress}%)
-              </span>
-              {isLive && (
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleAnimationsMute}
-                    className="h-8 w-8"
-                    title={isAnimationsMuted ? "Show pick animations" : "Hide pick animations"}
-                  >
-                    {isAnimationsMuted ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleMute}
-                    className="h-8 w-8"
-                    title={isMuted ? "Unmute pick sound" : "Mute pick sound"}
-                  >
-                    {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                  </Button>
                 </div>
-              )}
-              <Button variant="outline" size="icon" onClick={toggleFullscreen} className="hidden md:flex h-8 w-8">
-                {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
-          </div>
-          {/* Orange accent separator */}
-          <div className="w-full h-1 bg-primary rounded-full" />
-          <h1 className="text-xl font-bold tracking-tight">{season.name} Draft{isCompleted ? " Results" : ""}</h1>
+                <div className="flex items-center gap-2">
+                  {isLive && (
+                    !draft.timerRunning && timerRemaining > 0 && timerRemaining < (draft.timerCountdown ?? draft.timerSeconds) ? (
+                      <Badge className="bg-amber-500 text-white text-[10px] px-2 py-0.5">PAUSED</Badge>
+                    ) : (
+                      <Badge className="bg-green-500 text-white animate-pulse text-[10px] px-2 py-0.5">LIVE</Badge>
+                    )
+                  )}
+                  <span className="text-xs text-muted-foreground tabular-nums font-medium">
+                    {madePicks}/{totalPicks} picks ({progress}%)
+                  </span>
+                  {isLive && (
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={toggleAnimationsMute}
+                        className="h-8 w-8"
+                        title={isAnimationsMuted ? "Show pick animations" : "Hide pick animations"}
+                      >
+                        {isAnimationsMuted ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={toggleMute}
+                        className="h-8 w-8"
+                        title={isMuted ? "Unmute pick sound" : "Mute pick sound"}
+                      >
+                        {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Orange accent separator */}
+              <div className="w-full h-1 bg-primary rounded-full" />
+              <h1 className="text-xl font-bold tracking-tight">{season.name} Draft</h1>
+            </>
+          )}
         </div>
 
         {/* Main content + Desktop sidebar grid */}
@@ -934,208 +891,220 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
 
         {/* Tabs: Board + Available Players / By Team */}
         <Tabs id="draft-board-tabs" value={mobileTab} onValueChange={setMobileTab}>
-          <TabsList className={isCompleted ? "w-full md:w-auto" : "md:hidden w-full"}>
-            {isCompleted && (
-              <TabsTrigger value="byteam" className="flex-1 md:flex-none">By Team</TabsTrigger>
-            )}
-            <TabsTrigger value="board" className="flex-1 md:flex-none">{isCompleted ? "Full Board" : "Draft Board"}</TabsTrigger>
-            {!isCompleted && (
-              <>
-                <TabsTrigger value="players" className="flex-1 md:flex-none">Available ({availablePlayers.length})</TabsTrigger>
-                <TabsTrigger value="recent" className="flex-1 md:hidden">Recent ({recentPicks.length})</TabsTrigger>
-              </>
-            )}
-          </TabsList>
+          {isCompleted ? (
+            /* View toggle: By Team / Full Board */
+            <div
+              role="tablist"
+              aria-label="Draft view"
+              className="inline-flex items-center p-1 rounded-lg bg-muted/60 border border-border/40 mb-4"
+            >
+              <button
+                role="tab"
+                aria-selected={mobileTab === "byteam"}
+                onClick={() => setMobileTab("byteam")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+                  mobileTab === "byteam"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutList className="h-3.5 w-3.5" />
+                By Team
+              </button>
+              <button
+                role="tab"
+                aria-selected={mobileTab === "board"}
+                onClick={() => setMobileTab("board")}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+                  mobileTab === "board"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Full Board
+              </button>
+            </div>
+          ) : (
+            <TabsList className="md:hidden w-full">
+              <TabsTrigger value="board" className="flex-1 md:flex-none">Draft Board</TabsTrigger>
+              <TabsTrigger value="players" className="flex-1 md:flex-none">Available ({availablePlayers.length})</TabsTrigger>
+              <TabsTrigger value="recent" className="flex-1 md:hidden">Recent ({recentPicks.length})</TabsTrigger>
+            </TabsList>
+          )}
 
           <div className="grid grid-cols-1 gap-4">
 
-            {/* By Team View (completed only) */}
+            {/* By Team View (completed only) — flat sections, no Cards, site-style */}
             {isCompleted && (
               <TabsContent value="byteam" className="mt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                   {teams.map((team) => {
-                    const teamPicks = sortTeamPicks(
-                      picks.filter((p) => p.teamSlug === team.teamSlug && p.playerId !== null)
-                    )
-                    const SortHeader = ({ label, sortKey, className }: { label: string; sortKey: TeamSortKey; className?: string }) => (
-                      <button
-                        onClick={() => toggleTeamSort(sortKey)}
-                        className={`flex items-center gap-0.5 font-semibold text-muted-foreground hover:text-foreground transition-colors ${className || ""}`}
-                      >
-                        {label}
-                        {teamSortKey === sortKey ? (
-                          teamSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                        ) : (
-                          <ArrowUpDown className="w-3 h-3 opacity-40" />
-                        )}
-                      </button>
-                    )
+                    const teamPicks = picks
+                      .filter((p) => p.teamSlug === team.teamSlug && p.playerId !== null)
+                      .sort((a, b) => a.pickNumber - b.pickNumber)
+
                     return (
-                      <Card key={team.teamSlug} className="overflow-hidden">
-                        <div
-                          className="h-[3px] w-full"
-                          style={{ backgroundColor: team.color || "#94a3b8" }}
-                        />
-                        <CardHeader className="pb-2 pt-3">
-                          <CardTitle className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full shrink-0"
-                                style={{ backgroundColor: team.color || "#94a3b8" }}
-                              />
-                              <span className="font-semibold">{team.teamName}</span>
-                            </div>
-                            <Badge variant="secondary" className="text-[10px]">{teamPicks.length} picks</Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0 pb-3">
-                          {/* Table header */}
-                          <div className="flex items-center gap-2 py-1 px-2 text-[10px] border-b border-border mb-0.5">
-                            <span className="w-6 shrink-0 text-right font-semibold text-muted-foreground">#</span>
-                            <span className="flex-1 font-semibold text-muted-foreground">Player</span>
-                            <SortHeader label="Skill" sortKey="skill" className="hidden md:flex w-14 md:w-20 justify-center text-[10px]" />
-                            <SortHeader label="Pos" sortKey="pos" className="w-14 justify-center text-[10px]" />
-                            <SortHeader label="Playoffs?" sortKey="playoffs" className="hidden md:flex w-14 justify-center text-[10px]" />
-                            <span className="w-10 shrink-0" />
-                          </div>
-                          <div className="space-y-0">
-                            {teamPicks.map((pick) => {
+                      <div key={team.teamSlug}>
+                        {/* Team header */}
+                        <div className="flex items-center gap-2.5 mb-2 pb-1.5 border-b border-border/40">
+                          <TeamLogo slug={team.teamSlug} name={team.teamName} size={28} className="shrink-0" />
+                          <Link
+                            href={`/team/${team.teamSlug}`}
+                            className="text-sm font-bold tracking-tight hover:text-primary transition-colors truncate"
+                          >
+                            {team.teamName}
+                          </Link>
+                          <span className="ml-auto text-[10px] text-muted-foreground/50 tabular-nums">
+                            {teamPicks.length} picks
+                          </span>
+                        </div>
+
+                        {/* Roster rows */}
+                        <div className="flex flex-col">
+                          {teamPicks.length === 0 ? (
+                            <p className="text-[11px] text-muted-foreground/50 px-2 py-3">No picks made.</p>
+                          ) : (
+                            teamPicks.map((pick, i) => {
                               const playerInPool = pick.playerId ? pool.find((p) => p.playerId === pick.playerId) : null
                               const meta = playerInPool?.registrationMeta as Record<string, unknown> | null
+                              const isCaptain = pick.playerId != null && captainSet.has(pick.playerId)
                               const isRookie = meta?.isRookie === true
-                              const isGoalie = typeof meta?.positions === "string" && (meta.positions as string).includes("G")
-                              const skillLevel = (meta?.skillLevel as string) || "—"
-                              const position = (meta?.positions as string) || "—"
-                              const playoffAvail = (meta?.playoffAvail as string) || "—"
-                              // Shorten playoff value for display
-                              const playoffShort = playoffAvail.toLowerCase().startsWith("yes") ? "Y" : playoffAvail.toLowerCase().startsWith("no") ? "N" : playoffAvail === "—" ? "—" : "?"
+                              const position = (meta?.positions as string) || ""
+
                               return (
                                 <div
                                   key={pick.id}
-                                  className={`flex items-center gap-2 py-1.5 px-2 text-xs rounded-sm cursor-pointer hover:bg-muted/50 transition-colors ${pick.isKeeper ? "bg-amber-50 dark:bg-amber-950/20" : ""}`}
                                   onClick={() => pick.playerId && openPlayerCard(pick.playerId)}
+                                  className={cn(
+                                    "group flex items-baseline gap-2 sm:gap-3 px-2 py-1.5 rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
+                                    i % 2 === 0 && "bg-card/15"
+                                  )}
                                 >
-                                  <span className="text-muted-foreground font-mono tabular-nums w-6 text-right shrink-0">#{pick.pickNumber}</span>
-                                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                                    <span className="font-medium truncate hover:underline hover:text-primary transition-colors">{pick.playerName}</span>
-                                    {pick.playerId && captainSet.has(pick.playerId) && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0 border-blue-400 text-blue-600">C</Badge>
+                                  <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-7 text-right">#{pick.pickNumber}</span>
+                                  <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                                    <span className="truncate text-xs font-semibold group-hover:text-primary transition-colors">
+                                      {pick.playerName}
+                                    </span>
+                                    {isCaptain && (
+                                      <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-primary/50 text-[9px] font-bold uppercase tracking-wider text-primary leading-none">C</span>
+                                    )}
+                                    {pick.isKeeper && !isCaptain && (
+                                      <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-border text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">K</span>
                                     )}
                                     {isRookie && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0 border-green-400 text-green-600">R</Badge>
+                                      <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-border text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">R</span>
                                     )}
-                                  </div>
-                                  <span title={skillLevel} className="hidden md:inline w-14 md:w-20 text-center text-[10px] text-muted-foreground font-mono truncate cursor-default">{skillLevel}</span>
-                                  <span title={position} className="w-14 text-center text-[10px] text-muted-foreground font-mono truncate cursor-default">{position}</span>
-                                  <span title={playoffAvail} className={`hidden md:inline w-14 text-center text-[10px] font-mono cursor-default ${playoffShort === "Y" ? "text-green-600" : playoffShort === "N" ? "text-red-500" : "text-muted-foreground"}`}>{playoffShort}</span>
-                                  <div className="flex flex-nowrap gap-0.5 shrink-0 w-10 justify-end">
-                                    {pick.isKeeper && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-400 text-amber-600">K</Badge>
-                                    )}
-                                    {isGoalie && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-purple-400 text-purple-600">G</Badge>
-                                    )}
-                                  </div>
+                                  </span>
+                                  {position && (
+                                    <span className="shrink-0 text-[10px] font-medium text-muted-foreground tabular-nums w-12 sm:w-16 text-right truncate" title={position}>
+                                      {position}
+                                    </span>
+                                  )}
                                 </div>
                               )
-                            })}
-                            {teamPicks.length === 0 && (
-                              <div className="text-center py-4 text-xs text-muted-foreground">No picks yet</div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+                            })
+                          )}
+                        </div>
+                      </div>
                     )
                   })}
+                </div>
+
+                {/* Legend — matches the standings/stats footer-note pattern */}
+                <div className="mt-4 pt-3 border-t border-border/20">
+                  <p className="text-[10px] text-muted-foreground/50">
+                    C=Captain, K=Keeper, R=Rookie
+                  </p>
                 </div>
               </TabsContent>
             )}
 
             {/* Full Board */}
             <TabsContent value="board" className={`mt-0 ${!isCompleted ? "md:!block" : ""}`}>
-              <Card>
-                <CardContent className="p-0 overflow-x-auto">
-                  <table className="w-full text-xs md:table-fixed">
+              {isCompleted ? (
+                /* Flat grid table, site-style with visible cell structure */
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <table className="w-full min-w-[720px] text-[11px] table-fixed border-collapse">
                     <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-2 py-2 text-left font-bold text-[10px] uppercase tracking-[0.06em] text-muted-foreground w-10 sticky left-0 bg-muted z-20" style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.1)' }}>Rd</th>
+                      <tr className="text-muted-foreground/50 text-[9px] uppercase tracking-wider">
+                        <th className="text-center font-medium py-2.5 sticky left-0 z-10 bg-background pl-4 sm:pl-0 w-12 border-b border-border/50 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none">
+                          Rd
+                        </th>
                         {teams.map((team) => (
                           <th
                             key={team.teamSlug}
-                            className="px-2 py-2 text-left font-semibold min-w-[120px] md:min-w-0 border-t-[3px] overflow-hidden"
-                            style={{ borderTopColor: team.color || "#94a3b8" }}
+                            className="text-left font-medium py-2.5 px-2 align-bottom normal-case tracking-tight border-b border-border/50 border-l border-border/20"
                           >
                             <div className="flex items-center gap-1.5">
-                              <TeamLogo slug={team.teamSlug} name={team.teamName} size={18} />
-                              <span className="truncate">{team.teamName}</span>
+                              <TeamLogo slug={team.teamSlug} name={team.teamName} size={20} className="shrink-0" />
+                              <Link
+                                href={`/team/${team.teamSlug}`}
+                                className="text-[11px] font-semibold text-foreground hover:text-primary transition-colors truncate"
+                              >
+                                {team.teamName}
+                              </Link>
                             </div>
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({ length: draft.rounds }, (_, i) => i + 1).map((round) => (
-                        <tr key={round} className="border-b last:border-b-0 hover:bg-muted/20">
-                          <td className="px-2 py-1.5 font-mono font-medium text-muted-foreground sticky left-0 bg-background z-20 tabular-nums" style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.1)' }}>
+                      {Array.from({ length: draft.rounds }, (_, i) => i + 1).map((round, rIdx) => (
+                        <tr
+                          key={round}
+                          className={cn(
+                            "group hover:bg-muted/50",
+                            rIdx % 2 === 0 && "bg-card/15"
+                          )}
+                        >
+                          <td className="text-center tabular-nums py-2 px-3 text-muted-foreground/70 font-medium sticky left-0 z-10 bg-background pl-4 sm:pl-0 group-hover:bg-muted/50 border-b border-border/20 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
                             {round}
                           </td>
                           {teams.map((team) => {
                             const pick = boardGrid[round]?.[team.teamSlug]
                             if (!pick) {
-                              return <td key={team.teamSlug} className="px-2 py-1.5 text-muted-foreground/30">—</td>
+                              return (
+                                <td key={team.teamSlug} className="px-2 py-2 text-muted-foreground/30 text-center border-b border-border/20 border-l border-border/20">—</td>
+                              )
                             }
-
                             const isTradedSlot = pick.teamSlug !== pick.originalTeamSlug
                             const newOwner = isTradedSlot ? teams.find((t) => t.teamSlug === pick.teamSlug) : null
                             const playerInPool = pick.playerId ? pool.find((p) => p.playerId === pick.playerId) : null
-                            const isRookie = playerInPool?.registrationMeta?.isRookie === true
-                            const isGoalie = typeof playerInPool?.registrationMeta?.positions === "string" && playerInPool.registrationMeta.positions.includes("G")
-                            const isOnTheClock = currentPick?.id === pick.id
-                            const isHighlighted = highlightedPickIds.has(pick.id)
+                            const meta = playerInPool?.registrationMeta as Record<string, unknown> | null
+                            const isCaptain = pick.playerId != null && captainSet.has(pick.playerId)
+                            const isRookie = meta?.isRookie === true
 
                             return (
-                              <td
-                                key={team.teamSlug}
-                                className={`px-2 py-1.5 transition-colors duration-1000 ${
-                                  isHighlighted
-                                    ? "bg-amber-100"
-                                    : isOnTheClock
-                                      ? "bg-primary/5 ring-1 ring-primary/20 ring-inset"
-                                      : ""
-                                }`}
-                              >
+                              <td key={team.teamSlug} className="px-2 py-2 align-middle border-b border-border/20 border-l border-border/20">
                                 {pick.playerId ? (
-                                  <div className="flex flex-nowrap items-center gap-1">
+                                  <div className="flex items-center gap-1.5 min-w-0">
                                     <button
-                                      className="truncate max-w-[100px] text-left hover:underline hover:text-primary transition-colors"
+                                      className="truncate text-left text-xs text-foreground hover:text-primary transition-colors min-w-0 cursor-pointer"
                                       onClick={() => pick.playerId && openPlayerCard(pick.playerId)}
-                                    >{formatPlayerName(pick.playerName)}</button>
-                                    {pick.playerId && captainSet.has(pick.playerId) && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0 border-blue-400 text-blue-600">C</Badge>
+                                      title={pick.playerName || undefined}
+                                    >
+                                      {pick.playerName}
+                                    </button>
+                                    {isCaptain && (
+                                      <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-primary/50 text-[9px] font-bold uppercase tracking-wider text-primary leading-none">C</span>
+                                    )}
+                                    {pick.isKeeper && !isCaptain && (
+                                      <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-border text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">K</span>
                                     )}
                                     {isRookie && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-green-400 text-green-600">R</Badge>
+                                      <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-border text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">R</span>
                                     )}
-                                    {pick.isKeeper && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-400 text-amber-600">K</Badge>
-                                    )}
-                                    {isGoalie && (
-                                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-purple-400 text-purple-600">G</Badge>
+                                    {newOwner && (
+                                      <span className="shrink-0 text-[9px] italic text-muted-foreground/50" title={`Acquired via trade from ${pick.originalTeamSlug}`}>↔</span>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-muted-foreground/40">
-                                    {isOnTheClock ? (
-                                      <span className="text-primary/60 text-[10px] font-medium animate-pulse">On the Clock</span>
-                                    ) : isTradedSlot && newOwner ? (
-                                      <span className="text-blue-500 text-[10px]">→ {newOwner.teamName}</span>
-                                    ) : (
-                                      "—"
-                                    )}
+                                  <span className="text-muted-foreground/40 text-[10px]">
+                                    {newOwner ? `→ ${newOwner.teamName}` : "—"}
                                   </span>
-                                )}
-                                {pick.playerId && isTradedSlot && newOwner && (
-                                  <div className="text-[10px] text-blue-500">→ {newOwner.teamName}</div>
                                 )}
                               </td>
                             )
@@ -1144,8 +1113,103 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                       ))}
                     </tbody>
                   </table>
-                </CardContent>
-              </Card>
+                </div>
+              ) : (
+                /* LIVE BOARD — unchanged */
+                <Card>
+                  <CardContent className="p-0 overflow-x-auto">
+                    <table className="w-full text-xs md:table-fixed">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="px-2 py-2 text-left font-bold text-[10px] uppercase tracking-[0.06em] text-muted-foreground w-10 sticky left-0 bg-muted z-20" style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.1)' }}>Rd</th>
+                          {teams.map((team) => (
+                            <th
+                              key={team.teamSlug}
+                              className="px-2 py-2 text-left font-semibold min-w-[120px] md:min-w-0 border-t-[3px] overflow-hidden"
+                              style={{ borderTopColor: team.color || "#94a3b8" }}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <TeamLogo slug={team.teamSlug} name={team.teamName} size={18} />
+                                <span className="truncate">{team.teamName}</span>
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: draft.rounds }, (_, i) => i + 1).map((round) => (
+                          <tr key={round} className="border-b last:border-b-0 hover:bg-muted/20">
+                            <td className="px-2 py-1.5 font-mono font-medium text-muted-foreground sticky left-0 bg-background z-20 tabular-nums" style={{ boxShadow: '2px 0 4px -2px rgba(0,0,0,0.1)' }}>
+                              {round}
+                            </td>
+                            {teams.map((team) => {
+                              const pick = boardGrid[round]?.[team.teamSlug]
+                              if (!pick) {
+                                return <td key={team.teamSlug} className="px-2 py-1.5 text-muted-foreground/30">—</td>
+                              }
+
+                              const isTradedSlot = pick.teamSlug !== pick.originalTeamSlug
+                              const newOwner = isTradedSlot ? teams.find((t) => t.teamSlug === pick.teamSlug) : null
+                              const playerInPool = pick.playerId ? pool.find((p) => p.playerId === pick.playerId) : null
+                              const isRookie = playerInPool?.registrationMeta?.isRookie === true
+                              const isGoalie = typeof playerInPool?.registrationMeta?.positions === "string" && playerInPool.registrationMeta.positions.includes("G")
+                              const isOnTheClock = currentPick?.id === pick.id
+                              const isHighlighted = highlightedPickIds.has(pick.id)
+
+                              return (
+                                <td
+                                  key={team.teamSlug}
+                                  className={`px-2 py-1.5 transition-colors duration-1000 ${
+                                    isHighlighted
+                                      ? "bg-amber-100"
+                                      : isOnTheClock
+                                        ? "bg-primary/5 ring-1 ring-primary/20 ring-inset"
+                                        : ""
+                                  }`}
+                                >
+                                  {pick.playerId ? (
+                                    <div className="flex flex-nowrap items-center gap-1">
+                                      <button
+                                        className="truncate max-w-[100px] text-left hover:underline hover:text-primary transition-colors cursor-pointer"
+                                        onClick={() => pick.playerId && openPlayerCard(pick.playerId)}
+                                      >{formatPlayerName(pick.playerName)}</button>
+                                      {pick.playerId && captainSet.has(pick.playerId) && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0 border-blue-400 text-blue-600">C</Badge>
+                                      )}
+                                      {isRookie && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-green-400 text-green-600">R</Badge>
+                                      )}
+                                      {pick.isKeeper && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-400 text-amber-600">K</Badge>
+                                      )}
+                                      {isGoalie && (
+                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-purple-400 text-purple-600">G</Badge>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground/40">
+                                      {isOnTheClock ? (
+                                        <span className="text-primary/60 text-[10px] font-medium animate-pulse">On the Clock</span>
+                                      ) : isTradedSlot && newOwner ? (
+                                        <span className="text-blue-500 text-[10px]">→ {newOwner.teamName}</span>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </span>
+                                  )}
+                                  {pick.playerId && isTradedSlot && newOwner && (
+                                    <div className="text-[10px] text-blue-500">→ {newOwner.teamName}</div>
+                                  )}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
 

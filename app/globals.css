@@ -125,3 +125,15 @@
   }
 }
 
+/* Prevent layout shift when Radix Dialog opens. `scrollbar-gutter: stable`
+   reserves the scrollbar's space so it never visually disappears; the second
+   rule overrides the `margin-right` compensation that react-remove-scroll-bar
+   injects on lock (higher specificity beats Radix's `!important` rule). */
+html {
+  scrollbar-gutter: stable;
+}
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
