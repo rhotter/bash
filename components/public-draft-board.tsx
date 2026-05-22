@@ -668,9 +668,13 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-y-1">
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
-              <span className="text-lg font-extrabold tracking-tight">BASH</span>
-              <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
+              {!isCompleted && (
+                <>
+                  <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
+                  <span className="text-lg font-extrabold tracking-tight">BASH</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {isLive && (
@@ -680,12 +684,11 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                   <Badge className="bg-green-500 text-white animate-pulse text-[10px] px-2 py-0.5">LIVE</Badge>
                 )
               )}
-              {isCompleted && (
-                <Badge className="bg-green-600 text-white text-[10px] px-2 py-0.5">COMPLETE</Badge>
+              {!isCompleted && (
+                <span className="text-xs text-muted-foreground tabular-nums font-medium">
+                  {madePicks}/{totalPicks} picks ({progress}%)
+                </span>
               )}
-              <span className="text-xs text-muted-foreground tabular-nums font-medium">
-                {madePicks}/{totalPicks} picks ({progress}%)
-              </span>
               {isLive && (
                 <div className="flex gap-1.5">
                   <Button
@@ -714,7 +717,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
             </div>
           </div>
           {/* Orange accent separator */}
-          <div className="w-full h-1 bg-primary rounded-full" />
+          {!isCompleted && <div className="w-full h-1 bg-primary rounded-full" />}
           <h1 className="text-xl font-bold tracking-tight">{season.name} Draft{isCompleted ? " Results" : ""}</h1>
         </div>
 
@@ -926,24 +929,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
           </div>
         )}
 
-        {/* Completed: Summary Stats Row */}
-        {isCompleted && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Total Picks", value: String(madePicks) },
-              { label: "Rounds", value: String(draft.rounds) },
-              { label: "Teams", value: String(teams.length) },
-              { label: trades.length === 1 ? "Trade" : "Trades", value: String(trades.length) },
-            ].map((stat) => (
-              <Card key={stat.label}>
-                <CardContent className="py-2 px-3 md:py-3 md:px-4 text-center">
-                  <div className="text-xl md:text-2xl font-mono font-bold tabular-nums">{stat.value}</div>
-                  <div className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground mt-0.5">{stat.label}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+
 
         {/* Tabs: Board + Available Players / By Team */}
         <Tabs id="draft-board-tabs" value={mobileTab} onValueChange={setMobileTab}>
