@@ -668,9 +668,13 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-y-1">
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
-              <span className="text-lg font-extrabold tracking-tight">BASH</span>
-              <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
+              {!isCompleted && (
+                <>
+                  <Image src="/logo.png" alt="BASH" width={28} height={28} className="shrink-0" />
+                  <span className="text-lg font-extrabold tracking-tight">BASH</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground hidden sm:inline">Draft Board</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {isLive && (
