@@ -27,6 +27,8 @@ const logoMapping: Record<string, string> = {
   "team-canada": "team-canada_1024.png",
   "dolo-minions": "dolo_minions_logo_only_1024.png",
   "lazy-skater-dangle": "lazy_skater_dangle_1024.png",
+  "money-shots": "money_shots_1024.png",
+  "mitch-a-palooza": "mitch_a_palooza_1024.png",
 }
 
 // Season-specific logo overrides (takes priority over default)
