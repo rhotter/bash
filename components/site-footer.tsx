@@ -37,9 +37,6 @@ export function SiteFooter() {
             </Link>
           </div>
         </div>
-        <div className="text-center text-[10px] text-muted-foreground/40">
-          © {new Date().getFullYear()} BASH · Bay Area Street Hockey
-        </div>
       </div>
     </footer>
   )
