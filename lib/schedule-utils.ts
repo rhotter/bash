@@ -110,6 +110,8 @@ export function generateRoundRobin(
         teams.push(pos)
       }
 
+      // Collect matches for this round before appending
+      const roundMatches: RoundRobinSlot[] = []
       for (let match = 0; match < matchesPerRound; match++) {
         const home = teams[match]
         const away = teams[n - 1 - match]
@@ -119,14 +121,24 @@ export function generateRoundRobin(
 
         // Alternate home/away by round for fairness
         if (round % 2 === 0) {
-          allSlots.push({ round: roundNum, home, away })
+          roundMatches.push({ round: roundNum, home, away })
         } else {
-          allSlots.push({ round: roundNum, home: away, away: home })
+          roundMatches.push({ round: roundNum, home: away, away: home })
         }
-        
-        if (maxTotalGames && allSlots.length >= maxTotalGames) {
-          break
-        }
+      }
+
+      // Rotate match ordering so teams cycle through different time slots
+      // each week. Without this, team 0 (fixed in Berger tables) always
+      // lands in match position 0 and gets the earliest time slot every round.
+      // Use cumulative round index (roundNum) so the offset advances across cycles.
+      const offset = (roundNum - 1) % Math.max(1, roundMatches.length)
+      const rotated = offset === 0
+        ? roundMatches
+        : [...roundMatches.slice(offset), ...roundMatches.slice(0, offset)]
+
+      for (const m of rotated) {
+        allSlots.push(m)
+        if (maxTotalGames && allSlots.length >= maxTotalGames) break
       }
       if (maxTotalGames && allSlots.length >= maxTotalGames) break
     }

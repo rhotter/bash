@@ -950,7 +950,9 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                       <div key={team.teamSlug}>
                         {/* Team header */}
                         <div className="flex items-center gap-2.5 mb-2 pb-1.5 border-b border-border/40">
-                          <TeamLogo slug={team.teamSlug} name={team.teamName} size={28} className="shrink-0" />
+                          <div className="shrink-0 w-7 h-7 md:w-[72px] md:h-[72px]">
+                            <TeamLogo slug={team.teamSlug} name={team.teamName} size={72} className="!w-full !h-full object-contain" />
+                          </div>
                           <Link
                             href={`/team/${team.teamSlug}`}
                             className="text-sm font-bold tracking-tight hover:text-primary transition-colors truncate"
