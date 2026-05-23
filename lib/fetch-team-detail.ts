@@ -68,7 +68,17 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
         AND g.game_type = 'regular'
-      ORDER BY g.date DESC, CASE WHEN g.time = 'TBD' THEN '23:59'::time ELSE to_timestamp(CASE WHEN g.time LIKE '%a' THEN replace(g.time, 'a', ' AM') ELSE replace(g.time, 'p', ' PM') END, 'HH:MI AM')::time END DESC
+      ORDER BY g.date DESC,
+        CASE
+          WHEN g.time = 'TBD' THEN '23:59'::time
+          WHEN g.time ILIKE '%a%' OR g.time ILIKE '%p%' THEN
+            to_timestamp(
+              replace(replace(lower(g.time), 'a', ' AM'), 'p', ' PM'),
+              'HH:MI AM'
+            )::time
+          ELSE
+            g.time::time
+        END DESC
     `),
   ])
 

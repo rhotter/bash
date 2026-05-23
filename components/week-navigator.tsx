@@ -99,14 +99,19 @@ export function WeekNavigator({
   const exhibitionStartIndex = playoffStartIndex + pWeeks.length
 
   const defaultIndex = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    const todayWeek = getWeekKey(today)
+    const todayWeek = getWeekKey(new Date().toISOString().slice(0, 10))
+
+    // 1. Today falls within a game week — use it
     const currentIdx = allWeeks.findIndex((w) => w.isCurrent)
     if (currentIdx !== -1) return currentIdx
 
+    // 2. Most recent past week (good for mid-season and completed seasons)
     for (let i = allWeeks.length - 1; i >= 0; i--) {
       if (allWeeks[i].key <= todayWeek) return i
     }
+
+    // 3. No past weeks — show the nearest upcoming week (brand new season)
+    if (allWeeks.length > 0) return 0
 
     return Math.max(0, allWeeks.length - 1)
   }, [allWeeks])
