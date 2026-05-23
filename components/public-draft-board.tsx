@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Search, Clock, Users, Volume2, VolumeX, CalendarPlus, Layers, X, ChevronsRight, Eye, EyeOff, Trophy, LayoutList, LayoutGrid } from "lucide-react"
+import { Search, Clock, Users, Volume2, VolumeX, CalendarPlus, Layers, X, ChevronsRight, Eye, EyeOff, Trophy, LayoutList, LayoutGrid, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { PlayerCardModal } from "@/components/player-card-modal"
 import { TeamLogo } from "@/components/team-logo"
 
@@ -88,6 +88,14 @@ function formatPlayerName(name: string | null) {
   return `${parts[0][0]}. ${parts.slice(1).join(" ")}`
 }
 
+/** Last name only — used when badges (C/K) eat into the column width */
+function formatPlayerNameCompact(name: string | null) {
+  if (!name) return "—"
+  const parts = name.split(" ")
+  if (parts.length < 2) return name
+  return parts.slice(1).join(" ")
+}
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 // "The Pick Is In" banner data
@@ -135,6 +143,21 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
 
   const isAnimationsMutedRef = useRef(false)
   const [isAnimationsMuted, setIsAnimationsMuted] = useState(false)
+
+  // By-team sort state
+  type TeamSortKey = "pick" | "skill" | "pos" | "playoffs"
+  const [teamSortKey, setTeamSortKey] = useState<TeamSortKey>("pick")
+  const [teamSortDir, setTeamSortDir] = useState<"asc" | "desc">("asc")
+
+  const toggleTeamSort = useCallback((key: TeamSortKey) => {
+    if (teamSortKey === key) {
+      setTeamSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setTeamSortKey(key)
+      setTeamSortDir("asc")
+    }
+  }, [teamSortKey])
+
 
   // Sync persisted preferences from localStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -208,6 +231,24 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
     })
     return set
   }, [captainPlayerIds, pool])
+
+  const sortTeamPicks = useCallback((teamPicks: typeof picks) => {
+    return [...teamPicks].sort((a, b) => {
+      const poolA = a.playerId ? pool.find((p) => p.playerId === a.playerId) : null
+      const poolB = b.playerId ? pool.find((p) => p.playerId === b.playerId) : null
+      const metaA = poolA?.registrationMeta as Record<string, unknown> | null
+      const metaB = poolB?.registrationMeta as Record<string, unknown> | null
+      const cmp =
+        teamSortKey === "skill"
+          ? ((metaA?.skillLevel as string) || "").localeCompare((metaB?.skillLevel as string) || "")
+          : teamSortKey === "pos"
+            ? ((metaA?.positions as string) || "").localeCompare((metaB?.positions as string) || "")
+            : teamSortKey === "playoffs"
+              ? ((metaA?.playoffAvail as string) || "").localeCompare((metaB?.playoffAvail as string) || "")
+              : a.pickNumber - b.pickNumber
+      return teamSortDir === "desc" ? -cmp : cmp
+    })
+  }, [teamSortKey, teamSortDir, pool])
 
   // ─── Timer ──────────────────────────────────────────────────────────────
 
@@ -942,15 +983,20 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
               <TabsContent value="byteam" className="mt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                   {teams.map((team) => {
-                    const teamPicks = picks
-                      .filter((p) => p.teamSlug === team.teamSlug && p.playerId !== null)
-                      .sort((a, b) => a.pickNumber - b.pickNumber)
+                    const teamPicks = sortTeamPicks(
+                      picks.filter((p) => p.teamSlug === team.teamSlug && p.playerId !== null)
+                    )
 
                     return (
                       <div key={team.teamSlug}>
                         {/* Team header */}
-                        <div className="flex items-center gap-2.5 mb-2 pb-1.5 border-b border-border/40">
-                          <TeamLogo slug={team.teamSlug} name={team.teamName} size={28} className="shrink-0" />
+                        <div
+                          className="flex items-center gap-2.5 mb-2 pb-1.5 border-b-2"
+                          style={{ borderBottomColor: team.color || "#94a3b8" }}
+                        >
+                          <div className="shrink-0 w-7 h-7 md:w-14 md:h-14">
+                            <TeamLogo slug={team.teamSlug} name={team.teamName} size={56} className="!w-full !h-full object-contain" />
+                          </div>
                           <Link
                             href={`/team/${team.teamSlug}`}
                             className="text-sm font-bold tracking-tight hover:text-primary transition-colors truncate"
@@ -960,6 +1006,21 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                           <span className="ml-auto text-[10px] text-muted-foreground/50 tabular-nums">
                             {teamPicks.length} picks
                           </span>
+                        </div>
+
+                        {/* Column headers (desktop) */}
+                        <div className="hidden md:flex items-center gap-2 sm:gap-3 px-2 py-1 text-[10px] border-b border-border/30 mb-0.5">
+                          <span className="w-7 shrink-0" />
+                          <span className="flex-1 font-semibold text-muted-foreground">Player</span>
+                          <button onClick={() => toggleTeamSort("pos")} className="flex items-center gap-0.5 font-semibold text-muted-foreground hover:text-foreground transition-colors w-12 sm:w-16 justify-end">
+                            Pos {teamSortKey === "pos" ? (teamSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                          </button>
+                          <button onClick={() => toggleTeamSort("skill")} className="flex items-center gap-0.5 font-semibold text-muted-foreground hover:text-foreground transition-colors w-16 justify-end">
+                            Skill {teamSortKey === "skill" ? (teamSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                          </button>
+                          <button onClick={() => toggleTeamSort("playoffs")} className="flex items-center gap-0.5 font-semibold text-muted-foreground hover:text-foreground transition-colors w-8 justify-center">
+                            PO {teamSortKey === "playoffs" ? (teamSortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                          </button>
                         </div>
 
                         {/* Roster rows */}
@@ -973,6 +1034,9 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                               const isCaptain = pick.playerId != null && captainSet.has(pick.playerId)
                               const isRookie = meta?.isRookie === true
                               const position = (meta?.positions as string) || ""
+                              const skillLevel = (meta?.skillLevel as string) || ""
+                              const playoffAvail = (meta?.playoffAvail as string) || ""
+                              const playoffShort = playoffAvail.toLowerCase().startsWith("yes") ? "Y" : playoffAvail.toLowerCase().startsWith("no") ? "N" : "?"
 
                               return (
                                 <div
@@ -1003,6 +1067,12 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                                       {position}
                                     </span>
                                   )}
+                                  <span className="hidden md:inline shrink-0 text-[10px] font-medium text-muted-foreground tabular-nums w-16 text-right truncate" title={skillLevel}>
+                                    {skillLevel || "—"}
+                                  </span>
+                                  <span className={`hidden md:inline shrink-0 text-[10px] font-medium tabular-nums w-8 text-center ${playoffShort === "Y" ? "text-green-600" : playoffShort === "N" ? "text-red-500" : "text-muted-foreground"}`} title={playoffAvail}>
+                                    {playoffShort}
+                                  </span>
                                 </div>
                               )
                             })
@@ -1036,7 +1106,8 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                         {teams.map((team) => (
                           <th
                             key={team.teamSlug}
-                            className="text-left font-medium py-2.5 px-3 align-bottom normal-case tracking-tight border-b border-border/50 border-l border-border/20"
+                            className="text-left font-medium py-2.5 px-3 align-bottom normal-case tracking-tight border-b border-border/50 border-l border-border/20 border-t-2"
+                            style={{ borderTopColor: team.color || "#94a3b8" }}
                           >
                             <div className="flex items-center gap-1.5">
                               <TeamLogo slug={team.teamSlug} name={team.teamName} size={20} className="shrink-0" />
@@ -1086,7 +1157,7 @@ export function PublicDraftBoard({ seasonSlug, initialData }: PublicDraftBoardPr
                                       onClick={() => pick.playerId && openPlayerCard(pick.playerId)}
                                       title={pick.playerName || undefined}
                                     >
-                                      {pick.playerName}
+                                      {(isCaptain || pick.isKeeper) ? formatPlayerNameCompact(pick.playerName) : formatPlayerName(pick.playerName)}
                                     </button>
                                     {isCaptain && (
                                       <span className="shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-sm border border-primary/50 text-[9px] font-bold uppercase tracking-wider text-primary leading-none">C</span>
