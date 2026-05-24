@@ -84,6 +84,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       statsOnly,
       playoffTeams,
       isCurrent,
+      enableSync,
     } = body
 
     // Validate status
@@ -97,7 +98,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     }
 
     // Build update object
-    const updates: Record<string, unknown> = {}
+    const updates: Partial<typeof schema.seasons.$inferInsert> = {}
     if (name !== undefined) updates.name = name
     if (seasonType !== undefined) updates.seasonType = seasonType
     if (leagueId !== undefined) updates.leagueId = leagueId
@@ -111,6 +112,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       updates.playoffTeams = playoffTeams
     }
     if (isCurrent !== undefined) updates.isCurrent = isCurrent
+    if (enableSync !== undefined) updates.enableSync = enableSync
 
     // Auto-set is_current when activating
     if (status === "active" && existing.status !== "active") {

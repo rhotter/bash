@@ -631,6 +631,14 @@ export async function GET(request: Request) {
 
     // Default: sync current season (quick mode — just update scores + boxscores)
     const current = await getCurrentSeason()
+    if (!current.enableSync) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        message: `Sportability sync is disabled for current season: ${current.name} (${current.id})`,
+        timestamp: new Date().toISOString(),
+      })
+    }
     const scheduleResult = await syncScheduleScores(current.leagueId, current.id)
 
     const gamesNeedingBoxscore = await rawSql(sql`

@@ -37,6 +37,7 @@ export function SeasonWizard() {
     leagueId: "",
     teamCount: 7,
     teamCountUnknown: false,
+    enableSync: false,
   })
 
   function nextStep() {
@@ -57,8 +58,9 @@ export function SeasonWizard() {
         body: JSON.stringify({
           name: form.name,
           seasonType: form.seasonType,
-          leagueId: form.leagueId || null,
+          leagueId: form.enableSync ? (form.leagueId || null) : null,
           teamCount: form.teamCountUnknown ? null : form.teamCount,
+          enableSync: form.enableSync,
         }),
       })
 
@@ -139,14 +141,27 @@ export function SeasonWizard() {
                 </RadioGroup>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">League ID (optional)</Label>
-                <Input
-                  value={form.leagueId}
-                  onChange={(e) => setForm((f) => ({ ...f, leagueId: e.target.value }))}
-                  placeholder="Sportability reference — can be added later"
+              <div className="flex items-center gap-2 pt-1 pb-2">
+                <Checkbox
+                  id="enableSync"
+                  checked={form.enableSync}
+                  onCheckedChange={(checked) => setForm((f) => ({ ...f, enableSync: checked === true }))}
                 />
+                <Label htmlFor="enableSync" className="text-sm font-medium leading-none cursor-pointer">
+                  Enable daily sync with Sportability
+                </Label>
               </div>
+
+              {form.enableSync && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">League ID (optional)</Label>
+                  <Input
+                    value={form.leagueId}
+                    onChange={(e) => setForm((f) => ({ ...f, leagueId: e.target.value }))}
+                    placeholder="Sportability reference — can be added later"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -197,7 +212,14 @@ export function SeasonWizard() {
                   </span>
                 </div>
 
-                {form.leagueId && (
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground">Sportability Sync</span>
+                  <span className="font-medium">
+                    {form.enableSync ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+
+                {form.enableSync && form.leagueId && (
                   <div className="flex justify-between py-1.5 border-b">
                     <span className="text-muted-foreground">League ID</span>
                     <span className="font-medium">{form.leagueId}</span>

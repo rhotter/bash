@@ -47,6 +47,7 @@ interface SeasonFormProps {
     adminNotes: string | null
     statsOnly: boolean
     playoffTeams: number | null
+    enableSync: boolean
   }
 }
 
@@ -78,6 +79,7 @@ export function SeasonForm({ season }: SeasonFormProps) {
     adminNotes: season.adminNotes || "",
     statsOnly: season.statsOnly || false,
     playoffTeams: season.playoffTeams as number | null,
+    enableSync: season.enableSync ?? true,
   })
 
   async function handleSave() {
@@ -325,6 +327,22 @@ export function SeasonForm({ season }: SeasonFormProps) {
               </Label>
               <p className="text-xs text-muted-foreground">
                 For legacy seasons imported before we had individual game data. Stats are read from pre-aggregated totals instead of game-by-game box scores.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Checkbox
+              id="enableSync"
+              checked={form.enableSync}
+              onCheckedChange={(checked) => setForm((f) => ({ ...f, enableSync: checked === true }))}
+            />
+            <div className="grid gap-1.5 leading-none">
+              <Label htmlFor="enableSync" className="text-sm font-medium leading-none cursor-pointer">
+                Enable daily sync with Sportability
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Automatically pull game scores and player box scores from Sportability daily. Turn off if games and stats are managed directly on the BASH site.
               </p>
             </div>
           </div>

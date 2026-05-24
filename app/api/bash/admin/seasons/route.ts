@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { name, seasonType, leagueId } = body
+    const { name, seasonType, leagueId, enableSync } = body
 
     if (!name || !seasonType) {
       return NextResponse.json({ error: "Name and seasonType are required" }, { status: 400 })
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
       gameLength: 60,
       defaultLocation,
       playoffTeams: body.playoffTeams ?? 4,
+      enableSync: enableSync !== undefined ? enableSync : true,
     })
 
     // Bust the Next.js season cache so subsequent reads see the new season

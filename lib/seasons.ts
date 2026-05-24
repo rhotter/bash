@@ -9,7 +9,8 @@ export interface Season {
   leagueId: string
   seasonType: SeasonType
   status: string
-  statsOnly?: boolean
+  statsOnly: boolean
+  enableSync: boolean
 }
 
 // ─── Module-level Next.js tag cache ──────────────────────────────────────────
@@ -24,6 +25,7 @@ function mapRow(s: typeof schema.seasons.$inferSelect): Season {
     seasonType: s.seasonType as SeasonType,
     status: s.status,
     statsOnly: s.statsOnly,
+    enableSync: s.enableSync,
   }
 }
 
