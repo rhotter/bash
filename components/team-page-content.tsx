@@ -7,8 +7,10 @@ import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import { useRouter } from "next/navigation"
 import type { TeamDetail } from "@/app/api/bash/team/[slug]/route"
-import { useSort, SortableTh, SectionHeader } from "@/components/stats-table"
+import { useSort, SortableTh } from "@/components/stats-table"
 import { TeamLogo } from "@/components/team-logo"
+import { Calendar } from "lucide-react"
+import { downloadICS } from "@/lib/calendar-export"
 
 type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gp" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen" | "ptsPg"
 type GoalieSortKey = "savePercentage" | "gaa" | "wins" | "losses" | "gp" | "shutouts" | "saves" | "goalsAgainst" | "shotsAgainst" | "goalieAssists"
@@ -34,6 +36,23 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
       return goalieDir === "desc" ? bv - av : av - bv
     })
   }, [team, goalieSort, goalieDir])
+
+  const calendarEvents = useMemo(() => {
+    return team.games.map((g) => {
+      const homeTeam = g.isHome ? team.name : g.opponent
+      const awayTeam = g.isHome ? g.opponent : team.name
+      return {
+        id: g.id,
+        date: g.date,
+        time: g.time,
+        homeTeam,
+        awayTeam,
+        location: g.location,
+        seasonLocation: team.seasonLocation,
+        seasonName: team.seasonName,
+      }
+    })
+  }, [team])
 
   return (
     <div className="flex flex-col gap-8">
@@ -152,7 +171,21 @@ export function TeamPageContent({ team }: { team: TeamDetail }) {
 
       {/* Schedule/Results */}
       <div>
-        <SectionHeader>Schedule</SectionHeader>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex-1 flex items-center gap-3 min-w-0">
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground whitespace-nowrap">
+              Schedule
+            </h4>
+            <div className="h-px flex-1 bg-border/60" />
+          </div>
+          <button
+            onClick={() => downloadICS(calendarEvents, `${team.slug}-schedule`)}
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 hover:text-foreground border border-border/30 hover:bg-muted/40 px-2.5 py-1.5 rounded transition-all cursor-pointer shrink-0"
+          >
+            ADD TO CAL
+            <Calendar className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <div className="flex flex-col gap-1">
           {team.games.map((g) => (
             <GameRow key={g.id} game={g} />
@@ -169,16 +202,17 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
 
   return (
     <div
-      className={cn(
-        "flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg",
-        isFinal && "hover:bg-muted/50 cursor-pointer"
-      )}
-      onClick={isFinal ? () => router.push(`/game/${g.id}`) : undefined}
+      className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-muted/50 cursor-pointer"
+      onClick={() => router.push(`/game/${g.id}`)}
     >
-      <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0 w-[80px] sm:w-32 whitespace-nowrap">
+      <Link
+        href={`/game/${g.id}`}
+        className="text-[10px] text-muted-foreground/60 hover:text-primary font-medium shrink-0 w-[80px] sm:w-32 whitespace-nowrap transition-colors"
+        onClick={(e) => e.stopPropagation()}
+      >
         <span className="sm:hidden">{formatGameDateNoYear(g.date)}</span>
         <span className="hidden sm:inline">{formatGameDate(g.date)}</span>
-      </span>
+      </Link>
       <span className="text-[10px] text-muted-foreground/40 w-3 sm:w-4 shrink-0 text-center">
         {g.isHome ? "vs" : "@"}
       </span>

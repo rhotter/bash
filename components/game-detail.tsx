@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { useGameDetail, useLiveGame, type BashGame, type BashGameDetail } from "@/lib/hockey-data"
 import { formatGameDate, formatGameTime } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
-import { Loader2, Star } from "lucide-react"
+import { Loader2, Star, Calendar } from "lucide-react"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
 import { formatGoalieTime } from "@/lib/format-goalie-time"
@@ -18,6 +18,7 @@ import { useAdmin } from "@/lib/admin-context"
 import { TeamLogo } from "@/components/team-logo"
 import { mutate } from "swr"
 import { GameTypeBadge } from "@/components/game-type-badge"
+import { downloadICS } from "@/lib/calendar-export"
 
 type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gwg" | "ppg" | "shg" | "eng" | "hatTricks" | "pen"
 
@@ -95,6 +96,24 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
         <span className="text-border">|</span>
         <span className="normal-case tracking-normal">{game.location}</span>
         <GameTypeBadge gameType={game.gameType} />
+        <span className="text-border">|</span>
+        <button
+          onClick={() => downloadICS([{
+            id: game.id,
+            date: game.date,
+            time: game.time,
+            homeTeam: game.homeTeam,
+            awayTeam: game.awayTeam,
+            location: game.location || undefined,
+            seasonLocation: detail?.seasonLocation || initialDetail?.seasonLocation || undefined,
+            title: game.title,
+            seasonName: detail?.seasonName || initialDetail?.seasonName || undefined,
+          }], `game-${game.id}`)}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-foreground border border-border/30 hover:bg-muted/40 px-2 py-0.5 -my-0.5 rounded transition-all cursor-pointer shrink-0"
+        >
+          ADD TO CAL
+          <Calendar className="h-3 w-3" />
+        </button>
       </div>
 
       {/* Hero Scoreboard */}

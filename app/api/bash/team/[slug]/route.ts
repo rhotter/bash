@@ -53,6 +53,8 @@ export interface TeamRecord {
 export interface TeamDetail {
   slug: string
   name: string
+  seasonName: string
+  seasonLocation: string | null
   record: TeamRecord
   skaters: SkaterRoster[]
   goalies: GoalieRoster[]
@@ -68,6 +70,7 @@ export interface TeamDetail {
     status: string
     isOvertime: boolean
     result: "W" | "L" | "OTW" | "OTL" | null
+    location: string | null
   }[]
 }
 
@@ -172,12 +175,16 @@ export async function GET(
       }
     })
 
+    const seasonRows = await rawSql(sql`SELECT name, default_location FROM seasons WHERE id = ${seasonId}`)
+    const seasonName = seasonRows.length > 0 ? seasonRows[0].name : seasonId
+    const seasonLocation = seasonRows.length > 0 ? seasonRows[0].default_location : null
+
     // Team games
     const gameRows = await rawSql(sql`
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime,
-        g.home_team, g.away_team,
+        g.home_team, g.away_team, g.location,
         ht.name as home_name, awt.name as away_name
       FROM games g
       JOIN teams ht ON g.home_team = ht.slug
@@ -222,6 +229,7 @@ export async function GET(
         status: r.status,
         isOvertime: r.is_overtime,
         result,
+        location: r.location,
       }
     })
 
@@ -269,7 +277,7 @@ export async function GET(
     const rankIdx = allTeamResults.findIndex(r => r.team_slug === slug)
     record.rank = rankIdx >= 0 ? rankIdx + 1 : 0
 
-    const result: TeamDetail = { slug: team.slug, name: team.name, record, skaters, goalies, games }
+    const result: TeamDetail = { slug: team.slug, name: team.name, seasonName, seasonLocation, record, skaters, goalies, games }
 
     return NextResponse.json(result, {
       headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },

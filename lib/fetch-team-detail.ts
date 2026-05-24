@@ -7,6 +7,12 @@ export type { TeamDetail, TeamRecord, SkaterRoster, GoalieRoster }
 
 export async function fetchTeamDetail(slug: string, seasonParam?: string | null): Promise<TeamDetail | null> {
   const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : (await getCurrentSeason()).id
+  const seasonRows = await db.select({
+    name: schema.seasons.name,
+    defaultLocation: schema.seasons.defaultLocation
+  }).from(schema.seasons).where(eq(schema.seasons.id, seasonId))
+  const seasonName = seasonRows.length > 0 ? seasonRows[0].name : seasonId
+  const seasonLocation = seasonRows.length > 0 ? seasonRows[0].defaultLocation : null
 
   const teamRows = await db.select().from(schema.teams).where(eq(schema.teams.slug, slug))
   if (teamRows.length === 0) return null
@@ -59,7 +65,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
       SELECT
         g.id, g.date, g.time, g.home_score, g.away_score,
         g.status, g.is_overtime,
-        g.home_team, g.away_team,
+        g.home_team, g.away_team, g.location,
         ht.name as home_name, awt.name as away_name
       FROM games g
       JOIN teams ht ON g.home_team = ht.slug
@@ -144,6 +150,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
       status: r.status,
       isOvertime: r.is_overtime,
       result,
+      location: r.location,
     }
   })
 
@@ -192,5 +199,5 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
   const rankIdx = allTeamResults.findIndex((r) => r.team_slug === slug)
   record.rank = rankIdx >= 0 ? rankIdx + 1 : 0
 
-  return { slug: team.slug, name: team.name, record, skaters, goalies, games }
+  return { slug: team.slug, name: team.name, seasonName, seasonLocation, record, skaters, goalies, games }
 }
