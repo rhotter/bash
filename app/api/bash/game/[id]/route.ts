@@ -52,6 +52,8 @@ export interface BashGameDetail {
   awayGoalies: GoalieBoxScore[]
   officials: { name: string; role: string }[]
   notes: string | null
+  seasonName?: string
+  seasonLocation?: string | null
 }
 
 export async function GET(
@@ -159,6 +161,10 @@ export async function GET(
       .where(eq(schema.gameOfficials.gameId, id))
       .orderBy(asc(schema.gameOfficials.role), asc(schema.gameOfficials.name))
 
+    const seasonRows = await rawSql(sql`SELECT name, default_location FROM seasons WHERE id = ${game.season_id}`)
+    const seasonName = seasonRows.length > 0 ? seasonRows[0].name : game.season_id
+    const seasonLocation = seasonRows.length > 0 ? seasonRows[0].default_location : null
+
     const result: BashGameDetail = {
       id,
       date: game.date,
@@ -181,6 +187,8 @@ export async function GET(
       awayGoalies,
       officials: officialRows.map((r) => ({ name: r.name, role: r.role })),
       notes: game.notes ?? null,
+      seasonName,
+      seasonLocation,
     }
 
     return NextResponse.json(result, {

@@ -67,12 +67,12 @@ export function StandingsTab({
                 key={row.slug}
                 className={cn(statsRowClass(i), "group")}
               >
-                <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-0 w-[170px] min-w-[170px] whitespace-nowrap after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
-                  <div className="flex items-center gap-2 pr-4">
+                <td className="py-2 sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-0 w-[170px] min-w-[170px] sm:whitespace-nowrap after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
+                  <div className="flex items-center gap-2 pr-4 min-w-0">
                     <span className="text-muted-foreground/40 tabular-nums text-[10px] shrink-0 w-3 text-right">{i + 1}</span>
-                    <Link href={`/team/${row.slug}`} className="flex items-center gap-2 group/team">
+                    <Link href={`/team/${row.slug}`} className="flex items-center gap-2 group/team min-w-0">
                       <TeamLogo slug={row.slug} name={row.team} size={28} className="shrink-0" />
-                      <span className="text-xs font-semibold group-hover/team:text-primary transition-colors">
+                      <span className="text-xs font-semibold group-hover/team:text-primary transition-colors line-clamp-2">
                         {row.team}
                       </span>
                     </Link>

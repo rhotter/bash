@@ -100,6 +100,13 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     officialsPromise,
   ])
 
+  const seasonRows = await db.select({
+    name: schema.seasons.name,
+    defaultLocation: schema.seasons.defaultLocation
+  }).from(schema.seasons).where(eq(schema.seasons.id, game.season_id))
+  const seasonName = seasonRows.length > 0 ? seasonRows[0].name : game.season_id
+  const seasonLocation = seasonRows.length > 0 ? seasonRows[0].defaultLocation : null
+
   return {
     id,
     date: game.date,
@@ -122,5 +129,7 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
     awayGoalies,
     officials: officialRows.map((r) => ({ name: r.name, role: r.role })),
     notes: game.notes ?? null,
+    seasonName,
+    seasonLocation,
   }
 }
