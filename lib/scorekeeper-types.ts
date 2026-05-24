@@ -148,14 +148,14 @@ export function computeScore(goals: GoalEvent[], homeSlug: string, awaySlug: str
 }
 
 /** Compute total seconds a team's goalie was pulled. */
-export function computePulledSeconds(pulls: GoaliePullEvent[], team: string): number {
+export function computePulledSeconds(pulls: GoaliePullEvent[], team: string, periodLength: number = 1200, otPeriodLength: number = 300): number {
   let total = 0
   for (const pull of pulls) {
     if (pull.team !== team) continue
-    const startElapsed = clockToElapsed(pull.period, parseClockString(pull.pulledAt))
+    const startElapsed = clockToElapsed(pull.period, parseClockString(pull.pulledAt), periodLength, otPeriodLength)
     const endElapsed = pull.returnedAt
-      ? clockToElapsed(pull.period, parseClockString(pull.returnedAt))
-      : clockToElapsed(pull.period, 0) // pulled for rest of period if not returned
+      ? clockToElapsed(pull.period, parseClockString(pull.returnedAt), periodLength, otPeriodLength)
+      : clockToElapsed(pull.period, 0, periodLength, otPeriodLength) // pulled for rest of period if not returned
     total += endElapsed - startElapsed
   }
   return total
@@ -170,21 +170,21 @@ export function shotPeriodIndex(period: number): number {
 // ─── Power Play Tracking ──────────────────────────────────────────────────
 
 /** Convert period + clock seconds remaining to total elapsed game seconds. */
-export function clockToElapsed(period: number, clockSeconds: number): number {
-  const periodLength = period <= 3 ? 1200 : period === 4 ? 300 : 0
-  const elapsedInPeriod = periodLength - clockSeconds
+export function clockToElapsed(period: number, clockSeconds: number, periodLength: number = 1200, otPeriodLength: number = 300): number {
+  const pLength = period <= 3 ? periodLength : period === 4 ? otPeriodLength : 0
+  const elapsedInPeriod = pLength - clockSeconds
   let totalElapsed = 0
   for (let p = 1; p < period; p++) {
-    totalElapsed += p <= 3 ? 1200 : 300
+    totalElapsed += p <= 3 ? periodLength : otPeriodLength
   }
   return totalElapsed + elapsedInPeriod
 }
 
 /** Convert a countdown clock "M:SS" to elapsed time "M:SS" for display. */
-export function clockToElapsedDisplay(clock: string, period: number): string {
+export function clockToElapsedDisplay(clock: string, period: number, periodLength: number = 1200, otPeriodLength: number = 300): string {
   const remaining = parseClockString(clock)
-  const periodLength = period <= 3 ? 1200 : period === 4 ? 300 : 0
-  const elapsed = periodLength - remaining
+  const pLength = period <= 3 ? periodLength : period === 4 ? otPeriodLength : 0
+  const elapsed = pLength - remaining
   const m = Math.max(0, Math.floor(elapsed / 60))
   const s = Math.max(0, Math.floor(elapsed % 60))
   return `${m}:${s.toString().padStart(2, "0")}`
@@ -205,16 +205,18 @@ export interface ActivePenalty {
 export function getActivePenalties(
   penalties: PenaltyEvent[],
   currentPeriod: number,
-  currentClockSeconds: number
+  currentClockSeconds: number,
+  periodLength: number = 1200,
+  otPeriodLength: number = 300
 ): ActivePenalty[] {
   if (currentPeriod === 0 || currentPeriod === 5) return []
-  const currentElapsed = clockToElapsed(currentPeriod, currentClockSeconds)
+  const currentElapsed = clockToElapsed(currentPeriod, currentClockSeconds, periodLength, otPeriodLength)
 
   return penalties
     .filter((p) => !p.endedByGoalId) // not fully ended by a PPG
     .filter((p) => p.minutes <= 5) // 10-min misconducts don't affect strength
     .map((p) => {
-      const startElapsed = clockToElapsed(p.period, parseClockString(p.clock))
+      const startElapsed = clockToElapsed(p.period, parseClockString(p.clock), periodLength, otPeriodLength)
       const endElapsed = p.adjustedEndElapsed ?? startElapsed + p.minutes * 60
       const remaining = Math.min(endElapsed - currentElapsed, p.minutes * 60)
       return { penalty: p, remainingSeconds: remaining }
@@ -235,9 +237,11 @@ export function getPowerPlayState(
   currentPeriod: number,
   currentClockSeconds: number,
   homeSlug: string,
-  awaySlug: string
+  awaySlug: string,
+  periodLength: number = 1200,
+  otPeriodLength: number = 300
 ): PowerPlayState {
-  const active = getActivePenalties(penalties, currentPeriod, currentClockSeconds)
+  const active = getActivePenalties(penalties, currentPeriod, currentClockSeconds, periodLength, otPeriodLength)
   const homePenalties = active.filter((ap) => ap.penalty.team === homeSlug).length
   const awayPenalties = active.filter((ap) => ap.penalty.team === awaySlug).length
 
@@ -260,10 +264,12 @@ export function findPenaltyToEnd(
   penalties: PenaltyEvent[],
   scoringTeam: string,
   currentPeriod: number,
-  currentClockSeconds: number
+  currentClockSeconds: number,
+  periodLength: number = 1200,
+  otPeriodLength: number = 300
 ): { penaltyId: string; action: "end" | "halve" } | null {
-  const currentElapsed = clockToElapsed(currentPeriod, currentClockSeconds)
-  const opposingPenalties = getActivePenalties(penalties, currentPeriod, currentClockSeconds)
+  const currentElapsed = clockToElapsed(currentPeriod, currentClockSeconds, periodLength, otPeriodLength)
+  const opposingPenalties = getActivePenalties(penalties, currentPeriod, currentClockSeconds, periodLength, otPeriodLength)
     .filter((ap) => ap.penalty.team !== scoringTeam)
     .sort((a, b) => a.remainingSeconds - b.remainingSeconds) // earliest expiring first
 
@@ -272,7 +278,7 @@ export function findPenaltyToEnd(
     if (p.minutes === 5) continue // majors don't end on PPG
     if (p.minutes === 2) return { penaltyId: p.id, action: "end" }
     if (p.minutes === 4) {
-      const startElapsed = clockToElapsed(p.period, parseClockString(p.clock))
+      const startElapsed = clockToElapsed(p.period, parseClockString(p.clock), periodLength, otPeriodLength)
       const halfwayPoint = p.adjustedEndElapsed
         ? p.adjustedEndElapsed // already been halved once, so end it
         : startElapsed + 120

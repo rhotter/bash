@@ -239,13 +239,14 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
             THEN SUM(ggs.saves)::float / SUM(ggs.shots_against)::float
             ELSE 0 END as save_pct,
           CASE WHEN SUM(ggs.seconds) > 0
-            THEN (SUM(ggs.goals_against)::float / SUM(ggs.seconds)::float) * 3600
+            THEN (SUM(ggs.goals_against)::float / SUM(ggs.seconds)::float) * (COALESCE(MAX(s.game_length), 60) * 60)
             ELSE 0 END as gaa,
           COUNT(*) FILTER (WHERE ggs.result = 'W')::int as wins,
           COUNT(*) FILTER (WHERE ggs.result = 'L')::int as losses
         FROM players p
         JOIN goalie_game_stats ggs ON p.id = ggs.player_id
         JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId} AND ${playoffFragment} AND ${gameTypeFragment}
+        LEFT JOIN seasons s ON g.season_id = s.id
         GROUP BY p.id, p.name
         ORDER BY save_pct DESC
       `),

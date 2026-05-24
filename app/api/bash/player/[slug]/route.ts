@@ -230,9 +230,9 @@ export async function GET(
       }
     }
 
-    function buildGoalieStats(s: Record<string, number>): GoalieStats {
+    function buildGoalieStats(s: Record<string, number>, gameLength: number = 60): GoalieStats {
       const svPct = s.sa > 0 ? (s.saves / s.sa) : 0
-      const gaa = s.seconds > 0 ? (s.ga / s.seconds) * 3600 : 0
+      const gaa = s.seconds > 0 ? (s.ga / s.seconds) * (gameLength * 60) : 0
       return {
         gp: s.gp, wins: s.wins, losses: s.losses,
         gaa: gaa.toFixed(2), savePercentage: svPct.toFixed(3),
@@ -317,9 +317,11 @@ export async function GET(
           SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
           SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
           COUNT(*) FILTER (WHERE result = 'W')::int as wins,
-          COUNT(*) FILTER (WHERE result = 'L')::int as losses
+          COUNT(*) FILTER (WHERE result = 'L')::int as losses,
+          COALESCE(MAX(s.game_length), 60)::int as game_length
         FROM goalie_game_stats ggs
         JOIN games g ON ggs.game_id = g.id AND g.season_id = ${gameLogSeasonId} AND NOT g.is_playoff AND g.game_type = 'regular'
+        LEFT JOIN seasons s ON g.season_id = s.id
         WHERE ggs.player_id = ${player.id}
       `),
       // Goalie all-time stats (regular season, fall only)
@@ -345,11 +347,13 @@ export async function GET(
           SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
           SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
           COUNT(*) FILTER (WHERE result = 'W')::int as wins,
-          COUNT(*) FILTER (WHERE result = 'L')::int as losses
+          COUNT(*) FILTER (WHERE result = 'L')::int as losses,
+          COALESCE(MAX(s.game_length), 60)::int as game_length
         FROM goalie_game_stats ggs
         JOIN games g ON ggs.game_id = g.id AND NOT g.is_playoff AND g.game_type = 'regular'
         JOIN player_seasons ps ON ps.player_id = ggs.player_id AND ps.season_id = g.season_id
         JOIN teams t ON ps.team_slug = t.slug
+        LEFT JOIN seasons s ON g.season_id = s.id
         WHERE ggs.player_id = ${player.id}
         GROUP BY g.season_id, ps.team_slug, t.name
         ORDER BY g.season_id DESC
@@ -435,11 +439,13 @@ export async function GET(
           SUM(shots_against)::int as sa, SUM(seconds)::int as seconds,
           SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
           COUNT(*) FILTER (WHERE result = 'W')::int as wins,
-          COUNT(*) FILTER (WHERE result = 'L')::int as losses
+          COUNT(*) FILTER (WHERE result = 'L')::int as losses,
+          COALESCE(MAX(s.game_length), 60)::int as game_length
         FROM goalie_game_stats ggs
         JOIN games g ON ggs.game_id = g.id AND g.is_playoff AND g.game_type IN ('playoff', 'championship')
         JOIN player_seasons ps ON ps.player_id = ggs.player_id AND ps.season_id = g.season_id
         JOIN teams t ON ps.team_slug = t.slug
+        LEFT JOIN seasons s ON g.season_id = s.id
         WHERE ggs.player_id = ${player.id}
         GROUP BY g.season_id, ps.team_slug, t.name
         ORDER BY g.season_id DESC
@@ -554,9 +560,9 @@ export async function GET(
       }
     })
 
-    // Populate goalie stats if data exists
+     // Populate goalie stats if data exists
     if (goalieSeasonRows.length > 0 && goalieSeasonRows[0].gp > 0) {
-      goalieSeasonStats = buildGoalieStats(goalieSeasonRows[0])
+      goalieSeasonStats = buildGoalieStats(goalieSeasonRows[0], goalieSeasonRows[0].game_length)
     }
     if (goalieAllTimeRows.length > 0 && goalieAllTimeRows[0].gp > 0) {
       allTimeGoalieStats = buildGoalieStats(goalieAllTimeRows[0])
@@ -568,7 +574,7 @@ export async function GET(
         seasonName: seasonMap.get(r.season_id) ?? r.season_id,
         teamName: r.team_name,
         teamSlug: r.team_slug,
-        stats: buildGoalieStats(r),
+        stats: buildGoalieStats(r, r.game_length),
       }))
     goalieGames = goalieGameRows.map((r) => {
       const isHome = player.team_slug ? r.home_team === player.team_slug : true
@@ -631,7 +637,7 @@ export async function GET(
         seasonName: seasonMap.get(r.season_id) ?? r.season_id,
         teamName: r.team_name,
         teamSlug: r.team_slug,
-        stats: buildGoalieStats(r),
+        stats: buildGoalieStats(r, r.game_length),
       }))
     playoffGoalieGames = poGoalieGameRows.map((r) => {
       const isHome = player.team_slug ? r.home_team === player.team_slug : true

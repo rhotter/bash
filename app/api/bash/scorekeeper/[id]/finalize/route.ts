@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 import type { LiveGameState, GoalEvent } from "@/lib/scorekeeper-types"
 import { computePulledSeconds, clockToElapsed, parseClockString } from "@/lib/scorekeeper-types"
 import { getSession } from "@/lib/admin-session"
@@ -40,8 +40,11 @@ export async function POST(
         seasonId: schema.games.seasonId,
         homeTeam: schema.games.homeTeam,
         awayTeam: schema.games.awayTeam,
+        isPlayoff: schema.games.isPlayoff,
+        gameLength: schema.seasons.gameLength,
       })
       .from(schema.games)
+      .leftJoin(schema.seasons, eq(schema.games.seasonId, schema.seasons.id))
       .where(eq(schema.games.id, id))
     if (gameRows.length === 0) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 })
@@ -160,8 +163,26 @@ export async function POST(
     // 9. Delete old player/goalie stats then insert fresh for attending players
     await db.delete(schema.playerGameStats).where(eq(schema.playerGameStats.gameId, id))
 
+    const playerIds = Array.from(playerStats.keys())
+    const playerNamesMap = new Map<number, string>()
+    if (playerIds.length > 0) {
+      const pRows = await db
+        .select({ id: schema.players.id, name: schema.players.name })
+        .from(schema.players)
+        .where(inArray(schema.players.id, playerIds))
+      for (const row of pRows) {
+        playerNamesMap.set(row.id, row.name)
+      }
+    }
+
     for (const [playerId, stats] of playerStats) {
-      if (goalieIds.has(playerId)) continue // skip goalies
+      const isGoalie = goalieIds.has(playerId)
+      const playerName = playerNamesMap.get(playerId) || ""
+      const isSub = playerName.toLowerCase().includes("sub")
+      const hasSkaterStats = stats.goals > 0 || stats.assists > 0 || stats.pen > 0 || stats.pim > 0
+
+      // Only skip goalies if they are NOT a sub player AND didn't record any skater stats
+      if (isGoalie && !isSub && !hasSkaterStats) continue
 
       const hatTricks = (goalCounts.get(playerId) || 0) >= 3 ? 1 : 0
       const gwg = playerId === gwgScorerId ? 1 : 0
@@ -204,13 +225,42 @@ export async function POST(
     const totalAwayShots = state.awayShots.reduce((a, b) => a + b, 0)
 
     const homeWon = homeScore > awayScore
-    // Compute total game time: 3 periods of 1200s + OT periods
-    // Regular season OT = 300s, Playoff OT = 1200s per period
-    const gameIsPlayoff = !!(await db.select({ isPlayoff: schema.games.isPlayoff }).from(schema.games).where(eq(schema.games.id, id)))[0]?.isPlayoff
+    // Compute total game time: 3 regulation periods + OT periods
+    const gameIsPlayoff = !!game.isPlayoff
+    const seasonGameLength = game.gameLength || 60
+    const regulationGameSecs = seasonGameLength * 60
+    const regulationPeriodSecs = regulationGameSecs / 3
+
     const maxPeriod = Math.max(...state.goals.map((g) => g.period), state.period ?? 3)
     const otPeriods = Math.max(0, Math.min(maxPeriod, isShootout ? maxPeriod - 1 : maxPeriod) - 3)
-    const otSecsPerPeriod = gameIsPlayoff ? 1200 : 300
-    const totalGameSecs = 3600 + otPeriods * otSecsPerPeriod
+    const otSecsPerPeriod = gameIsPlayoff ? regulationPeriodSecs : 300
+
+    // Compute actual OT elapsed seconds
+    let actualOtSeconds = 0
+    if (otPeriods > 0) {
+      if (isShootout) {
+        // If ended in shootout, full OT period was played
+        actualOtSeconds = otPeriods * otSecsPerPeriod
+      } else {
+        // Did a sudden death goal happen in the last OT period?
+        const otGoals = state.goals.filter((g) => g.period >= 4)
+        if (otGoals.length > 0) {
+          // Sort OT goals chronologically
+          otGoals.sort((a, b) => clockToElapsed(a.period, parseClockString(a.clock), regulationPeriodSecs, otSecsPerPeriod) - clockToElapsed(b.period, parseClockString(b.clock), regulationPeriodSecs, otSecsPerPeriod))
+          const winningGoal = otGoals[0]
+          // Elapsed seconds in the winning OT period:
+          const winningOtPeriod = winningGoal.period
+          const elapsedInWinningOt = otSecsPerPeriod - parseClockString(winningGoal.clock)
+          // Add prior OT periods (if any) + elapsed in winning period
+          actualOtSeconds = (winningOtPeriod - 4) * otSecsPerPeriod + elapsedInWinningOt
+        } else {
+          // No OT goals, ended in a tie but no shootout
+          actualOtSeconds = otPeriods * otSecsPerPeriod
+        }
+      }
+    }
+
+    const totalGameSecs = regulationGameSecs + actualOtSeconds
     const pulls = state.goaliePulls ?? []
     const goalieChanges = state.goalieChanges ?? []
 
@@ -229,11 +279,11 @@ export async function POST(
       if (teamGoalies.length === 0) return []
 
       const teamChanges = goalieChanges.filter((c) => c.team === teamSlug)
-        .sort((a, b) => clockToElapsed(a.period, parseClockString(a.clock)) - clockToElapsed(b.period, parseClockString(b.clock)))
+        .sort((a, b) => clockToElapsed(a.period, parseClockString(a.clock), regulationPeriodSecs, otSecsPerPeriod) - clockToElapsed(b.period, parseClockString(b.clock), regulationPeriodSecs, otSecsPerPeriod))
 
       // If no mid-game changes, all goalies split evenly (original behavior)
       if (teamChanges.length === 0) {
-        const pulledSecs = computePulledSeconds(pulls, teamSlug)
+        const pulledSecs = computePulledSeconds(pulls, teamSlug, regulationPeriodSecs, otSecsPerPeriod)
         const seconds = Math.max(0, totalGameSecs - pulledSecs)
         const ga = goalsAgainstEvents.length
         return teamGoalies.map((goalieId) => ({
@@ -257,7 +307,7 @@ export async function POST(
       segments.push({
         goalieId: firstChange.outGoalieId,
         startElapsed: 0,
-        endElapsed: clockToElapsed(firstChange.period, parseClockString(firstChange.clock)),
+        endElapsed: clockToElapsed(firstChange.period, parseClockString(firstChange.clock), regulationPeriodSecs, otSecsPerPeriod),
       })
 
       // Middle segments (between changes)
@@ -266,9 +316,9 @@ export async function POST(
         const nextChange = teamChanges[i + 1]
         segments.push({
           goalieId: change.inGoalieId,
-          startElapsed: clockToElapsed(change.period, parseClockString(change.clock)),
+          startElapsed: clockToElapsed(change.period, parseClockString(change.clock), regulationPeriodSecs, otSecsPerPeriod),
           endElapsed: nextChange
-            ? clockToElapsed(nextChange.period, parseClockString(nextChange.clock))
+            ? clockToElapsed(nextChange.period, parseClockString(nextChange.clock), regulationPeriodSecs, otSecsPerPeriod)
             : totalGameSecs,
         })
       }
@@ -284,10 +334,10 @@ export async function POST(
       // Subtract pulled time per goalie segment
       for (const pull of pulls) {
         if (pull.team !== teamSlug) continue
-        const pullStart = clockToElapsed(pull.period, parseClockString(pull.pulledAt))
+        const pullStart = clockToElapsed(pull.period, parseClockString(pull.pulledAt), regulationPeriodSecs, otSecsPerPeriod)
         const pullEnd = pull.returnedAt
-          ? clockToElapsed(pull.period, parseClockString(pull.returnedAt))
-          : clockToElapsed(pull.period, 0)
+          ? clockToElapsed(pull.period, parseClockString(pull.returnedAt), regulationPeriodSecs, otSecsPerPeriod)
+          : clockToElapsed(pull.period, 0, regulationPeriodSecs, otSecsPerPeriod)
         // Find which goalie was in net during this pull
         for (const seg of segments) {
           if (pullStart >= seg.startElapsed && pullStart < seg.endElapsed) {
@@ -301,7 +351,7 @@ export async function POST(
 
       // Attribute goals against to the goalie who was in net at the time
       for (const goal of goalsAgainstEvents) {
-        const goalElapsed = clockToElapsed(goal.period, parseClockString(goal.clock))
+        const goalElapsed = clockToElapsed(goal.period, parseClockString(goal.clock), regulationPeriodSecs, otSecsPerPeriod)
         // Find the segment containing this goal (last segment whose start <= goalElapsed)
         let assignedGoalie = segments[segments.length - 1].goalieId
         for (const seg of segments) {
@@ -335,12 +385,12 @@ export async function POST(
 
     const homeGoalieStats = computeTeamGoalieStats(
       homeSlug, state.homeAttendance,
-      state.goals.filter((g) => g.team === awaySlug && g.period <= 4),
+      state.goals.filter((g) => g.team === awaySlug && g.period <= 4 && !g.flags.includes("ENG")),
       totalAwayShots, true
     )
     const awayGoalieStats = computeTeamGoalieStats(
       awaySlug, state.awayAttendance,
-      state.goals.filter((g) => g.team === homeSlug && g.period <= 4),
+      state.goals.filter((g) => g.team === homeSlug && g.period <= 4 && !g.flags.includes("ENG")),
       totalHomeShots, false
     )
 

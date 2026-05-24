@@ -65,6 +65,7 @@ interface Props {
   awayRoster: RosterPlayer[]
   existingState: LiveGameState | null
   initialAuthenticated?: boolean
+  defaultPeriodLength?: number
 }
 
 export function ScorekeeperApp({
@@ -72,6 +73,7 @@ export function ScorekeeperApp({
   homeSlug, awaySlug, homeTeam, awayTeam,
   homeRoster: initialHomeRoster, awayRoster: initialAwayRoster, existingState,
   initialAuthenticated = false,
+  defaultPeriodLength = 1200,
 }: Props) {
   // ─── PIN Gate ────────────────────────────────────────────────────────────
   const [pin, setPin] = useState("")
@@ -115,7 +117,9 @@ export function ScorekeeperApp({
   // ─── Game State ──────────────────────────────────────────────────────────
   const [state, setState] = useState<LiveGameState>(() => {
     if (existingState) return existingState
-    return createInitialState()
+    const initial = createInitialState()
+    initial.clockSeconds = defaultPeriodLength
+    return initial
   })
 
   // ─── Sync ────────────────────────────────────────────────────────────────
@@ -227,12 +231,12 @@ export function ScorekeeperApp({
 
   // ─── Power Play State ──────────────────────────────────────────────────
   const activePenalties = useMemo(
-    () => getActivePenalties(state.penalties, state.period, displayClock),
-    [state.penalties, state.period, displayClock]
+    () => getActivePenalties(state.penalties, state.period, displayClock, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300),
+    [state.penalties, state.period, displayClock, defaultPeriodLength, isPlayoff]
   )
   const ppState = useMemo(
-    () => getPowerPlayState(state.penalties, state.period, displayClock, homeSlug, awaySlug),
-    [state.penalties, state.period, displayClock, homeSlug, awaySlug]
+    () => getPowerPlayState(state.penalties, state.period, displayClock, homeSlug, awaySlug, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300),
+    [state.penalties, state.period, displayClock, homeSlug, awaySlug, defaultPeriodLength, isPlayoff]
   )
 
   // ─── Load from localStorage on mount ─────────────────────────────────────
@@ -343,7 +347,6 @@ export function ScorekeeperApp({
     const goalies = players.filter((p) => p.id === goalieId)
     return [...skaters, ...goalies]
   }
-  const attendingSkaters = (team: string) => attendingPlayers(team).filter((p) => p.id !== goalieIdForTeam(team))
   const currentGoalieId = (team: string): string => {
     const gid = goalieIdForTeam(team)
     return gid != null ? String(gid) : "none"
@@ -420,7 +423,7 @@ export function ScorekeeperApp({
   function startNextPeriod() {
     updateState((prev) => {
       const nextPeriod = prev.period + 1
-      const clockSecs = nextPeriod >= 4 ? (isPlayoff ? 1200 : 300) : 1200
+      const clockSecs = nextPeriod >= 4 ? (isPlayoff ? defaultPeriodLength : 300) : defaultPeriodLength
       const homeShots = [...prev.homeShots]
       const awayShots = [...prev.awayShots]
       while (homeShots.length < (nextPeriod <= 3 ? nextPeriod : 4)) homeShots.push(0)
@@ -448,7 +451,7 @@ export function ScorekeeperApp({
 
   function setPeriodTo(p: number) {
     updateState((prev) => {
-      const clockSecs = p === 0 ? 1200 : p === 4 ? 300 : 1200
+      const clockSecs = p === 0 ? defaultPeriodLength : p === 4 ? 300 : defaultPeriodLength
       const homeShots = [...prev.homeShots]
       const awayShots = [...prev.awayShots]
       while (homeShots.length < (p <= 3 ? p : 4)) homeShots.push(0)
@@ -630,7 +633,7 @@ export function ScorekeeperApp({
   /** Convert elapsed min:sec inputs back to countdown clock string. */
   function elapsedPartsToCountdown(min: string, sec: string, period: number): string {
     const elapsedSecs = (parseInt(min) || 0) * 60 + (parseInt(sec) || 0)
-    const periodLength = period <= 3 ? 1200 : (isPlayoff ? 1200 : 300)
+    const periodLength = period <= 3 ? defaultPeriodLength : (isPlayoff ? defaultPeriodLength : 300)
     const remaining = Math.max(0, periodLength - elapsedSecs)
     const m = Math.floor(remaining / 60)
     const s = remaining % 60
@@ -640,7 +643,7 @@ export function ScorekeeperApp({
   /** Set the clock parts from a countdown clock string, converting to elapsed for display. */
   function setElapsedPartsFromCountdown(clock: string, period: number) {
     const remaining = parseClockString(clock)
-    const periodLength = period <= 3 ? 1200 : (isPlayoff ? 1200 : 300)
+    const periodLength = period <= 3 ? defaultPeriodLength : (isPlayoff ? defaultPeriodLength : 300)
     const elapsed = Math.max(0, periodLength - remaining)
     const m = Math.floor(elapsed / 60)
     const s = elapsed % 60
@@ -717,9 +720,9 @@ export function ScorekeeperApp({
         // End penalty on PP goal
         if (goalPPG) {
           const clockSecs = parseClockString(clock)
-          const result = findPenaltyToEnd(prev.penalties, goalTeam, capturedPeriod, clockSecs)
+          const result = findPenaltyToEnd(prev.penalties, goalTeam, capturedPeriod, clockSecs, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)
           if (result) {
-            const currentElapsed = clockToElapsed(capturedPeriod, clockSecs)
+            const currentElapsed = clockToElapsed(capturedPeriod, clockSecs, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)
             next.penalties = prev.penalties.map((p) => {
               if (p.id !== result.penaltyId) return p
               if (result.action === "end") {
@@ -1289,8 +1292,8 @@ export function ScorekeeperApp({
               homeTeam={homeTeam}
               awayTeam={awayTeam}
               shootout={state.shootout}
-              homeRoster={attendingSkaters(homeSlug)}
-              awayRoster={attendingSkaters(awaySlug)}
+              homeRoster={attendingPlayers(homeSlug)}
+              awayRoster={attendingPlayers(awaySlug)}
               onAttempt={addShootoutAttempt}
               onUndo={undoLastShootoutAttempt}
             />
@@ -1359,7 +1362,7 @@ export function ScorekeeperApp({
                           )}
                         </div>
                         <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(g.period)} {clockToElapsedDisplay(g.clock, g.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(g.period)} {clockToElapsedDisplay(g.clock, g.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: g.id, type: "goal" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1379,7 +1382,7 @@ export function ScorekeeperApp({
                           <span className="text-[10px] text-muted-foreground/50"> &middot; {p.infraction} &middot; {p.minutes}min</span>
                         </div>
                         <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(p.period)} {clockToElapsedDisplay(p.clock, p.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(p.period)} {clockToElapsedDisplay(p.clock, p.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: p.id, type: "penalty" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1397,7 +1400,7 @@ export function ScorekeeperApp({
                         <div className="flex-1 min-w-0">
                           <span className="text-[11px] font-medium text-muted-foreground">{teamName}</span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(t.period)} {clockToElapsedDisplay(t.clock, t.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(t.period)} {clockToElapsedDisplay(t.clock, t.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: t.id, type: "timeout" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1418,7 +1421,7 @@ export function ScorekeeperApp({
                           <span className="text-[11px] font-medium">{nameById(c.inGoalieId)}</span>
                         </div>
                         <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(c.period)} {clockToElapsedDisplay(c.clock, c.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(c.period)} {clockToElapsedDisplay(c.clock, c.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: c.id, type: "goalieChange" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"

@@ -14,10 +14,12 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
   const gameRows = await rawSql(sql`
     SELECT g.id, g.date, g.time, g.status, g.season_id,
       g.home_team, g.away_team, g.is_playoff, g.game_type,
-      COALESCE(ht.name, g.home_team) as home_team_name, COALESCE(awt.name, g.away_team) as away_team_name
+      COALESCE(ht.name, g.home_team) as home_team_name, COALESCE(awt.name, g.away_team) as away_team_name,
+      s.game_length
     FROM games g
     LEFT JOIN teams ht ON g.home_team = ht.slug
     LEFT JOIN teams awt ON g.away_team = awt.slug
+    LEFT JOIN seasons s ON g.season_id = s.id
     WHERE g.id = ${id}
   `)
 
@@ -64,6 +66,8 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
     SELECT state FROM game_live WHERE game_id = ${id}
   `)
 
+  const defaultPeriodLength = Math.round(((game.game_length || 60) / 3) * 60)
+
   return (
     <>
     <SiteHeader />
@@ -82,6 +86,7 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
       awayRoster={awayRoster}
       existingState={liveRows.length > 0 ? liveRows[0].state : null}
       initialAuthenticated={await getSession()}
+      defaultPeriodLength={defaultPeriodLength}
     />
     </>
   )
