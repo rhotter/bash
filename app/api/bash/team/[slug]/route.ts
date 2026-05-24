@@ -185,7 +185,7 @@ export async function GET(
       WHERE g.season_id = ${seasonId}
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
-      ORDER BY g.date DESC, 
+      ORDER BY g.date ASC, 
         CASE 
           WHEN g.time = 'TBD' THEN '23:59'::time 
           WHEN g.time ILIKE '%a%' OR g.time ILIKE '%p%' THEN 
@@ -195,7 +195,7 @@ export async function GET(
             )::time 
           ELSE 
             g.time::time 
-        END DESC
+        END ASC
     `)
 
     const games = gameRows.map((r) => {

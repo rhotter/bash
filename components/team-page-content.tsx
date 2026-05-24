@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { formatGameDate } from "@/lib/format-time"
+import { formatGameDate, formatGameDateNoYear } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
@@ -170,15 +170,16 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-lg",
+        "flex items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg",
         isFinal && "hover:bg-muted/50 cursor-pointer"
       )}
       onClick={isFinal ? () => router.push(`/game/${g.id}`) : undefined}
     >
-      <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0 w-32 whitespace-nowrap">
-        {formatGameDate(g.date)}
+      <span className="text-[10px] text-muted-foreground/60 font-medium shrink-0 w-[80px] sm:w-32 whitespace-nowrap">
+        <span className="sm:hidden">{formatGameDateNoYear(g.date)}</span>
+        <span className="hidden sm:inline">{formatGameDate(g.date)}</span>
       </span>
-      <span className="text-[10px] text-muted-foreground/40 w-4 shrink-0 text-center">
+      <span className="text-[10px] text-muted-foreground/40 w-3 sm:w-4 shrink-0 text-center">
         {g.isHome ? "vs" : "@"}
       </span>
       <span className="flex-1 min-w-0 truncate">

@@ -68,7 +68,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
         AND (g.home_team = ${slug} OR g.away_team = ${slug})
         AND g.is_playoff = false
         AND g.game_type = 'regular'
-      ORDER BY g.date DESC,
+      ORDER BY g.date ASC,
         CASE
           WHEN g.time = 'TBD' THEN '23:59'::time
           WHEN g.time ILIKE '%a%' OR g.time ILIKE '%p%' THEN
@@ -78,7 +78,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
             )::time
           ELSE
             g.time::time
-        END DESC
+        END ASC
     `),
   ])
 

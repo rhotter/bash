@@ -16,6 +16,12 @@ export function formatGameDateShort(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
+export function formatGameDateNoYear(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number)
+  const date = new Date(y, m - 1, d)
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+}
+
 export function formatGameTime(time: string): string {
   // Strip trailing am/pm or a/p to keep all schedule times uniform
   return time.replace(/\s*(a|p|am|pm)$/i, "")
