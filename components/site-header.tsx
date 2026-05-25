@@ -45,12 +45,13 @@ function SiteHeaderInner({ activeTab }: { activeTab?: string }) {
           </Link>
           <nav className="ml-auto flex items-center gap-0 sm:gap-1">
             <PlayerSearch />
-            {NAV_ITEMS.filter((item) => season !== "all" || item.label === "Stats").map((item) => {
+            {NAV_ITEMS.map((item) => {
               const isActive = activeTab === item.label.toLowerCase()
+              const itemQuery = (season === "all" && item.label !== "Stats") ? "" : seasonQuery
               return (
                 <Link
                   key={item.label}
-                  href={`${item.href}${seasonQuery}`}
+                  href={`${item.href}${itemQuery}`}
                   className={
                     "text-[11px] sm:text-xs font-semibold px-2 sm:px-3 py-1.5 rounded-md transition-colors " +
                     (isActive

@@ -39,10 +39,15 @@ export function useBashData(season?: string, fallbackData?: BashApiData) {
   }
 }
 
-export function usePlayerStats(season?: string, fallbackData?: PlayerStatsData, playoff?: boolean) {
+export function usePlayerStats(season?: string, fallbackData?: PlayerStatsData, playoff?: boolean, seasonType?: string, gameType?: string) {
   const params = new URLSearchParams()
   if (season) params.set("season", season)
-  if (playoff) params.set("playoff", "true")
+  if (season === "all" && gameType) {
+    params.set("gameType", gameType)
+  } else if (playoff) {
+    params.set("playoff", "true")
+  }
+  if (seasonType) params.set("seasonType", seasonType)
   const qs = params.toString()
   const url = qs ? `/api/bash/players?${qs}` : "/api/bash/players"
 

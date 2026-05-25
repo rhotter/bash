@@ -20,9 +20,11 @@ const PER_PAGE = 25
 export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
   const searchParams = useSearchParams()
   const season = searchParams.get("season") || undefined
-  const [playoff, setPlayoff] = useState(false)
-  const { skaters, goalies, teams, hasPlayoffs, isLoading, isError } = usePlayerStats(season, !playoff ? initialData : undefined, playoff)
+  const seasonType = searchParams.get("seasonType") || "fall"
+  const gameType = searchParams.get("gameType") || "regular"
   const router = useRouter()
+  const [playoff, setPlayoff] = useState(false)
+  const { skaters, goalies, teams, hasPlayoffs, isLoading, isError } = usePlayerStats(season, !playoff ? initialData : undefined, playoff, seasonType, gameType)
   const rawView = searchParams.get("view")
   const tab = rawView === "goalies" ? "goalies" : "skaters" as const
 
@@ -37,6 +39,21 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
     router.replace(qs ? `?${qs}` : "/stats", { scroll: false })
   }, [searchParams, router])
 
+  const setSeasonType = useCallback((type: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("seasonType", type)
+    const qs = params.toString()
+    router.replace(qs ? `?${qs}` : "/stats", { scroll: false })
+  }, [searchParams, router])
+
+  const setGameType = useCallback((type: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("gameType", type)
+    const qs = params.toString()
+    router.replace(qs ? `?${qs}` : "/stats", { scroll: false })
+  }, [searchParams, router])
+
+  const [minGames, setMinGames] = useState<number | "">(15)
   const [nameFilter, setNameFilter] = useState("")
   const [teamFilter, setTeamFilter] = useState<string>("all")
   const { sortKey, sortDir, toggleSort } = useSort<SortKey>("points")
@@ -47,24 +64,32 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
   const nameLower = nameFilter.toLowerCase()
 
   const filteredSkaters = useMemo(() => {
-    let list = teamFilter === "all" ? skaters : skaters.filter((p) => p.teamSlug === teamFilter)
+    let list = (season === "all" || teamFilter === "all") ? skaters : skaters.filter((p) => p.teamSlug === teamFilter)
     if (nameLower) list = list.filter((p) => p.name.toLowerCase().includes(nameLower))
+    if (season === "all" && tab === "skaters") {
+      const minGp = typeof minGames === "number" ? minGames : 0
+      list = list.filter((p) => p.gp >= minGp)
+    }
     return [...list].sort((a, b) => {
       const av = (a[sortKey] ?? 0) as number
       const bv = (b[sortKey] ?? 0) as number
       return sortDir === "desc" ? bv - av : av - bv
     })
-  }, [skaters, teamFilter, nameLower, sortKey, sortDir])
-
+  }, [skaters, teamFilter, nameLower, sortKey, sortDir, season, tab, minGames])
+ 
   const filteredGoalies = useMemo(() => {
-    let list = teamFilter === "all" ? goalies : goalies.filter((p) => p.teamSlug === teamFilter)
+    let list = (season === "all" || teamFilter === "all") ? goalies : goalies.filter((p) => p.teamSlug === teamFilter)
     if (nameLower) list = list.filter((p) => p.name.toLowerCase().includes(nameLower))
+    if (season === "all" && tab === "goalies") {
+      const minGp = typeof minGames === "number" ? minGames : 0
+      list = list.filter((p) => p.gp >= minGp)
+    }
     return [...list].sort((a, b) => {
       const av = (a[goalieSortKey] ?? 0) as number
       const bv = (b[goalieSortKey] ?? 0) as number
       return goalieSortDir === "desc" ? bv - av : av - bv
     })
-  }, [goalies, teamFilter, nameLower, goalieSortKey, goalieSortDir])
+  }, [goalies, teamFilter, nameLower, goalieSortKey, goalieSortDir, season, tab, minGames])
 
   const skaterTotalPages = Math.max(1, Math.ceil(filteredSkaters.length / PER_PAGE))
   const goalieTotalPages = Math.max(1, Math.ceil(filteredGoalies.length / PER_PAGE))
@@ -135,61 +160,149 @@ export function StatsTab({ initialData }: { initialData?: PlayerStatsData }) {
         <div className="h-px flex-1 bg-border/40 ml-2" />
       </div>
 
-      {/* Team filter */}
-      {teams.length > 8 ? (
-        <div className="flex items-center gap-2">
-          <select
-            value={teamFilter}
-            onChange={(e) => { setTeamFilter(e.target.value); setSkaterPage(1); setGoaliePage(1) }}
-            className="rounded-md bg-card border border-border/40 px-2.5 py-1.5 text-[11px] font-medium text-foreground min-h-[44px] sm:min-h-0 appearance-none cursor-pointer pr-7 bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
-          >
-            <option value="all">All Teams</option>
-            {teams.map((t) => (
-              <option key={t.slug} value={t.slug}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-      ) : (
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <button
-            onClick={() => { setTeamFilter("all"); setSkaterPage(1); setGoaliePage(1) }}
-            className={cn(
-              "shrink-0 rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors min-h-[44px] sm:min-h-0 flex items-center gap-1",
-              teamFilter === "all"
-                ? "bg-card text-foreground font-semibold"
-                : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card/40"
-            )}
-          >
-            All Teams
-          </button>
-          {teams.map((t) => (
-            <button
-              key={t.slug}
-              onClick={() => { setTeamFilter(t.slug); setSkaterPage(1); setGoaliePage(1) }}
-              className={cn(
-                "shrink-0 rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors min-h-[44px] sm:min-h-0 flex items-center gap-1",
-                teamFilter === t.slug
-                  ? "bg-card text-foreground font-semibold"
-                  : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card/40"
-              )}
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Filters Control Bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border border-border/10 rounded-lg p-3 bg-card/45">
+        <div className="flex items-end gap-2 sm:gap-3 w-full sm:w-auto">
+          {/* Team Filter (only when season is not "all") */}
+          {season !== "all" && (
+            <>
+              {/* Mobile Team Filter Dropdown (always select on small screen) */}
+              <div className="flex flex-col gap-1.5 sm:hidden w-[120px]">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-bold pl-0.5">Team</span>
+                <select
+                  value={teamFilter}
+                  onChange={(e) => { setTeamFilter(e.target.value); setSkaterPage(1); setGoaliePage(1) }}
+                  className="rounded-md bg-card border border-border/40 px-2 py-1.5 text-[11px] font-semibold text-foreground appearance-none cursor-pointer pr-6 bg-[length:10px] bg-[right_6px_center] bg-no-repeat min-h-[36px] sm:min-h-0 w-full"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                >
+                  <option value="all">All Teams</option>
+                  {teams.map((t) => (
+                    <option key={t.slug} value={t.slug}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
 
-      {/* Player name search */}
-      <div className="relative">
-        <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
-        <input
-          type="text"
-          value={nameFilter}
-          onChange={(e) => { setNameFilter(e.target.value); setSkaterPage(1); setGoaliePage(1) }}
-          placeholder="Search players..."
-          className="w-full rounded-md bg-card border border-border/40 pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 min-h-[44px] sm:min-h-0"
-        />
+              {/* Desktop Team Filter (buttons or select on larger screens) */}
+              <div className="hidden sm:flex sm:flex-col sm:gap-1.5">
+                {teams.length > 8 ? (
+                  <>
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-bold pl-0.5">Team</span>
+                    <select
+                      value={teamFilter}
+                      onChange={(e) => { setTeamFilter(e.target.value); setSkaterPage(1); setGoaliePage(1) }}
+                      className="rounded-md bg-card border border-border/40 px-2.5 py-1.5 text-[11px] font-semibold text-foreground min-h-[40px] sm:min-h-0 appearance-none cursor-pointer pr-7 bg-[length:12px] bg-[right_8px_center] bg-no-repeat w-40"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                    >
+                      <option value="all">All Teams</option>
+                      {teams.map((t) => (
+                        <option key={t.slug} value={t.slug}>{t.name}</option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-bold pl-0.5">Team</span>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+                      <button
+                        onClick={() => { setTeamFilter("all"); setSkaterPage(1); setGoaliePage(1) }}
+                        className={cn(
+                          "shrink-0 rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors min-h-[40px] sm:min-h-0 flex items-center gap-1",
+                          teamFilter === "all"
+                            ? "bg-card text-foreground font-semibold"
+                            : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card/40"
+                        )}
+                      >
+                        All Teams
+                      </button>
+                      {teams.map((t) => (
+                        <button
+                          key={t.slug}
+                          onClick={() => { setTeamFilter(t.slug); setSkaterPage(1); setGoaliePage(1) }}
+                          className={cn(
+                            "shrink-0 rounded-md px-2.5 py-1 text-[10px] font-medium transition-colors min-h-[40px] sm:min-h-0 flex items-center gap-1",
+                            teamFilter === t.slug
+                              ? "bg-card text-foreground font-semibold"
+                              : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card/40"
+                          )}
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Game Type Filter (only when season is "all") */}
+          {season === "all" && (
+            <div className="flex flex-col gap-1.5 w-[120px]">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-bold pl-0.5">Game Type</span>
+              <select
+                value={gameType}
+                onChange={(e) => { setGameType(e.target.value); setSkaterPage(1); setGoaliePage(1); }}
+                className="rounded-md bg-card border border-border/40 px-2 py-1.5 text-[11px] font-semibold text-foreground appearance-none cursor-pointer pr-6 bg-[length:10px] bg-[right_6px_center] bg-no-repeat min-h-[36px] sm:min-h-0 w-full"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+              >
+                <option value="regular">Regular Season</option>
+                <option value="playoffs">Playoffs</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          )}
+
+          {/* All-time specific filters */}
+          {season === "all" && (
+            <>
+              <div className="flex flex-col gap-1.5 w-[100px] sm:w-32">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-bold pl-0.5">Season Type</span>
+                <select
+                  value={seasonType}
+                  onChange={(e) => { setSeasonType(e.target.value); setGoaliePage(1); setSkaterPage(1); }}
+                  className="rounded-md bg-card border border-border/40 px-2 py-1.5 text-[11px] font-semibold text-foreground appearance-none cursor-pointer pr-6 sm:pr-7 bg-[length:10px] sm:bg-[length:12px] bg-[right_6px_center] sm:bg-[right_8px_center] bg-no-repeat min-h-[36px] sm:min-h-0 w-full"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
+                >
+                  <option value="fall">Fall</option>
+                  <option value="summer">Summer</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5 w-[70px] sm:w-24">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-bold pl-0.5">Min Games</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={minGames}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === "") {
+                      setMinGames("")
+                    } else {
+                      setMinGames(Math.max(0, parseInt(val) || 0))
+                    }
+                    setGoaliePage(1)
+                    setSkaterPage(1)
+                  }}
+                  className="rounded-md bg-card border border-border/40 px-2 py-1.5 text-[11px] font-semibold text-foreground min-h-[36px] sm:min-h-0 text-center w-full"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Player Name Search */}
+        <div className="relative w-full sm:max-w-xs self-end">
+          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+          <input
+            type="text"
+            value={nameFilter}
+            onChange={(e) => { setNameFilter(e.target.value); setSkaterPage(1); setGoaliePage(1) }}
+            placeholder="Search players..."
+            className="w-full rounded-md bg-card border border-border/40 pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 min-h-[40px] sm:min-h-0"
+          />
+        </div>
       </div>
 
       {/* Skaters Table */}

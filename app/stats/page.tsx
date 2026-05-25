@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 
 export const revalidate = 60
 
-export default async function StatsPage({ searchParams }: { searchParams: Promise<{ season?: string }> }) {
-  const { season } = await searchParams
-  const data = await fetchPlayerStats(season)
+export default async function StatsPage({ searchParams }: { searchParams: Promise<{ season?: string; seasonType?: string; gameType?: string }> }) {
+  const { season, seasonType, gameType } = await searchParams
+  const data = await fetchPlayerStats(season, false, seasonType, gameType)
 
   return (
     <div className="flex flex-1 flex-col bg-background">

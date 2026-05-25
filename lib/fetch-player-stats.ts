@@ -49,13 +49,36 @@ export interface PlayerStatsData {
   hasPlayoffs?: boolean
 }
 
-export async function fetchPlayerStats(seasonParam?: string | null, playoff?: boolean): Promise<PlayerStatsData> {
+export async function fetchPlayerStats(
+  seasonParam?: string | null,
+  playoff?: boolean,
+  seasonTypeParam?: string | null,
+  gameTypeParam?: string | null
+): Promise<PlayerStatsData> {
   const isAllTime = seasonParam === "all"
   const seasonId = !isAllTime ? (seasonParam || (await getCurrentSeason()).id) : null
   const isPlayoff = playoff === true
-  const gameTypeFragment = isPlayoff
-    ? sql`g.game_type IN ('playoff', 'championship')`
-    : sql`g.game_type = 'regular'`
+
+  const gameType = gameTypeParam || (isPlayoff ? "playoffs" : "regular")
+
+  let playoffFilter = sql`g.is_playoff = false`
+  let gameTypeFragment = sql`g.game_type = 'regular'`
+  let histPlayoffFilter = sql`pss.is_playoff = false`
+
+  if (gameType === "playoffs") {
+    playoffFilter = sql`g.is_playoff = true`
+    gameTypeFragment = sql`g.game_type IN ('playoff', 'championship', 'regular')`
+    histPlayoffFilter = sql`pss.is_playoff = true`
+  } else if (gameType === "all") {
+    playoffFilter = sql`1=1`
+    gameTypeFragment = sql`g.game_type IN ('regular', 'playoff', 'championship')`
+    histPlayoffFilter = sql`1=1`
+  }
+
+  const seasonType = seasonTypeParam || "fall"
+  const seasonTypeFragment = seasonType === "all"
+    ? sql`s.season_type IN ('fall', 'summer')`
+    : sql`s.season_type = ${seasonType}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let skaterRows: any[]
@@ -87,22 +110,23 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
             SUM(pgs.pen)::int as pen, SUM(pgs.pim)::int as pim,
             COUNT(DISTINCT g.season_id)::int as seasons_played
           FROM player_game_stats pgs
-          JOIN games g ON pgs.game_id = g.id AND NOT g.is_playoff AND g.game_type = 'regular'
-          JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
+          JOIN games g ON pgs.game_id = g.id AND ${playoffFilter} AND ${gameTypeFragment}
+          JOIN seasons s ON g.season_id = s.id AND ${seasonTypeFragment}
           GROUP BY pgs.player_id
         ), hist_stats AS (
           SELECT
-            player_id,
-            SUM(gp)::int as gp,
-            SUM(goals)::int as goals, SUM(assists)::int as assists,
-            SUM(points)::int as points, SUM(gwg)::int as gwg,
-            SUM(ppg)::int as ppg, SUM(shg)::int as shg,
-            SUM(eng)::int as eng, SUM(hat_tricks)::int as hat_tricks,
-            SUM(pen)::int as pen, SUM(pim)::int as pim,
-            COUNT(DISTINCT season_id)::int as seasons_played
-          FROM player_season_stats
-          WHERE NOT is_playoff
-          GROUP BY player_id
+            pss.player_id,
+            SUM(pss.gp)::int as gp,
+            SUM(pss.goals)::int as goals, SUM(pss.assists)::int as assists,
+            SUM(pss.points)::int as points, SUM(pss.gwg)::int as gwg,
+            SUM(pss.ppg)::int as ppg, SUM(pss.shg)::int as shg,
+            SUM(pss.eng)::int as eng, SUM(pss.hat_tricks)::int as hat_tricks,
+            SUM(pss.pen)::int as pen, SUM(pss.pim)::int as pim,
+            COUNT(DISTINCT pss.season_id)::int as seasons_played
+          FROM player_season_stats pss
+          JOIN seasons s ON pss.season_id = s.id AND ${seasonTypeFragment}
+          WHERE ${histPlayoffFilter}
+          GROUP BY pss.player_id
         ), combined AS (
           SELECT
             COALESCE(gs.player_id, hs.player_id) as player_id,
@@ -158,8 +182,8 @@ export async function fetchPlayerStats(seasonParam?: string | null, playoff?: bo
           COUNT(DISTINCT g.season_id)::int as seasons_played
         FROM players p
         JOIN goalie_game_stats ggs ON p.id = ggs.player_id
-        JOIN games g ON ggs.game_id = g.id AND g.game_type = 'regular'
-        JOIN seasons s ON g.season_id = s.id AND s.season_type = 'fall'
+        JOIN games g ON ggs.game_id = g.id AND ${playoffFilter} AND ${gameTypeFragment}
+        JOIN seasons s ON g.season_id = s.id AND ${seasonTypeFragment}
         GROUP BY p.id, p.name
         ORDER BY save_pct DESC
       `),

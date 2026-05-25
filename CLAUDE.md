@@ -45,7 +45,7 @@ Each page follows: async Server Component (data fetch + `generateMetadata`) → 
 - `app/api/bash/admin/seasons/[id]/draft/` — Draft management API (22 endpoints)
 - `lib/fetch-*.ts` — Server-side data fetching functions (raw SQL queries)
 - `lib/hockey-data.ts` — SWR hooks for client-side data
-- `lib/db/schema.ts` — Drizzle ORM schema (22 tables)
+- `lib/db/schema.ts` — Drizzle ORM schema (39 tables)
 - `lib/draft-helpers.ts` — Snake/linear pick slot generation
 - `lib/draft-trade-resolver.ts` — Chain trade resolution engine
 - `lib/csv-utils.ts` — Shared CSV parser for Sportability exports
