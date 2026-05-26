@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Search, UserPlus, Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -15,7 +16,10 @@ interface AddPlayerModalProps {
   teamSide: "home" | "away"
   teamName: string
   pin?: string
-  onPlayerAdded: (player: { id: number; name: string }, isNew: boolean) => void
+  // True if this game is exhibition/tryout — for adhoc games, adding a player
+  // is the normal path (not a sub), so the sub toggle defaults off.
+  adhocGame?: boolean
+  onPlayerAdded: (player: { id: number; name: string }, isNew: boolean, isSub: boolean) => void
 }
 
 interface SearchResult {
@@ -30,6 +34,7 @@ export function AddPlayerModal({
   teamSide,
   teamName,
   pin,
+  adhocGame = false,
   onPlayerAdded,
 }: AddPlayerModalProps) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -38,6 +43,9 @@ export function AddPlayerModal({
   const [isAdding, setIsAdding] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newPlayerName, setNewPlayerName] = useState("")
+  // For regular-season games, default to sub. For exhibition/tryout, default off
+  // since the standard flow is to add players to the per-game roster.
+  const [isSub, setIsSub] = useState(!adhocGame)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Reset state when modal opens
@@ -47,10 +55,11 @@ export function AddPlayerModal({
       setSearchResults([])
       setShowCreateForm(false)
       setNewPlayerName("")
+      setIsSub(!adhocGame)
       // Focus search input after modal animation
       setTimeout(() => searchInputRef.current?.focus(), 100)
     }
-  }, [open])
+  }, [open, adhocGame])
 
   // Debounced search across the full players table
   useEffect(() => {
@@ -87,15 +96,19 @@ export function AddPlayerModal({
       const res = await fetch(`/api/bash/scorekeeper/${gameId}/player`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ name: player.name, teamSide }),
+        body: JSON.stringify({ name: player.name, teamSide, isSub }),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Failed to add player")
       }
       const data = await res.json()
-      onPlayerAdded(data.player, data.isNew)
-      toast.success(`${data.player.name} added to ${teamName}`)
+      onPlayerAdded(data.player, data.isNew, !!data.isSub)
+      toast.success(
+        data.isSub
+          ? `${data.player.name} added as sub for ${teamName}`
+          : `${data.player.name} added to ${teamName}`
+      )
       onOpenChange(false)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to add player")
@@ -113,18 +126,18 @@ export function AddPlayerModal({
       const res = await fetch(`/api/bash/scorekeeper/${gameId}/player`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ name: newPlayerName.trim(), teamSide }),
+        body: JSON.stringify({ name: newPlayerName.trim(), teamSide, isSub }),
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || "Failed to create player")
       }
       const data = await res.json()
-      onPlayerAdded(data.player, data.isNew)
+      onPlayerAdded(data.player, data.isNew, !!data.isSub)
       toast.success(
         data.isNew
-          ? `${data.player.name} created and added to ${teamName}`
-          : `${data.player.name} found and added to ${teamName}`
+          ? `${data.player.name} created and added to ${teamName}${data.isSub ? " as sub" : ""}`
+          : `${data.player.name} found and added to ${teamName}${data.isSub ? " as sub" : ""}`
       )
       onOpenChange(false)
     } catch (err: unknown) {
@@ -145,6 +158,22 @@ export function AddPlayerModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-3">
+          {/* Sub toggle */}
+          <label className="flex items-center gap-2 px-1 py-1.5 cursor-pointer select-none">
+            <Checkbox
+              checked={isSub}
+              onCheckedChange={(v) => setIsSub(v === true)}
+              disabled={isAdding}
+              className="data-[state=checked]:bg-foreground data-[state=checked]:border-foreground data-[state=checked]:text-background"
+            />
+            <span className="text-xs">
+              Sub for this game only
+              <span className="text-muted-foreground/70 ml-1">
+                — stats won&apos;t count toward season totals
+              </span>
+            </span>
+          </label>
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

@@ -2,9 +2,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import type { RosterPlayer } from "@/lib/scorekeeper-types"
+import { SubBadge } from "./sub-badge"
 
-export function GoalieSelect({ label, players, value, onChange }: {
+export function GoalieSelect({ label, players, value, onChange, subPlayerIds }: {
   label: string; players: RosterPlayer[]; value: string; onChange: (value: string) => void
+  subPlayerIds?: Set<number>
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -16,7 +18,12 @@ export function GoalieSelect({ label, players, value, onChange }: {
         <SelectContent>
           <SelectItem value="none">No goalie</SelectItem>
           {players.map((p) => (
-            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+            <SelectItem key={p.id} value={String(p.id)}>
+              <span className="inline-flex items-center">
+                {p.name}
+                {subPlayerIds?.has(p.id) && <SubBadge />}
+              </span>
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
-import { eq, inArray } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { LiveGameState, GoalEvent } from "@/lib/scorekeeper-types"
 import { computePulledSeconds, clockToElapsed, parseClockString } from "@/lib/scorekeeper-types"
 import { getSession } from "@/lib/admin-session"
@@ -163,25 +163,23 @@ export async function POST(
     // 9. Delete old player/goalie stats then insert fresh for attending players
     await db.delete(schema.playerGameStats).where(eq(schema.playerGameStats.gameId, id))
 
-    const playerIds = Array.from(playerStats.keys())
-    const playerNamesMap = new Map<number, string>()
-    if (playerIds.length > 0) {
-      const pRows = await db
-        .select({ id: schema.players.id, name: schema.players.name })
-        .from(schema.players)
-        .where(inArray(schema.players.id, playerIds))
-      for (const row of pRows) {
-        playerNamesMap.set(row.id, row.name)
-      }
-    }
+    // Look up which players are subs in this game (from adhoc_game_rosters).
+    // Subs still get pgs/ggs rows so they appear on the game's box score,
+    // but the is_sub flag is denormalized onto those rows so season-stats
+    // aggregations can filter them out.
+    const adhocRows = await db
+      .select({ playerId: schema.adhocGameRosters.playerId, isSub: schema.adhocGameRosters.isSub })
+      .from(schema.adhocGameRosters)
+      .where(eq(schema.adhocGameRosters.gameId, id))
+    const subIds = new Set<number>(adhocRows.filter((r) => r.isSub).map((r) => r.playerId))
 
     for (const [playerId, stats] of playerStats) {
       const isGoalie = goalieIds.has(playerId)
-      const playerName = playerNamesMap.get(playerId) || ""
-      const isSub = playerName.toLowerCase().includes("sub")
+      const isSub = subIds.has(playerId)
       const hasSkaterStats = stats.goals > 0 || stats.assists > 0 || stats.pen > 0 || stats.pim > 0
 
-      // Only skip goalies if they are NOT a sub player AND didn't record any skater stats
+      // Skip pure goalies with no skater stats. Sub goalies still get a pgs row
+      // so the box score shows them on the team they subbed for.
       if (isGoalie && !isSub && !hasSkaterStats) continue
 
       const hatTricks = (goalCounts.get(playerId) || 0) >= 3 ? 1 : 0
@@ -202,6 +200,7 @@ export async function POST(
           hatTricks,
           pen: stats.pen,
           pim: stats.pim,
+          isSub,
         })
         .onConflictDoUpdate({
           target: [schema.playerGameStats.playerId, schema.playerGameStats.gameId],
@@ -216,6 +215,7 @@ export async function POST(
             hatTricks,
             pen: stats.pen,
             pim: stats.pim,
+            isSub,
           },
         })
     }
@@ -395,6 +395,7 @@ export async function POST(
     )
 
     for (const gs of [...homeGoalieStats, ...awayGoalieStats]) {
+      const isSub = subIds.has(gs.goalieId)
       await db
         .insert(schema.goalieGameStats)
         .values({
@@ -407,6 +408,7 @@ export async function POST(
           shutouts: gs.shutouts,
           goalieAssists: 0,
           result: gs.result,
+          isSub,
         })
         .onConflictDoUpdate({
           target: [schema.goalieGameStats.playerId, schema.goalieGameStats.gameId],
@@ -417,6 +419,7 @@ export async function POST(
             saves: gs.saves,
             shutouts: gs.shutouts,
             result: gs.result,
+            isSub,
           },
         })
     }

@@ -165,6 +165,7 @@ export const playerGameStats = pgTable(
     hatTricks: integer("hat_tricks").notNull().default(0),
     pen: integer("pen").notNull().default(0),
     pim: integer("pim").notNull().default(0),
+    isSub: boolean("is_sub").notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.playerId, t.gameId] }),
@@ -191,6 +192,7 @@ export const goalieGameStats = pgTable(
     shutouts: integer("shutouts").notNull().default(0),
     goalieAssists: integer("goalie_assists").notNull().default(0),
     result: text("result"),
+    isSub: boolean("is_sub").notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.playerId, t.gameId] }),
@@ -768,6 +770,7 @@ export const adhocGameRosters = pgTable(
       .notNull()
       .references(() => players.id),
     teamSide: text("team_side").notNull(), // "home" | "away"
+    isSub: boolean("is_sub").notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.gameId, t.playerId] }),

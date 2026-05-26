@@ -13,6 +13,7 @@ export interface LiveGameData {
   updatedAt: string
   playerNames: Record<number, string>
   goalieIds: number[]
+  subPlayerIds: number[]
 }
 
 export async function fetchLiveGameData(id: string): Promise<LiveGameData | null> {
@@ -59,6 +60,14 @@ export async function fetchLiveGameData(id: string): Promise<LiveGameData | null
     if (stateObj.awayGoalieId != null) goalieIds.push(stateObj.awayGoalieId)
   }
 
+  // Sub player IDs come from adhoc_game_rosters (set when a sub is added in
+  // the scorekeeper), independent of whether stats have been finalized yet.
+  const subRows = await rawSql(sql`
+    SELECT player_id FROM adhoc_game_rosters
+    WHERE game_id = ${id} AND is_sub = true
+  `)
+  const subPlayerIds = subRows.map((r) => r.player_id as number)
+
   return {
     state: row.state,
     homeScore: row.home_score,
@@ -71,5 +80,6 @@ export async function fetchLiveGameData(id: string): Promise<LiveGameData | null
     updatedAt: row.updated_at,
     playerNames,
     goalieIds,
+    subPlayerIds,
   }
 }

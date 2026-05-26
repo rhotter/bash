@@ -16,12 +16,17 @@ Database schema:
 - games (id TEXT PK, season_id TEXT, date TEXT, time TEXT, home_team TEXT, away_team TEXT, home_score INT, away_score INT, status TEXT ['upcoming'|'final'|'live'], is_overtime BOOL, is_playoff BOOL, location TEXT, has_boxscore BOOL)
 - players (id SERIAL PK, name TEXT UNIQUE)
 - player_seasons (player_id INT, season_id TEXT, team_slug TEXT, is_goalie BOOL)
-- player_game_stats (player_id INT, game_id TEXT, goals INT, assists INT, points INT, gwg INT, ppg INT, shg INT, eng INT, hat_tricks INT, pen INT, pim INT)
+- player_game_stats (player_id INT, game_id TEXT, goals INT, assists INT, points INT, gwg INT, ppg INT, shg INT, eng INT, hat_tricks INT, pen INT, pim INT, is_sub BOOL)
 - player_season_stats (player_id INT, season_id TEXT, team_slug TEXT, is_playoff BOOL, gp INT, goals INT, assists INT, points INT, gwg INT, ppg INT, shg INT, eng INT, hat_tricks INT, pen INT, pim INT)
-- goalie_game_stats (player_id INT, game_id TEXT, seconds INT, goals_against INT, shots_against INT, saves INT, shutouts INT, goalie_assists INT, result TEXT)
+- goalie_game_stats (player_id INT, game_id TEXT, seconds INT, goals_against INT, shots_against INT, saves INT, shutouts INT, goalie_assists INT, result TEXT, is_sub BOOL)
+- adhoc_game_rosters (game_id TEXT, player_id INT, team_side TEXT ['home'|'away'], is_sub BOOL)
 - player_awards (id SERIAL, player_name TEXT, player_id INT, season_id TEXT, award_type TEXT)
 - hall_of_fame (id SERIAL, player_name TEXT, player_id INT, class_year INT, wing TEXT, years_active TEXT, achievements TEXT)
 - game_officials (id SERIAL, game_id TEXT, name TEXT, role TEXT)
+
+NOTE: Rows in player_game_stats / goalie_game_stats with is_sub = true represent
+substitute appearances for a single game and are excluded from season-level stats.
+Filter aggregations with 'AND NOT is_sub'.
 
 Season IDs look like "2025-2026" (fall) or "2024-summer". The current season is marked with is_current=true.
 Only SELECT queries are allowed. Results limited to 100 rows.`,

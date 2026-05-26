@@ -112,6 +112,7 @@ export async function fetchPlayerStats(
           FROM player_game_stats pgs
           JOIN games g ON pgs.game_id = g.id AND ${playoffFilter} AND ${gameTypeFragment}
           JOIN seasons s ON g.season_id = s.id AND ${seasonTypeFragment}
+          WHERE NOT pgs.is_sub
           GROUP BY pgs.player_id
         ), hist_stats AS (
           SELECT
@@ -184,6 +185,7 @@ export async function fetchPlayerStats(
         JOIN goalie_game_stats ggs ON p.id = ggs.player_id
         JOIN games g ON ggs.game_id = g.id AND ${playoffFilter} AND ${gameTypeFragment}
         JOIN seasons s ON g.season_id = s.id AND ${seasonTypeFragment}
+        WHERE NOT ggs.is_sub
         GROUP BY p.id, p.name
         ORDER BY save_pct DESC
       `),
@@ -240,6 +242,7 @@ export async function fetchPlayerStats(
         FROM players p
         JOIN player_game_stats pgs ON p.id = pgs.player_id
         JOIN games g ON pgs.game_id = g.id AND g.season_id = ${seasonId} AND ${playoffFragment} AND ${gameTypeFragment}
+        WHERE NOT pgs.is_sub
         GROUP BY p.id, p.name
         ORDER BY points DESC, goals DESC, p.name ASC
       `),
@@ -271,6 +274,7 @@ export async function fetchPlayerStats(
         JOIN goalie_game_stats ggs ON p.id = ggs.player_id
         JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId} AND ${playoffFragment} AND ${gameTypeFragment}
         LEFT JOIN seasons s ON g.season_id = s.id
+        WHERE NOT ggs.is_sub
         GROUP BY p.id, p.name
         ORDER BY save_pct DESC
       `),

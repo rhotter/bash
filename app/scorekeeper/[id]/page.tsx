@@ -34,7 +34,8 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
   const game = gameRows[0]
   const isAdhocGame = game.game_type === 'exhibition' || game.game_type === 'tryout'
 
-  // Get rosters — exhibition/tryout games use adhoc_game_rosters, others use player_seasons
+  // Get rosters — exhibition/tryout games use adhoc_game_rosters as source of truth;
+  // regular games use player_seasons, plus any adhoc overlay (subs for this game).
   async function getRoster(teamSlug: string, seasonId: string, teamSide: 'home' | 'away'): Promise<RosterPlayer[]> {
     if (isAdhocGame) {
       const rows = await rawSql(sql`
@@ -47,19 +48,27 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
       return rows.map((r) => ({ id: r.id, name: r.name }))
     }
     const rows = await rawSql(sql`
-      SELECT p.id, p.name
-      FROM player_seasons ps
+      SELECT p.id, p.name FROM player_seasons ps
       JOIN players p ON ps.player_id = p.id
       WHERE ps.season_id = ${seasonId} AND ps.team_slug = ${teamSlug}
-      ORDER BY p.name ASC
+      UNION
+      SELECT p.id, p.name FROM adhoc_game_rosters agr
+      JOIN players p ON agr.player_id = p.id
+      WHERE agr.game_id = ${id} AND agr.team_side = ${teamSide}
+      ORDER BY name ASC
     `)
     return rows.map((r) => ({ id: r.id, name: r.name }))
   }
 
-  const [homeRoster, awayRoster] = await Promise.all([
+  const [homeRoster, awayRoster, adhocSubs] = await Promise.all([
     getRoster(game.home_team, game.season_id, 'home'),
     getRoster(game.away_team, game.season_id, 'away'),
+    rawSql(sql`
+      SELECT player_id FROM adhoc_game_rosters
+      WHERE game_id = ${id} AND is_sub = true
+    `),
   ])
+  const initialSubPlayerIds: number[] = adhocSubs.map((r) => r.player_id)
 
   // Check if there's existing live state
   const liveRows = await rawSql(sql`
@@ -84,6 +93,7 @@ export default async function ScorekeeperPage({ params }: { params: Promise<{ id
       awayTeam={game.away_team_name}
       homeRoster={homeRoster}
       awayRoster={awayRoster}
+      initialSubPlayerIds={initialSubPlayerIds}
       existingState={liveRows.length > 0 ? liveRows[0].state : null}
       initialAuthenticated={await getSession()}
       defaultPeriodLength={defaultPeriodLength}

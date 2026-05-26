@@ -24,19 +24,30 @@ async function getGameData(gameId: string) {
   return rows[0] || null
 }
 
-async function getRoster(seasonId: string, teamSlug: string) {
+async function getRoster(seasonId: string, teamSlug: string, gameId: string, teamSide: "home" | "away") {
   const rows = await rawSql(sql`
     SELECT
       p.name,
       ps.is_captain,
-      ps.is_goalie
+      ps.is_goalie,
+      false AS is_sub
     FROM player_seasons ps
     JOIN players p ON p.id = ps.player_id
     WHERE ps.season_id = ${seasonId}
       AND ps.team_slug = ${teamSlug}
-    ORDER BY p.name ASC
+    UNION
+    SELECT
+      p.name,
+      false AS is_captain,
+      false AS is_goalie,
+      agr.is_sub
+    FROM adhoc_game_rosters agr
+    JOIN players p ON p.id = agr.player_id
+    WHERE agr.game_id = ${gameId}
+      AND agr.team_side = ${teamSide}
+    ORDER BY name ASC
   `)
-  return rows as { name: string; is_captain: boolean | null; is_goalie: boolean | null }[]
+  return rows as { name: string; is_captain: boolean | null; is_goalie: boolean | null; is_sub: boolean | null }[]
 }
 
 async function getOfficials(gameId: string) {
@@ -172,7 +183,7 @@ function TeamSection({
 }: {
   side: "H" | "A"
   teamName: string
-  roster: { name: string; is_captain: boolean | null; is_goalie: boolean | null }[]
+  roster: { name: string; is_captain: boolean | null; is_goalie: boolean | null; is_sub: boolean | null }[]
 }) {
   return (
     <>
@@ -185,7 +196,7 @@ function TeamSection({
             {roster.length > 0
               ? roster.map((p, i) => (
                   <span key={i}>
-                    {p.is_captain ? "(c) " : ""}{p.name}
+                    {p.is_captain ? "(c) " : ""}{p.name}{p.is_sub ? " (sub)" : ""}
                     <br />
                   </span>
                 ))
@@ -246,8 +257,8 @@ export default async function ScoresheetPage({
   if (!game) notFound()
 
   const [homeRoster, awayRoster, officials] = await Promise.all([
-    getRoster(game.season_id, game.home_slug),
-    getRoster(game.season_id, game.away_slug),
+    getRoster(game.season_id, game.home_slug, gameId, "home"),
+    getRoster(game.season_id, game.away_slug, gameId, "away"),
     getOfficials(gameId),
   ])
 

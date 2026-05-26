@@ -31,15 +31,16 @@ export async function POST(
   // Hoist trimmedName so the catch block can reference it for race-condition recovery
   let trimmedName = ""
   let requestedTeamSide: "home" | "away" | null = null
+  let requestedIsSub = false
 
-  async function addPlayerToGame(playerId: number, teamSide: "home" | "away") {
+  async function addPlayerToGame(playerId: number, teamSide: "home" | "away", isSub: boolean) {
     // Add to adhoc_game_rosters (upsert — idempotent if already on roster)
     await db
       .insert(schema.adhocGameRosters)
-      .values({ gameId, playerId, teamSide })
+      .values({ gameId, playerId, teamSide, isSub })
       .onConflictDoUpdate({
         target: [schema.adhocGameRosters.gameId, schema.adhocGameRosters.playerId],
-        set: { teamSide },
+        set: { teamSide, isSub },
       })
 
     // Patch game_live.state attendance array so player appears in live scoring UI
@@ -67,7 +68,7 @@ export async function POST(
   }
 
   try {
-    const { name, teamSide } = await request.json()
+    const { name, teamSide, isSub } = await request.json()
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 })
@@ -78,8 +79,9 @@ export async function POST(
 
     trimmedName = name.trim()
     requestedTeamSide = teamSide
+    requestedIsSub = isSub === true
 
-    // Verify game exists and is exhibition/tryout
+    // Verify game exists
     const gameRows = await db
       .select({ gameType: schema.games.gameType })
       .from(schema.games)
@@ -87,9 +89,12 @@ export async function POST(
     if (gameRows.length === 0) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 })
     }
-    if (gameRows[0].gameType !== "exhibition" && gameRows[0].gameType !== "tryout") {
+    // Non-sub inline player creation is only allowed for exhibition/tryout games
+    // (where adhoc rosters are the source of truth). Subs may be added to any game.
+    const gt = gameRows[0].gameType
+    if (!requestedIsSub && gt !== "exhibition" && gt !== "tryout") {
       return NextResponse.json(
-        { error: "Inline player creation only available for exhibition/tryout games" },
+        { error: "Inline player creation only available for exhibition/tryout games (use isSub: true to add a substitute)" },
         { status: 403 }
       )
     }
@@ -118,12 +123,13 @@ export async function POST(
       isNew = true
     }
 
-    await addPlayerToGame(playerId, teamSide)
+    await addPlayerToGame(playerId, teamSide, requestedIsSub)
 
     return NextResponse.json({
       ok: true,
       player: { id: playerId, name: playerName },
       isNew,
+      isSub: requestedIsSub,
     }, { status: isNew ? 201 : 200 })
   } catch (error) {
     console.error("Failed to create/add player:", error)
@@ -136,11 +142,12 @@ export async function POST(
           SELECT id, name FROM players WHERE LOWER(name) = LOWER(${trimmedName}) LIMIT 1
         `)
         if (rows.length > 0) {
-          await addPlayerToGame(rows[0].id, requestedTeamSide)
+          await addPlayerToGame(rows[0].id, requestedTeamSide, requestedIsSub)
           return NextResponse.json({
             ok: true,
             player: { id: rows[0].id, name: rows[0].name },
             isNew: false,
+            isSub: requestedIsSub,
           })
         }
       } catch {

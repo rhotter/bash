@@ -76,7 +76,8 @@ export async function GET(
             .where(
               and(
                 eq(schema.playerGameStats.playerId, playerId),
-                inArray(schema.playerGameStats.gameId, gameIds)
+                inArray(schema.playerGameStats.gameId, gameIds),
+                eq(schema.playerGameStats.isSub, false)
               )
             )
           if (!ss?.gp) return null
@@ -104,7 +105,8 @@ export async function GET(
             .where(
               and(
                 eq(schema.goalieGameStats.playerId, playerId),
-                inArray(schema.goalieGameStats.gameId, gameIds)
+                inArray(schema.goalieGameStats.gameId, gameIds),
+                eq(schema.goalieGameStats.isSub, false)
               )
             )
           if (!gs?.gp) return null

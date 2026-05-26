@@ -21,32 +21,47 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
   const isAdhocGame = game.game_type === 'exhibition' || game.game_type === 'tryout'
 
   async function getPlayerStats(gameId: string, teamSlug: string, seasonId: string, teamSide: 'home' | 'away'): Promise<PlayerBoxScore[]> {
+    // For adhoc games (exhibition/tryout), the per-game roster is the only
+    // source of truth. For regular games, players belong via player_seasons,
+    // but any adhoc roster entry (a sub for this game) is also included.
     const result = isAdhocGame
       ? await rawSql(sql`
           SELECT p.id, p.name,
             pgs.goals, pgs.assists, pgs.points,
-            pgs.gwg, pgs.ppg, pgs.shg, pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim
+            pgs.gwg, pgs.ppg, pgs.shg, pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim,
+            pgs.is_sub
           FROM player_game_stats pgs
           JOIN players p ON pgs.player_id = p.id
           JOIN adhoc_game_rosters agr ON agr.player_id = p.id AND agr.game_id = ${gameId}
           WHERE pgs.game_id = ${gameId} AND agr.team_side = ${teamSide}
-          ORDER BY pgs.points DESC, pgs.goals DESC, p.name ASC
+          ORDER BY pgs.is_sub ASC, pgs.points DESC, pgs.goals DESC, p.name ASC
         `)
       : await rawSql(sql`
           SELECT p.id, p.name,
             pgs.goals, pgs.assists, pgs.points,
-            pgs.gwg, pgs.ppg, pgs.shg, pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim
+            pgs.gwg, pgs.ppg, pgs.shg, pgs.eng, pgs.hat_tricks, pgs.pen, pgs.pim,
+            pgs.is_sub
           FROM player_game_stats pgs
           JOIN players p ON pgs.player_id = p.id
-          JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
-          WHERE pgs.game_id = ${gameId} AND ps.team_slug = ${teamSlug}
-          ORDER BY pgs.points DESC, pgs.goals DESC, p.name ASC
+          WHERE pgs.game_id = ${gameId}
+            AND (
+              EXISTS (
+                SELECT 1 FROM player_seasons ps
+                WHERE ps.player_id = p.id AND ps.season_id = ${seasonId} AND ps.team_slug = ${teamSlug}
+              )
+              OR EXISTS (
+                SELECT 1 FROM adhoc_game_rosters agr
+                WHERE agr.game_id = ${gameId} AND agr.player_id = p.id AND agr.team_side = ${teamSide}
+              )
+            )
+          ORDER BY pgs.is_sub ASC, pgs.points DESC, pgs.goals DESC, p.name ASC
         `)
     return result.map((r) => ({
       id: r.id, name: r.name,
       goals: r.goals, assists: r.assists, points: r.points,
       gwg: r.gwg, ppg: r.ppg, shg: r.shg, eng: r.eng,
       hatTricks: r.hat_tricks, pen: r.pen, pim: r.pim,
+      isSub: !!r.is_sub,
     }))
   }
 
@@ -55,7 +70,7 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
       ? await rawSql(sql`
           SELECT p.id, p.name,
             ggs.seconds, ggs.goals_against, ggs.shots_against, ggs.saves,
-            ggs.shutouts, ggs.goalie_assists, ggs.result
+            ggs.shutouts, ggs.goalie_assists, ggs.result, ggs.is_sub
           FROM goalie_game_stats ggs
           JOIN players p ON ggs.player_id = p.id
           JOIN adhoc_game_rosters agr ON agr.player_id = p.id AND agr.game_id = ${gameId}
@@ -64,11 +79,20 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
       : await rawSql(sql`
           SELECT p.id, p.name,
             ggs.seconds, ggs.goals_against, ggs.shots_against, ggs.saves,
-            ggs.shutouts, ggs.goalie_assists, ggs.result
+            ggs.shutouts, ggs.goalie_assists, ggs.result, ggs.is_sub
           FROM goalie_game_stats ggs
           JOIN players p ON ggs.player_id = p.id
-          JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
-          WHERE ggs.game_id = ${gameId} AND ps.team_slug = ${teamSlug}
+          WHERE ggs.game_id = ${gameId}
+            AND (
+              EXISTS (
+                SELECT 1 FROM player_seasons ps
+                WHERE ps.player_id = p.id AND ps.season_id = ${seasonId} AND ps.team_slug = ${teamSlug}
+              )
+              OR EXISTS (
+                SELECT 1 FROM adhoc_game_rosters agr
+                WHERE agr.game_id = ${gameId} AND agr.player_id = p.id AND agr.team_side = ${teamSide}
+              )
+            )
         `)
     return result.map((r) => ({
       id: r.id, name: r.name,
@@ -82,6 +106,7 @@ export async function fetchGameDetail(id: string): Promise<BashGameDetail | null
       shutouts: r.shutouts,
       goalieAssists: r.goalie_assists,
       result: r.result,
+      isSub: !!r.is_sub,
     }))
   }
 

@@ -25,7 +25,7 @@ type SkaterSortKey = "points" | "goals" | "assists" | "pim" | "gwg" | "ppg" | "s
 interface GameDetailProps {
   game: BashGame
   initialDetail?: BashGameDetail
-  initialLiveData?: { state: unknown; homeScore: number | null; awayScore: number | null; playerNames: Record<number, string>; goalieIds: number[] }
+  initialLiveData?: { state: unknown; homeScore: number | null; awayScore: number | null; playerNames: Record<number, string>; goalieIds: number[]; subPlayerIds?: number[] }
   homeRoster?: RosterPlayer[]
   awayRoster?: RosterPlayer[]
   forceEdit?: boolean
@@ -211,6 +211,7 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
             <ThreeStars
               stars={liveState.threeStars}
               playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+              subPlayerIds={buildSubPlayerIds(detail, liveData?.subPlayerIds)}
             />
           )}
 
@@ -231,6 +232,7 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
                 homeTeam={game.homeTeam}
                 awayTeam={game.awayTeam}
                 playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+                subPlayerIds={buildSubPlayerIds(detail, liveData?.subPlayerIds)}
               />
             </div>
           )}
@@ -244,6 +246,7 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
                 homeTeam={game.homeTeam}
                 awayTeam={game.awayTeam}
                 playerNames={{ ...(liveData?.playerNames ?? {}), ...buildPlayerNameMap(detail) }}
+                subPlayerIds={buildSubPlayerIds(detail, liveData?.subPlayerIds)}
               />
             </div>
           )}
@@ -335,6 +338,7 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
             awayTeam={game.awayTeam}
             playerNames={liveData.playerNames ?? {}}
             goalieIds={liveData.goalieIds ?? []}
+            subPlayerIds={liveData.subPlayerIds ?? []}
           />
         )}
 
@@ -404,7 +408,28 @@ function buildPlayerNameMap(detail: BashGameDetail | null | undefined): Record<n
   return map
 }
 
-function ThreeStars({ stars, playerNames }: { stars: number[]; playerNames: Record<number, string> }) {
+function buildSubPlayerIds(
+  detail: BashGameDetail | null | undefined,
+  liveSubIds?: number[]
+): Set<number> {
+  const ids = new Set<number>(liveSubIds ?? [])
+  if (detail) {
+    for (const p of [...detail.homePlayers, ...detail.awayPlayers, ...detail.homeGoalies, ...detail.awayGoalies]) {
+      if (p.isSub) ids.add(p.id)
+    }
+  }
+  return ids
+}
+
+function SubBadge() {
+  return (
+    <span className="text-[8px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 px-1 py-0.5 rounded shrink-0 ml-1 align-middle">
+      sub
+    </span>
+  )
+}
+
+function ThreeStars({ stars, playerNames, subPlayerIds }: { stars: number[]; playerNames: Record<number, string>; subPlayerIds: Set<number> }) {
   const labels = ["1st", "2nd", "3rd"]
   return (
     <div className="mt-4 flex items-center justify-center gap-6 py-3">
@@ -415,8 +440,9 @@ function ThreeStars({ stars, playerNames }: { stars: number[]; playerNames: Reco
           <div key={i} className="flex items-center gap-1.5 text-[11px]">
             <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
             <span className="text-[9px] text-muted-foreground/50 uppercase tracking-wider font-medium">{labels[i]}</span>
-            <Link href={`/player/${playerSlug(name)}`} className="font-medium hover:text-primary transition-colors">
-              {name}
+            <Link href={`/player/${playerSlug(name)}`} className="font-medium hover:text-primary transition-colors inline-flex items-center">
+              <span>{name}</span>
+              {subPlayerIds.has(playerId) && <SubBadge />}
             </Link>
           </div>
         )
@@ -505,13 +531,23 @@ function LivePeriodSummary({ state, homeSlug, awaySlug, homeTeam, awayTeam }: {
   )
 }
 
-function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }: {
+function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames, subPlayerIds }: {
   state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
-  playerNames: Record<number, string>
+  playerNames: Record<number, string>; subPlayerIds: Set<number>
 }) {
   const nameById = (id: number | null) => {
     if (id == null) return null
     return playerNames[id] ?? `#${id}`
+  }
+  const renderName = (id: number | null) => {
+    const name = nameById(id)
+    if (name == null || id == null) return null
+    return (
+      <>
+        <span>{name}</span>
+        {subPlayerIds.has(id) && <SubBadge />}
+      </>
+    )
   }
 
   const events = [
@@ -547,19 +583,24 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
               {periodEvents.map((item) => {
                 if (item.type === "goal") {
                   const g = item.event as GoalEvent
-                  const scorer = nameById(g.scorerId)
-                  const a1 = nameById(g.assist1Id)
-                  const a2 = nameById(g.assist2Id)
                   const score = runningScores.get(g.id)
                   return (
                     <div key={g.id} className="flex items-center gap-2.5 py-2.5 border-t border-border/30">
                       <TeamLogo slug={g.team} name={g.team === homeSlug ? homeTeam : awayTeam} size={20} />
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px]">
-                          <span className="font-semibold text-foreground">{scorer}</span>
-                          {(a1 || a2) ? (
-                            <span className="text-muted-foreground">
-                              {" "}({a1}{a2 ? `, ${a2}` : ""})
+                          <span className="font-semibold text-foreground inline-flex items-center">{renderName(g.scorerId)}</span>
+                          {(g.assist1Id || g.assist2Id) ? (
+                            <span className="text-muted-foreground inline-flex items-center flex-wrap">
+                              {" "}(
+                              <span className="inline-flex items-center">{renderName(g.assist1Id)}</span>
+                              {g.assist2Id && (
+                                <>
+                                  <span>, </span>
+                                  <span className="inline-flex items-center">{renderName(g.assist2Id)}</span>
+                                </>
+                              )}
+                              )
                             </span>
                           ) : (
                             <span className="text-muted-foreground/50"> (unassisted)</span>
@@ -587,9 +628,9 @@ function EventLog({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames }
   )
 }
 
-function PenaltyLog({ state, homeSlug, awaySlug: _awaySlug, homeTeam, awayTeam, playerNames }: {
+function PenaltyLog({ state, homeSlug, awaySlug: _awaySlug, homeTeam, awayTeam, playerNames, subPlayerIds }: {
   state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
-  playerNames: Record<number, string>
+  playerNames: Record<number, string>; subPlayerIds: Set<number>
 }) {
   const nameById = (id: number) => playerNames[id] ?? `#${id}`
 
@@ -615,7 +656,10 @@ function PenaltyLog({ state, homeSlug, awaySlug: _awaySlug, homeTeam, awayTeam, 
                   <TeamLogo slug={p.team} name={p.team === homeSlug ? homeTeam : awayTeam} size={20} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[11px]">
-                      <span className="font-semibold text-foreground">{nameById(p.playerId)}</span>
+                      <span className="font-semibold text-foreground inline-flex items-center">
+                        <span>{nameById(p.playerId)}</span>
+                        {subPlayerIds.has(p.playerId) && <SubBadge />}
+                      </span>
                       <span className="text-muted-foreground"> — {p.infraction} ({p.minutes} min)</span>
                     </div>
                   </div>
@@ -630,11 +674,12 @@ function PenaltyLog({ state, homeSlug, awaySlug: _awaySlug, homeTeam, awayTeam, 
   )
 }
 
-function LiveBoxScore({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames, goalieIds }: {
+function LiveBoxScore({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNames, goalieIds, subPlayerIds }: {
   state: LiveGameState; homeSlug: string; awaySlug: string; homeTeam: string; awayTeam: string
-  playerNames: Record<number, string>; goalieIds: number[]
+  playerNames: Record<number, string>; goalieIds: number[]; subPlayerIds: number[]
 }) {
   const goalieSet = useMemo(() => new Set(goalieIds), [goalieIds])
+  const subSet = useMemo(() => new Set(subPlayerIds), [subPlayerIds])
 
   const { homePlayers, awayPlayers, homeGoalies, awayGoalies } = useMemo(() => {
     // Build skater stats from goals/penalties
@@ -669,7 +714,7 @@ function LiveBoxScore({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNam
         .filter((id) => !goalieSet.has(id))
         .map((id) => {
           const s = stats.get(id)!
-          return { id, name: playerNames[id] ?? `#${id}`, goals: s.goals, assists: s.assists, points: s.points, gwg: 0, ppg: s.ppg, shg: s.shg, eng: s.eng, hatTricks: s.goals >= 3 ? 1 : 0, pen: s.pen, pim: s.pim }
+          return { id, name: playerNames[id] ?? `#${id}`, goals: s.goals, assists: s.assists, points: s.points, gwg: 0, ppg: s.ppg, shg: s.shg, eng: s.eng, hatTricks: s.goals >= 3 ? 1 : 0, pen: s.pen, pim: s.pim, isSub: subSet.has(id) }
         })
     }
 
@@ -685,7 +730,7 @@ function LiveBoxScore({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNam
         .map((id) => {
           const saves = shotsAgainst - goalsAgainst
           const svPct = shotsAgainst > 0 ? (saves / shotsAgainst).toFixed(3).replace(/^0/, "") : "-"
-          return { id, name: playerNames[id] ?? `#${id}`, seconds: 0, goalsAgainst, shotsAgainst, saves, savePercentage: svPct, shutouts: goalsAgainst === 0 ? 1 : 0, goalieAssists: 0, result: null }
+          return { id, name: playerNames[id] ?? `#${id}`, seconds: 0, goalsAgainst, shotsAgainst, saves, savePercentage: svPct, shutouts: goalsAgainst === 0 ? 1 : 0, goalieAssists: 0, result: null, isSub: subSet.has(id) }
         })
     }
 
@@ -695,7 +740,7 @@ function LiveBoxScore({ state, homeSlug, awaySlug, homeTeam, awayTeam, playerNam
       homeGoalies: buildGoalies(state.homeAttendance, totalAwayShots, homeGoalsAgainst),
       awayGoalies: buildGoalies(state.awayAttendance, totalHomeShots, awayGoalsAgainst),
     }
-  }, [state, homeSlug, awaySlug, playerNames, goalieSet])
+  }, [state, homeSlug, awaySlug, playerNames, goalieSet, subSet])
 
   return (
     <div className="flex flex-col gap-8">
@@ -757,8 +802,11 @@ function SkaterBoxScore({ players }: { players: PlayerBoxScore[] }) {
               )}
             >
               <td className="py-2 whitespace-nowrap sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[140px] max-w-[140px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
-                <Link href={`/player/${playerSlug(p.name)}`} className="hover:text-primary transition-colors truncate block pr-4">
-                  {p.name}
+                <Link href={`/player/${playerSlug(p.name)}`} className="hover:text-primary transition-colors truncate inline-flex items-center gap-1.5 pr-4 align-middle">
+                  <span className="truncate">{p.name}</span>
+                  {p.isSub && (
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 px-1 py-0.5 rounded shrink-0">sub</span>
+                  )}
                 </Link>
               </td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{p.goals}</td>
@@ -805,7 +853,12 @@ function GoalieBoxScoreTable({ goalies }: { goalies: GoalieBoxScore[] }) {
               )}
             >
               <td className="py-2 whitespace-nowrap sticky left-0 z-10 bg-background group-hover:bg-muted/50 pl-4 sm:pl-2 w-[140px] max-w-[140px] after:absolute after:right-0 after:top-0 after:bottom-0 after:w-4 after:bg-gradient-to-r after:from-background/80 after:to-transparent after:pointer-events-none group-hover:after:from-muted/50">
-                <Link href={`/player/${playerSlug(g.name)}`} className="hover:text-primary transition-colors truncate block pr-4">{g.name}</Link>
+                <Link href={`/player/${playerSlug(g.name)}`} className="hover:text-primary transition-colors truncate inline-flex items-center gap-1.5 pr-4 align-middle">
+                  <span className="truncate">{g.name}</span>
+                  {g.isSub && (
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 px-1 py-0.5 rounded shrink-0">sub</span>
+                  )}
+                </Link>
               </td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{formatGoalieTime(g.seconds)}</td>
               <td className="text-center tabular-nums py-2 px-3 text-muted-foreground">{g.shotsAgainst}</td>

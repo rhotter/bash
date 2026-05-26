@@ -1,13 +1,15 @@
 import { Checkbox } from "@/components/ui/checkbox"
 import type { RosterPlayer } from "@/lib/scorekeeper-types"
+import { SubBadge } from "./sub-badge"
 
 export function AttendanceList({
-  label, count, team, roster, attendance, onToggle, onSelectAll, onUnselectAll, newPlayerIds,
+  label, count, team, roster, attendance, onToggle, onSelectAll, onUnselectAll, newPlayerIds, subPlayerIds,
 }: {
   label: string; count: number; team: string; roster: RosterPlayer[]; attendance: number[]
   onToggle: (team: string, id: number) => void; onSelectAll: (team: string) => void
   onUnselectAll: (team: string) => void
   newPlayerIds?: Set<number>
+  subPlayerIds?: Set<number>
 }) {
   const allSelected = roster.length > 0 && roster.every((p) => attendance.includes(p.id))
   return (
@@ -32,7 +34,8 @@ export function AttendanceList({
             <span className="text-[11px] truncate flex-1">
               {p.name}
             </span>
-            {newPlayerIds?.has(p.id) && (
+            {subPlayerIds?.has(p.id) && <SubBadge />}
+            {newPlayerIds?.has(p.id) && !subPlayerIds?.has(p.id) && (
               <span className="text-[8px] font-bold uppercase tracking-wider text-teal-600 bg-teal-500/10 px-1 py-0.5 rounded shrink-0">
                 new
               </span>

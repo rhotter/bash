@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
-import { eq, sum, asc, desc, countDistinct } from "drizzle-orm"
+import { eq, and, sum, asc, desc, countDistinct } from "drizzle-orm"
 
 export interface RefStat {
   name: string
@@ -43,7 +43,7 @@ export async function GET() {
         schema.playerGameStats,
         eq(schema.gameOfficials.gameId, schema.playerGameStats.gameId)
       )
-      .where(eq(schema.gameOfficials.role, "ref"))
+      .where(and(eq(schema.gameOfficials.role, "ref"), eq(schema.playerGameStats.isSub, false)))
       .groupBy(schema.gameOfficials.name)
 
     const penMap = new Map<string, { totalPen: number; totalPim: number }>()

@@ -110,7 +110,7 @@ export async function GET(
       JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       JOIN player_game_stats pgs ON pgs.player_id = p.id
       JOIN games g ON pgs.game_id = g.id AND g.season_id = ${seasonId}
-      WHERE ps.team_slug = ${slug}
+      WHERE ps.team_slug = ${slug} AND NOT pgs.is_sub
       GROUP BY p.id, p.name
       ORDER BY points DESC, goals DESC, p.name ASC
     `)
@@ -152,7 +152,7 @@ export async function GET(
       JOIN goalie_game_stats ggs ON ggs.player_id = p.id
       JOIN games g ON ggs.game_id = g.id AND g.season_id = ${seasonId}
       LEFT JOIN seasons s ON g.season_id = s.id
-      WHERE ps.team_slug = ${slug}
+      WHERE ps.team_slug = ${slug} AND NOT ggs.is_sub
       GROUP BY p.id, p.name
       ORDER BY gp DESC, p.name ASC
     `)
