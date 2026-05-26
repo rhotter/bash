@@ -1,9 +1,78 @@
 import { db, schema, rawSql } from "@/lib/db"
 import { sql, eq } from "drizzle-orm"
 import { getCurrentSeason } from "@/lib/seasons"
-import type { TeamDetail, TeamRecord, SkaterRoster, GoalieRoster } from "@/app/api/bash/team/[slug]/route"
+import { computeGaa, DEFAULT_GAME_LENGTH_MIN } from "@/lib/game-rules"
 
-export type { TeamDetail, TeamRecord, SkaterRoster, GoalieRoster }
+export interface GoalieRoster {
+  id: number
+  name: string
+  isGoalie: true
+  gp: number
+  wins: number
+  losses: number
+  gaa: string
+  savePercentage: string
+  shutouts: number
+  saves: number
+  goalsAgainst: number
+  shotsAgainst: number
+  goalieAssists: number
+}
+
+export interface SkaterRoster {
+  id: number
+  name: string
+  isGoalie: false
+  gp: number
+  goals: number
+  assists: number
+  points: number
+  ptsPg: string
+  gwg: number
+  ppg: number
+  shg: number
+  eng: number
+  hatTricks: number
+  pen: number
+  pim: number
+}
+
+export interface TeamRecord {
+  gp: number
+  w: number
+  otw: number
+  l: number
+  otl: number
+  pts: number
+  gf: number
+  ga: number
+  rank: number
+  totalTeams: number
+}
+
+export interface TeamDetail {
+  slug: string
+  name: string
+  seasonName: string
+  seasonLocation: string | null
+  record: TeamRecord
+  skaters: SkaterRoster[]
+  goalies: GoalieRoster[]
+  games: {
+    id: string
+    date: string
+    time: string
+    opponent: string
+    opponentSlug: string
+    isHome: boolean
+    teamScore: number | null
+    opponentScore: number | null
+    status: string
+    isOvertime: boolean
+    result: "W" | "L" | "OTW" | "OTL" | null
+    location: string | null
+  }[]
+}
 
 export async function fetchTeamDetail(slug: string, seasonParam?: string | null): Promise<TeamDetail | null> {
   const seasonId = seasonParam && seasonParam !== "all" ? seasonParam : (await getCurrentSeason()).id
@@ -53,7 +122,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
         SUM(ggs.goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE ggs.result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE ggs.result = 'L')::int as losses,
-        COALESCE(MAX(s.game_length), 60)::int as game_length
+        COALESCE(MAX(s.game_length), ${DEFAULT_GAME_LENGTH_MIN})::int as game_length
       FROM players p
       JOIN player_seasons ps ON p.id = ps.player_id AND ps.season_id = ${seasonId}
       JOIN goalie_game_stats ggs ON ggs.player_id = p.id
@@ -110,8 +179,7 @@ export async function fetchTeamDetail(slug: string, seasonParam?: string | null)
 
   const goalies: GoalieRoster[] = goalieRows.map((r) => {
     const svPct = r.sa > 0 ? (r.saves / r.sa) : 0
-    const gameLength = r.game_length || 60
-    const gaa = r.seconds > 0 ? (r.ga / r.seconds) * (gameLength * 60) : 0
+    const gaa = computeGaa(r.ga, r.seconds, r.game_length || DEFAULT_GAME_LENGTH_MIN)
     return {
       id: r.id,
       name: r.name,

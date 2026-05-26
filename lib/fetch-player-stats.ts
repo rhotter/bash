@@ -1,6 +1,8 @@
 import { rawSql } from "@/lib/db"
 import { sql } from "drizzle-orm"
 import { getCurrentSeason, isStatsOnlySeason } from "@/lib/seasons"
+import { filterLegacyTeams } from "@/lib/team-filters"
+import { DEFAULT_GAME_LENGTH_MIN } from "@/lib/game-rules"
 
 export interface SkaterStat {
   id: number
@@ -266,7 +268,7 @@ export async function fetchPlayerStats(
             THEN SUM(ggs.saves)::float / SUM(ggs.shots_against)::float
             ELSE 0 END as save_pct,
           CASE WHEN SUM(ggs.seconds) > 0
-            THEN (SUM(ggs.goals_against)::float / SUM(ggs.seconds)::float) * (COALESCE(MAX(s.game_length), 60) * 60)
+            THEN (SUM(ggs.goals_against)::float / SUM(ggs.seconds)::float) * (COALESCE(MAX(s.game_length), ${DEFAULT_GAME_LENGTH_MIN}) * 60)
             ELSE 0 END as gaa,
           COUNT(*) FILTER (WHERE ggs.result = 'W')::int as wins,
           COUNT(*) FILTER (WHERE ggs.result = 'L')::int as losses
@@ -327,10 +329,7 @@ export async function fetchPlayerStats(
     ...(isAllTime ? { seasonsPlayed: r.seasons_played } : {}),
   }))
 
-  // TODO: Remove seed-* filtering once legacy seed teams are cleaned from production
-  const teams = teamRows
-    .filter((r) => r.slug !== "tbd" && !r.slug.startsWith("seed-"))
-    .map((r) => ({ slug: r.slug, name: r.name }))
+  const teams = filterLegacyTeams(teamRows).map((r) => ({ slug: r.slug, name: r.name }))
 
   return { skaters, goalies, teams, lastUpdated: new Date().toISOString(), hasPlayoffs }
 }

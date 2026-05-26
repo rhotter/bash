@@ -2,9 +2,129 @@ import { db, schema, rawSql } from "@/lib/db"
 import { sql, eq, desc } from "drizzle-orm"
 import { getCurrentSeason, getAllSeasons } from "@/lib/seasons"
 import { playerSlug } from "@/lib/player-slug"
-import type { PlayerDetail, SkaterStats, GoalieStats } from "@/app/api/bash/player/[slug]/route"
+import { computeGaa, DEFAULT_GAME_LENGTH_MIN } from "@/lib/game-rules"
 
-export type { PlayerDetail }
+export type SkaterStats = {
+  gp: number
+  goals: number
+  assists: number
+  points: number
+  ptsPg: string
+  gwg: number
+  ppg: number
+  shg: number
+  eng: number
+  hatTricks: number
+  pen: number
+  pim: number
+}
+
+export type GoalieStats = {
+  gp: number
+  wins: number
+  losses: number
+  gaa: string
+  savePercentage: string
+  saves: number
+  goalsAgainst: number
+  shotsAgainst: number
+  shutouts: number
+  goalieAssists: number
+  seconds: number
+}
+
+export type SeasonSkaterStats = { seasonId: string; seasonName: string; teamName: string; teamSlug: string; stats: SkaterStats }
+export type SeasonGoalieStats = { seasonId: string; seasonName: string; teamName: string; teamSlug: string; stats: GoalieStats }
+
+export type SkaterGameLog = {
+  gameId: string
+  date: string
+  opponent: string
+  opponentSlug: string
+  isHome: boolean
+  teamScore: number | null
+  opponentScore: number | null
+  result: string | null
+  goals: number
+  assists: number
+  points: number
+  gwg: number
+  ppg: number
+  shg: number
+  eng: number
+  hatTricks: number
+  pen: number
+  pim: number
+  gameType?: string
+}
+
+export type GoalieGameLog = {
+  gameId: string
+  date: string
+  opponent: string
+  opponentSlug: string
+  isHome: boolean
+  teamScore: number | null
+  opponentScore: number | null
+  seconds: number
+  goalsAgainst: number
+  shotsAgainst: number
+  saves: number
+  savePercentage: string
+  shutouts: number
+  goalieAssists: number
+  result: string | null
+  gameType?: string
+}
+
+export type Championship = {
+  seasonId: string
+  seasonName: string
+}
+
+export type PlayerAward = {
+  awardType: string
+  seasonId: string
+  seasonName: string
+}
+
+export type HallOfFameEntry = {
+  classYear: number
+  wing: string
+  yearsActive: string | null
+  achievements: string | null
+}
+
+export interface PlayerDetail {
+  id: number
+  name: string
+  team: string
+  teamSlug: string
+  isGoalie: boolean
+  seasonStats: SkaterStats | null
+  allTimeStats: SkaterStats | null
+  allTimeAllSeasonsStats: SkaterStats | null
+  perSeasonStats: SeasonSkaterStats[]
+  goalieSeasonStats: GoalieStats | null
+  allTimeGoalieStats: GoalieStats | null
+  allTimeAllSeasonsGoalieStats: GoalieStats | null
+  perSeasonGoalieStats: SeasonGoalieStats[]
+  games: SkaterGameLog[]
+  goalieGames: GoalieGameLog[]
+  playoffPerSeasonStats: SeasonSkaterStats[]
+  playoffAllTimeStats: SkaterStats | null
+  playoffAllTimeAllSeasonsStats: SkaterStats | null
+  playoffGames: SkaterGameLog[]
+  playoffPerSeasonGoalieStats: SeasonGoalieStats[]
+  playoffAllTimeGoalieStats: GoalieStats | null
+  playoffAllTimeAllSeasonsGoalieStats: GoalieStats | null
+  playoffGoalieGames: GoalieGameLog[]
+  exhibitionGames: SkaterGameLog[]
+  exhibitionGoalieGames: GoalieGameLog[]
+  championships: Championship[]
+  awards: PlayerAward[]
+  hallOfFame: HallOfFameEntry | null
+}
 
 export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | null> {
   const currentSeasonId = (await getCurrentSeason()).id
@@ -80,9 +200,9 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function buildGoalieStats(s: any, gameLength: number = 60): GoalieStats {
+  function buildGoalieStats(s: any, gameLength: number = DEFAULT_GAME_LENGTH_MIN): GoalieStats {
     const svPct = s.sa > 0 ? (s.saves / s.sa) : 0
-    const gaa = s.seconds > 0 ? (s.ga / s.seconds) * (gameLength * 60) : 0
+    const gaa = computeGaa(s.ga, s.seconds, gameLength)
     return {
       gp: s.gp, wins: s.wins, losses: s.losses,
       gaa: gaa.toFixed(2), savePercentage: svPct.toFixed(3),
@@ -207,7 +327,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses,
-        COALESCE(MAX(s.game_length), 60)::int as game_length
+        COALESCE(MAX(s.game_length), ${DEFAULT_GAME_LENGTH_MIN})::int as game_length
       FROM goalie_game_stats ggs
       JOIN games g ON ggs.game_id = g.id AND g.season_id = ${playerSeasonId} AND NOT g.is_playoff AND g.game_type = 'regular'
       LEFT JOIN seasons s ON g.season_id = s.id
@@ -237,7 +357,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses,
-        COALESCE(MAX(s.game_length), 60)::int as game_length
+        COALESCE(MAX(s.game_length), ${DEFAULT_GAME_LENGTH_MIN})::int as game_length
       FROM goalie_game_stats ggs
       JOIN games g ON ggs.game_id = g.id AND NOT g.is_playoff AND g.game_type = 'regular'
       LEFT JOIN player_seasons ps ON ps.player_id = ggs.player_id AND ps.season_id = g.season_id
@@ -365,7 +485,7 @@ export async function fetchPlayerDetail(slug: string): Promise<PlayerDetail | nu
         SUM(shutouts)::int as shutouts, SUM(goalie_assists)::int as goalie_assists,
         COUNT(*) FILTER (WHERE result = 'W')::int as wins,
         COUNT(*) FILTER (WHERE result = 'L')::int as losses,
-        COALESCE(MAX(s.game_length), 60)::int as game_length
+        COALESCE(MAX(s.game_length), ${DEFAULT_GAME_LENGTH_MIN})::int as game_length
       FROM goalie_game_stats ggs
       JOIN games g ON ggs.game_id = g.id AND g.is_playoff AND g.game_type IN ('playoff', 'championship', 'regular')
       LEFT JOIN player_seasons ps ON ps.player_id = ggs.player_id AND ps.season_id = g.season_id

@@ -4,6 +4,7 @@ import type { PlayerStatsData, SkaterStat, GoalieStat } from "@/app/api/bash/pla
 import type { RefStatsData, RefStat } from "@/app/api/bash/refs/route"
 import type { BashGameDetail } from "@/app/api/bash/game/[id]/route"
 import type { SeasonsData } from "@/app/api/bash/seasons/route"
+import { REFRESH, DEDUPE } from "@/lib/sync-config"
 
 export type { BashApiData, BashGame, Standing, PlayerStatsData, SkaterStat, GoalieStat, RefStatsData, RefStat, BashGameDetail, SeasonsData }
 
@@ -22,9 +23,9 @@ export function useBashData(season?: string, fallbackData?: BashApiData) {
   const isCurrentSeason = !season
 
   const { data, error, isLoading, mutate } = useSWR<BashApiData>(url, fetcher, {
-    refreshInterval: (latestData) => (latestData ?? fallbackData)?.games?.some((g) => g.status === "live") ? 10_000 : 60_000,
+    refreshInterval: (latestData) => (latestData ?? fallbackData)?.games?.some((g) => g.status === "live") ? REFRESH.LIVE_GAME : REFRESH.SCORES,
     revalidateOnFocus: true,
-    dedupingInterval: 5_000,
+    dedupingInterval: DEDUPE.SCORES,
     onSuccess: () => { if (isCurrentSeason) triggerSync() },
     fallbackData,
   })
@@ -52,9 +53,9 @@ export function usePlayerStats(season?: string, fallbackData?: PlayerStatsData, 
   const url = qs ? `/api/bash/players?${qs}` : "/api/bash/players"
 
   const { data, error, isLoading } = useSWR<PlayerStatsData>(url, fetcher, {
-    refreshInterval: 120_000,
+    refreshInterval: REFRESH.PLAYER_STATS,
     revalidateOnFocus: true,
-    dedupingInterval: 60_000,
+    dedupingInterval: DEDUPE.PLAYER_STATS,
     fallbackData,
   })
 
@@ -71,9 +72,9 @@ export function usePlayerStats(season?: string, fallbackData?: PlayerStatsData, 
 
 export function useRefStats() {
   const { data, error, isLoading } = useSWR<RefStatsData>("/api/bash/refs", fetcher, {
-    refreshInterval: 120_000,
+    refreshInterval: REFRESH.REFS,
     revalidateOnFocus: true,
-    dedupingInterval: 60_000,
+    dedupingInterval: DEDUPE.REFS,
   })
 
   return {
@@ -88,7 +89,7 @@ export function useGameDetail(gameId: string | null, fallbackData?: BashGameDeta
   const { data, error, isLoading } = useSWR<BashGameDetail>(
     gameId ? `/api/bash/game/${gameId}` : null,
     fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30_000, fallbackData }
+    { revalidateOnFocus: false, dedupingInterval: DEDUPE.GAME_DETAIL, fallbackData }
   )
 
   return {
@@ -101,7 +102,7 @@ export function useGameDetail(gameId: string | null, fallbackData?: BashGameDeta
 export function useSeasons() {
   const { data, error, isLoading } = useSWR<SeasonsData>("/api/bash/seasons", fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 300_000,
+    dedupingInterval: DEDUPE.SEASONS,
   })
 
   return {
@@ -115,7 +116,7 @@ export function useLiveGame(gameId: string | null, fallbackData?: unknown) {
   const { data, error, isLoading } = useSWR(
     gameId ? `/api/bash/game/${gameId}/live` : null,
     fetcher,
-    { refreshInterval: 10_000, revalidateOnFocus: true, dedupingInterval: 5_000, fallbackData }
+    { refreshInterval: REFRESH.LIVE_GAME, revalidateOnFocus: true, dedupingInterval: DEDUPE.LIVE_GAME, fallbackData }
   )
 
   return {

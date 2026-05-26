@@ -1,8 +1,61 @@
 import { db, schema, rawSql } from "@/lib/db"
 import { sql, eq, asc } from "drizzle-orm"
-import type { BashGameDetail, PlayerBoxScore, GoalieBoxScore } from "@/app/api/bash/game/[id]/route"
 
-export type { BashGameDetail, PlayerBoxScore, GoalieBoxScore }
+export interface PlayerBoxScore {
+  id: number
+  name: string
+  goals: number
+  assists: number
+  points: number
+  gwg: number
+  ppg: number
+  shg: number
+  eng: number
+  hatTricks: number
+  pen: number
+  pim: number
+  isSub: boolean
+}
+
+export interface GoalieBoxScore {
+  id: number
+  name: string
+  seconds: number
+  goalsAgainst: number
+  shotsAgainst: number
+  saves: number
+  savePercentage: string
+  shutouts: number
+  goalieAssists: number
+  result: string | null
+  isSub: boolean
+}
+
+export interface BashGameDetail {
+  id: string
+  date: string
+  time: string
+  homeTeam: string
+  homeSlug: string
+  awayTeam: string
+  awaySlug: string
+  homeScore: number | null
+  awayScore: number | null
+  status: string
+  isOvertime: boolean
+  isForfeit: boolean
+  location: string
+  gameType: string
+  title?: string | null
+  homePlayers: PlayerBoxScore[]
+  awayPlayers: PlayerBoxScore[]
+  homeGoalies: GoalieBoxScore[]
+  awayGoalies: GoalieBoxScore[]
+  officials: { name: string; role: string }[]
+  notes: string | null
+  seasonName?: string
+  seasonLocation?: string | null
+}
 
 export async function fetchGameDetail(id: string): Promise<BashGameDetail | null> {
   const gameResult = await rawSql(sql`
