@@ -1609,7 +1609,7 @@ export function ScorekeeperApp({
                 <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {attendingPlayers(goalTeam).filter((p) => p.id.toString() !== goalScorer).map((p) => (
+                  {attendingPlayers(goalTeam).filter((p) => p.id.toString() !== goalScorer || p.name.toLowerCase().includes("sub")).map((p) => (
                     <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1620,7 +1620,7 @@ export function ScorekeeperApp({
                 <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {attendingPlayers(goalTeam).filter((p) => p.id.toString() !== goalScorer && p.id.toString() !== goalAssist1).map((p) => (
+                  {attendingPlayers(goalTeam).filter((p) => (p.id.toString() !== goalScorer || p.name.toLowerCase().includes("sub")) && (p.id.toString() !== goalAssist1 || p.name.toLowerCase().includes("sub"))).map((p) => (
                     <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
