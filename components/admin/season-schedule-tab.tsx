@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Loader2, Plus, Calendar, Trash2, Edit, Shuffle, Trophy, ArrowRightLeft, AlertCircle, LayoutGrid, List, Users } from "lucide-react"
+import { Loader2, Plus, Calendar, Trash2, Edit, Shuffle, Trophy, ArrowRightLeft, AlertCircle, LayoutGrid, List, Users, Printer } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { TeamLogo } from "@/components/team-logo"
@@ -522,6 +522,11 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
                                   <Users className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              {g.homeSlug !== "tbd" && g.awaySlug !== "tbd" && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(`/admin/scoresheet/${g.id}`, '_blank')} title="Print Scoresheet">
+                                  <Printer className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Scorekeeper">
                                 <Link href={`/admin/games/${g.id}/edit`}>
                                   <Trophy className="h-3.5 w-3.5" />
@@ -615,6 +620,11 @@ export function SeasonScheduleTab({ seasonId, seasonStatus, initialTeams, defaul
                             {(g.gameType === "exhibition" || g.gameType === "tryout") && (
                               <Button variant="ghost" size="icon" onClick={() => openRosterModal(g)} title="Manage Roster">
                                 <Users className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {g.homeSlug !== "tbd" && g.awaySlug !== "tbd" && (
+                              <Button variant="ghost" size="icon" onClick={() => window.open(`/admin/scoresheet/${g.id}`, '_blank')} title="Print Scoresheet">
+                                <Printer className="h-4 w-4" />
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" asChild title="Scorekeeper">

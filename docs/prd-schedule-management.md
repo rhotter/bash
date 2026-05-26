@@ -207,6 +207,11 @@ UPDATE games SET game_type = 'regular' WHERE is_playoff = false;
     *   Per-round series configuration: quarterfinals (≥6 teams), semi-finals, and finals.
     *   Dynamic bracket preview auto-generated from seed assignments.
     *   Visual bracket rendered via CSS/SVG for the review step.
+*   **`app/admin/scoresheet/[gameId]/page.tsx`** — Printable game scoresheet.
+    *   Server Component fetches game info (date, time, teams, location), team rosters (`player_seasons` + `players`), and assigned officials (`game_officials`).
+    *   Renders a print-optimized HTML page matching the legacy Sportability scoresheet layout: per-team roster, scoring table (11 blank rows), penalty table (10 blank rows), goalie table (4 blank rows), shot tracking grids (Per 1-3 + OT, numbers 01-24), timeouts, officials/signatures box, scoring/shots summary grids, notes box, and a "Game Stars" table (Star #1/2/3).
+    *   Styled with `@page { size: letter }` and `@media print` CSS to fit exactly on one printed page.
+    *   Accessed via a `Printer` icon button on each game row in the schedule tab; opens in a new tab and auto-triggers `window.print()`.
 
 ### 4. Public Site (deferred)
 
