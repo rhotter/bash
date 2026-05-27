@@ -3,6 +3,7 @@ import { db, schema, rawSql } from "@/lib/db"
 import { sql, eq, and, count } from "drizzle-orm"
 import { getCurrentSeason, getSeasonById } from "@/lib/seasons"
 import { mergeDuplicatePlayers } from "@/lib/merge-duplicates"
+import { normalizeTimeForStorage } from "@/lib/format-time"
 
 const BASE_URL = "https://secure.sportability.com/spx/Leagues"
 const MAX_BOXSCORES_PER_SYNC = 8
@@ -224,7 +225,7 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
           id: gid,
           seasonId,
           date: currentDate,
-          time,
+          time: normalizeTimeForStorage(time),
           awayTeam: awaySlug,
           homeTeam: homeSlug,
           awayScore,
@@ -253,7 +254,7 @@ async function syncFullSchedule(leagueId: string, seasonId: string) {
           id: gid,
           seasonId,
           date: currentDate,
-          time,
+          time: normalizeTimeForStorage(time),
           awayTeam: awaySlug,
           homeTeam: homeSlug,
           awayScore,

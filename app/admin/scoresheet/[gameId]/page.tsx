@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm"
 import { notFound } from "next/navigation"
 import { AutoPrint } from "./auto-print"
 import { BackButton } from "./back-button"
+import { formatGameTime } from "@/lib/format-time"
 
 /* ─── Data Fetching ─────────────────────────────────────────────────── */
 
@@ -337,7 +338,7 @@ export default async function ScoresheetPage({
                 <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "2px" }}>{game.away_name} at {game.home_name}</div>
               </td>
               <td style={{ width: "25%", textAlign: "right", verticalAlign: "middle", fontSize: "11px", fontWeight: "bold" }}>
-                <div>{dateStr}&nbsp;&nbsp;&nbsp;{game.time}</div>
+                <div>{dateStr}&nbsp;&nbsp;&nbsp;{formatGameTime(game.time)}</div>
                 <div>{game.location}</div>
               </td>
             </tr>

@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm"
 import { getSession } from "@/lib/admin-session"
 import { revalidateTag } from "next/cache"
 import { nextGameIds } from "@/lib/db/game-id"
+import { normalizeTimeForStorage } from "@/lib/format-time"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         id: idMap.get(g.id) as string,
         seasonId,
         date: g.date,
-        time: g.time,
+        time: normalizeTimeForStorage(g.time),
         homeTeam: g.homeTeam,
         awayTeam: g.awayTeam,
         homePlaceholder: g.homePlaceholder ?? null,

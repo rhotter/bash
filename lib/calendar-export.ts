@@ -5,7 +5,7 @@
 export interface CalendarEventInput {
   id: string
   date: string // "YYYY-MM-DD"
-  time: string // "HH:MM" or "TBD"
+  time: string // "9:00pm", "14:00", or "TBD"
   homeTeam: string
   awayTeam: string
   location?: string | null
@@ -58,7 +58,18 @@ export function generateICS(events: CalendarEventInput[]): string {
       dtEndLine = `DTEND;VALUE=DATE:${formatAllDayDate(endDate)}`
     } else {
       // Fixed time game (Floating local time)
-      const [h, min] = event.time.split(":").map(Number)
+      // Parse time string: handles "14:00", "9:00p", "9:00pm", "9:00 PM", etc.
+      let h: number, min: number
+      const ampmMatch = event.time.match(/^(\d{1,2}):(\d{2})\s*(a|am|p|pm)$/i)
+      if (ampmMatch) {
+        h = parseInt(ampmMatch[1], 10)
+        min = parseInt(ampmMatch[2], 10)
+        const isPM = ampmMatch[3].toLowerCase().startsWith("p")
+        if (isPM && h !== 12) h += 12
+        else if (!isPM && h === 12) h = 0
+      } else {
+        ;[h, min] = event.time.split(":").map(Number)
+      }
       const startDate = new Date(y, m - 1, d, h, min, 0)
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Default: 1 hour duration
       dtStartLine = `DTSTART:${formatLocalICSDate(startDate)}`

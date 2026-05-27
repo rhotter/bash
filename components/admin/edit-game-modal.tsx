@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Plus, Loader2, X, Search, Database } from "lucide-react"
+import { toHHMM } from "@/lib/format-time"
 
 export interface GameFormData {
   id?: string
@@ -133,7 +134,7 @@ export function EditGameModal({
       } else {
         setFormData({
           date: new Date().toISOString().split("T")[0],
-          time: "12:00p",
+          time: "12:00",
           homeTeam: "",
           awayTeam: "",
           location: defaultLocation,
@@ -535,11 +536,28 @@ export function EditGameModal({
               />
             </div>
             <div className="space-y-2">
-              <Label>Time *</Label>
+              <div className="flex items-center justify-between">
+                <Label>Time *</Label>
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    id="time-tbd"
+                    checked={formData.time === "TBD"}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, time: checked ? "TBD" : "12:00" })
+                    }
+                    className="scale-75"
+                  />
+                  <Label htmlFor="time-tbd" className="text-xs text-muted-foreground cursor-pointer">
+                    TBD
+                  </Label>
+                </div>
+              </div>
               <Input
-                placeholder="e.g., 10:00a or TBD"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                type="time"
+                value={toHHMM(formData.time)}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value || "TBD" })}
+                disabled={formData.time === "TBD"}
+                className={formData.time === "TBD" ? "opacity-40" : ""}
               />
             </div>
             <div className="space-y-2">

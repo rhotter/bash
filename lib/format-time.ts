@@ -1,6 +1,6 @@
 /**
- * Client-side date/time formatting utilities.
- * All functions use the browser's local timezone automatically.
+ * Date/time formatting and normalization utilities.
+ * All date functions use the browser's local timezone automatically.
  */
 
 export function formatGameDate(dateStr: string): string {
@@ -22,7 +22,79 @@ export function formatGameDateNoYear(dateStr: string): string {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
 }
 
-export function formatGameTime(time: string): string {
-  // Strip trailing am/pm or a/p to keep all schedule times uniform
-  return time.replace(/\s*(a|p|am|pm)$/i, "")
+/**
+ * Normalizes a time string into a canonical storage format: "h:mmam" / "h:mmpm".
+ * Handles all known input formats:
+ *   - Sportability shorthand: "9:00p", "6:00a"
+ *   - Full AM/PM: "9:00pm", "9:00 AM"
+ *   - 24-hour (from HTML <input type="time">): "09:00", "14:00"
+ *   - Already canonical: "9:00am", "2:00pm"
+ *   - Special: "TBD", "", null/undefined
+ *
+ * Call this server-side before writing to the database.
+ */
+export function normalizeTimeForStorage(time: string | null | undefined): string {
+  if (!time || time.toUpperCase() === "TBD") return "TBD"
+
+  // Match AM/PM variants: "9:00p", "9:00pm", "9:00 PM", "12:00a", "6:00am"
+  const ampmMatch = time.match(/^(\d{1,2}):(\d{2})\s*(a|am|p|pm)$/i)
+  if (ampmMatch) {
+    const h = parseInt(ampmMatch[1], 10)
+    const m = ampmMatch[2]
+    const suffix = ampmMatch[3].toLowerCase().startsWith("p") ? "pm" : "am"
+    // Reject invalid hours for 12-hour format (e.g. "13:00pm")
+    if (h >= 1 && h <= 12) return `${h}:${m}${suffix}`
+  }
+
+  // Match pure 24-hour: "09:00", "14:00", "0:00"
+  const milMatch = time.match(/^(\d{1,2}):(\d{2})$/)
+  if (milMatch) {
+    let h = parseInt(milMatch[1], 10)
+    const m = milMatch[2]
+    const suffix = h >= 12 ? "pm" : "am"
+    if (h === 0) h = 12
+    else if (h > 12) h -= 12
+    return `${h}:${m}${suffix}`
+  }
+
+  // Fallback: return as-is
+  return time
 }
+
+/**
+ * Formats a game time for user-facing display.
+ * Delegates to normalizeTimeForStorage for consistent output.
+ */
+export function formatGameTime(time: string): string {
+  if (!time || time === "TBD") return time || "TBD"
+  return normalizeTimeForStorage(time)
+}
+
+/**
+ * Converts a stored time string (any format) back to 24-hour "HH:MM" format
+ * for use as the `value` of an HTML <input type="time"> element.
+ * Returns "" for "TBD" or unrecognized formats.
+ */
+export function toHHMM(time: string | null | undefined): string {
+  if (!time || time.toUpperCase() === "TBD") return ""
+
+  // Already 24-hour: "09:00", "14:00"
+  const milMatch = time.match(/^(\d{1,2}):(\d{2})$/)
+  if (milMatch) {
+    return `${milMatch[1].padStart(2, "0")}:${milMatch[2]}`
+  }
+
+  // AM/PM variants: "9:00pm", "9:00p", "12:00am"
+  const ampmMatch = time.match(/^(\d{1,2}):(\d{2})\s*(a|am|p|pm)$/i)
+  if (ampmMatch) {
+    let h = parseInt(ampmMatch[1], 10)
+    const m = ampmMatch[2]
+    const isPM = ampmMatch[3].toLowerCase().startsWith("p")
+    if (isPM && h !== 12) h += 12
+    else if (!isPM && h === 12) h = 0
+    return `${String(h).padStart(2, "0")}:${m}`
+  }
+
+  return ""
+}
+

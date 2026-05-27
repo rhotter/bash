@@ -38,6 +38,7 @@ import { ShootoutPanel } from "@/components/scorekeeper/shared/shootout-panel"
 import { TimeoutButton } from "@/components/scorekeeper/shared/timeout-button"
 import { ScorekeeperSectionHeader as SectionHeader } from "@/components/scorekeeper/shared/section-header"
 import { AddPlayerModal } from "@/components/scorekeeper/add-player-modal"
+import { formatGameTime } from "@/lib/format-time"
 
 /** Safe UUID helper — crypto.randomUUID() is unavailable in non-secure (HTTP) contexts on some mobile browsers */
 function uuid(): string {
@@ -923,7 +924,7 @@ export function ScorekeeperApp({
             <h1 className="text-lg font-bold">
               {awayTeam} <span className="text-muted-foreground/30 font-normal">@</span> {homeTeam}
             </h1>
-            <p className="text-[11px] text-muted-foreground/60">{date} &middot; {time}</p>
+            <p className="text-[11px] text-muted-foreground/60">{date} &middot; {formatGameTime(time)}</p>
           </div>
           <div className="space-y-3">
             <input
@@ -957,14 +958,16 @@ export function ScorekeeperApp({
           )}>
             Final
           </div>
-          <div className="flex items-baseline justify-center gap-3">
-            <div className="text-center">
-              <div className="text-sm font-bold mb-1">{awayTeam}</div>
+          <div className="flex items-start justify-center gap-8">
+            <div className="text-center flex flex-col items-center">
+              <div className="text-sm font-bold leading-tight">{awayTeam}</div>
+              <div className="text-[9px] font-bold text-muted-foreground/35 tracking-widest uppercase mb-2 select-none">Away</div>
               <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">{scores.away}</div>
             </div>
-            <span className="text-2xl text-muted-foreground/40 font-light select-none">&ndash;</span>
-            <div className="text-center">
-              <div className="text-sm font-bold mb-1">{homeTeam}</div>
+            <span className="text-2xl text-muted-foreground/40 font-light select-none pt-2">&ndash;</span>
+            <div className="text-center flex flex-col items-center">
+              <div className="text-sm font-bold leading-tight">{homeTeam}</div>
+              <div className="text-[9px] font-bold text-muted-foreground/35 tracking-widest uppercase mb-2 select-none">Home</div>
               <div className="text-5xl font-black font-mono tabular-nums tracking-tighter">{scores.home}</div>
             </div>
           </div>
@@ -1023,22 +1026,24 @@ export function ScorekeeperApp({
           <div className="relative rounded-2xl overflow-hidden bg-foreground text-background">
             <div className="relative px-6 py-5 sm:py-6">
               {/* Scores — hero */}
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+                  <span className="text-[9px] font-bold text-background/30 tracking-widest uppercase select-none">Away</span>
                   <span className="text-sm font-bold leading-tight text-center text-background/70">{awayTeam}</span>
                   {ppState.ppTeam === awaySlug && (
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-background/50">PP</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-background/50 mt-0.5">PP</span>
                   )}
                 </div>
-                <div className="flex items-baseline gap-3 px-4">
+                <div className="flex items-baseline gap-3 px-4 pt-1.5">
                   <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-background">{scores.away}</span>
                   <span className="text-2xl text-background/25 font-light select-none">&ndash;</span>
                   <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-background">{scores.home}</span>
                 </div>
-                <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                <div className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+                  <span className="text-[9px] font-bold text-background/30 tracking-widest uppercase select-none">Home</span>
                   <span className="text-sm font-bold leading-tight text-center text-background/70">{homeTeam}</span>
                   {ppState.ppTeam === homeSlug && (
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-background/50">PP</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-background/50 mt-0.5">PP</span>
                   )}
                 </div>
               </div>

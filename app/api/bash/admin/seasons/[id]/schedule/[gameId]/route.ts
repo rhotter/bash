@@ -3,6 +3,7 @@ import { db, schema } from "@/lib/db"
 import { eq, and } from "drizzle-orm"
 import { getSession } from "@/lib/admin-session"
 import { revalidateTag } from "next/cache"
+import { normalizeTimeForStorage } from "@/lib/format-time"
 
 interface RouteContext {
   params: Promise<{ id: string; gameId: string }>
@@ -28,7 +29,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Allowlist editable fields to prevent mass-assignment
     const updateData: Record<string, unknown> = {}
     if (body.date !== undefined) updateData.date = body.date
-    if (body.time !== undefined) updateData.time = body.time
+    if (body.time !== undefined) updateData.time = normalizeTimeForStorage(body.time)
     if (body.homeTeam !== undefined) updateData.homeTeam = body.homeTeam
     if (body.awayTeam !== undefined) updateData.awayTeam = body.awayTeam
     if (body.homeScore !== undefined) updateData.homeScore = body.homeScore

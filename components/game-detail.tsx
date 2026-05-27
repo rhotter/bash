@@ -123,25 +123,38 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
         "border border-border/60"
       )}>
         <div className="relative px-6 py-8 sm:py-10">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-start justify-between gap-2">
             {/* Away team */}
             <Link href={`/team/${game.awaySlug}`} className="flex flex-col items-center gap-2 flex-1 min-w-0 group/away">
               <TeamLogo slug={game.awaySlug} name={game.awayTeam} size={56} />
-              <span className="text-sm font-bold text-foreground leading-tight group-hover/away:text-primary transition-colors text-center">
-                {game.awayTeam}
-              </span>
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm font-bold text-foreground leading-tight group-hover/away:text-primary transition-colors text-center">
+                  {game.awayTeam}
+                </span>
+                <span className="text-[9px] font-bold text-muted-foreground/35 tracking-widest uppercase select-none">
+                  Away
+                </span>
+              </div>
             </Link>
 
             {/* Score block */}
-            <div className="flex flex-col items-center gap-2 px-4">
-              <div className="flex items-baseline gap-3">
-                <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
-                  {displayAwayScore ?? "-"}
-                </span>
-                <span className="text-2xl text-muted-foreground/40 font-light select-none">&ndash;</span>
-                <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
-                  {displayHomeScore ?? "-"}
-                </span>
+            <div className="flex flex-col items-center gap-2 px-4 flex-1">
+              <div className="h-14 flex items-center justify-center">
+                {game.status === "upcoming" ? (
+                  <span className="text-sm font-black text-muted-foreground/30 font-sans tracking-widest select-none uppercase px-3 py-1 bg-muted/30 rounded-md">
+                    VS
+                  </span>
+                ) : (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
+                      {displayAwayScore ?? "-"}
+                    </span>
+                    <span className="text-2xl text-muted-foreground/40 font-light select-none">&ndash;</span>
+                    <span className="text-5xl sm:text-6xl font-black font-mono tabular-nums tracking-tighter text-foreground">
+                      {displayHomeScore ?? "-"}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className={cn(
                 "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full",
@@ -164,9 +177,14 @@ export function GameDetail({ game, initialDetail, initialLiveData, homeRoster, a
             {/* Home team */}
             <Link href={`/team/${game.homeSlug}`} className="flex flex-col items-center gap-2 flex-1 min-w-0 group/home">
               <TeamLogo slug={game.homeSlug} name={game.homeTeam} size={56} />
-              <span className="text-sm font-bold text-foreground leading-tight group-hover/home:text-primary transition-colors text-center">
-                {game.homeTeam}
-              </span>
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm font-bold text-foreground leading-tight group-hover/home:text-primary transition-colors text-center">
+                  {game.homeTeam}
+                </span>
+                <span className="text-[9px] font-bold text-muted-foreground/35 tracking-widest uppercase select-none">
+                  Home
+                </span>
+              </div>
             </Link>
           </div>
         </div>

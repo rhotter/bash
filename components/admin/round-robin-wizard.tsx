@@ -42,6 +42,7 @@ import {
   type Holiday,
   type GeneratedGame,
 } from "@/lib/schedule-utils"
+import { formatGameTime } from "@/lib/format-time"
 
 interface RoundRobinWizardProps {
   open: boolean
@@ -868,7 +869,7 @@ export function RoundRobinWizard({
                       {previewGames.map((g, i) => (
                         <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
                           <td className="p-2">{g.date}</td>
-                          <td className="p-2">{g.time}</td>
+                          <td className="p-2">{formatGameTime(g.time)}</td>
                           <td className="p-2">
                             {effectiveTeams.find((t) => t.teamSlug === g.awayTeam)?.teamName ?? g.awayPlaceholder ?? g.awayTeam}
                           </td>

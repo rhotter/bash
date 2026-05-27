@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { formatGameDate, formatGameDateNoYear } from "@/lib/format-time"
+import { formatGameDate, formatGameDateNoYear, formatGameTime } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { playerSlug } from "@/lib/player-slug"
@@ -235,7 +235,7 @@ function GameRow({ game: g }: { game: TeamDetail["games"][number] }) {
           </span>
         </div>
       ) : (
-        <span className="text-[10px] text-muted-foreground/40">{g.time}</span>
+        <span className="text-[10px] text-muted-foreground/40">{formatGameTime(g.time)}</span>
       )}
     </div>
   )
