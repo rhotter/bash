@@ -1,15 +1,15 @@
+import { UserPlus } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { RosterPlayer } from "@/lib/scorekeeper-types"
-import { SubBadge } from "./sub-badge"
 
 export function AttendanceList({
-  label, count, team, roster, attendance, onToggle, onSelectAll, onUnselectAll, newPlayerIds, subPlayerIds,
+  label, count, team, roster, attendance, onToggle, onSelectAll, onUnselectAll, newPlayerIds, onAddPlayer,
 }: {
   label: string; count: number; team: string; roster: RosterPlayer[]; attendance: number[]
   onToggle: (team: string, id: number) => void; onSelectAll: (team: string) => void
   onUnselectAll: (team: string) => void
   newPlayerIds?: Set<number>
-  subPlayerIds?: Set<number>
+  onAddPlayer?: () => void
 }) {
   const allSelected = roster.length > 0 && roster.every((p) => attendance.includes(p.id))
   return (
@@ -34,8 +34,7 @@ export function AttendanceList({
             <span className="text-[11px] truncate flex-1">
               {p.name}
             </span>
-            {subPlayerIds?.has(p.id) && <SubBadge />}
-            {newPlayerIds?.has(p.id) && !subPlayerIds?.has(p.id) && (
+            {newPlayerIds?.has(p.id) && (
               <span className="text-[8px] font-bold uppercase tracking-wider text-teal-600 bg-teal-500/10 px-1 py-0.5 rounded shrink-0">
                 new
               </span>
@@ -43,6 +42,15 @@ export function AttendanceList({
           </label>
         ))}
       </div>
+      {onAddPlayer && (
+        <button
+          onClick={onAddPlayer}
+          className="w-full flex items-center justify-center gap-1.5 pt-2 mt-2 border-t border-dashed border-primary/30 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          Add Sub
+        </button>
+      )}
     </div>
   )
 }
