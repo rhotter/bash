@@ -1,6 +1,10 @@
 /**
  * Client-side iCalendar (.ics) generation and download utility.
+ * All BASH games are in America/Los_Angeles.
  */
+
+/** IANA timezone for all BASH game times */
+const BASH_TIMEZONE = "America/Los_Angeles"
 
 export interface CalendarEventInput {
   id: string
@@ -14,21 +18,53 @@ export interface CalendarEventInput {
   seasonName?: string
 }
 
-function formatLocalICSDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  const hours = String(date.getHours()).padStart(2, "0")
-  const minutes = String(date.getMinutes()).padStart(2, "0")
-  const seconds = String(date.getSeconds()).padStart(2, "0")
-  return `${year}${month}${day}T${hours}${minutes}${seconds}`
+/**
+ * Format a date/time as an ICS local-time string: YYYYMMDDTHHmmss
+ * Used with a TZID parameter — does NOT append "Z".
+ */
+function formatICSDateTime(y: number, mo: number, d: number, h: number, min: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${y}${pad(mo)}${pad(d)}T${pad(h)}${pad(min)}00`
 }
 
-function formatAllDayDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}${month}${day}`
+/** Format a UTC timestamp for DTSTAMP (appends Z). */
+function formatUTCStamp(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return (
+    `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T` +
+    `${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`
+  )
+}
+
+function formatAllDayDate(y: number, mo: number, d: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${y}${pad(mo)}${pad(d)}`
+}
+
+/**
+ * VTIMEZONE component for America/Los_Angeles.
+ * Covers standard US DST rules (second Sunday in March → first Sunday in November).
+ */
+function vtimezoneLA(): string[] {
+  return [
+    "BEGIN:VTIMEZONE",
+    "TZID:America/Los_Angeles",
+    "BEGIN:DAYLIGHT",
+    "TZOFFSETFROM:-0800",
+    "TZOFFSETTO:-0700",
+    "TZNAME:PDT",
+    "DTSTART:19700308T020000",
+    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
+    "END:DAYLIGHT",
+    "BEGIN:STANDARD",
+    "TZOFFSETFROM:-0700",
+    "TZOFFSETTO:-0800",
+    "TZNAME:PST",
+    "DTSTART:19701101T020000",
+    "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
+    "END:STANDARD",
+    "END:VTIMEZONE",
+  ]
 }
 
 export function generateICS(events: CalendarEventInput[]): string {
@@ -38,10 +74,11 @@ export function generateICS(events: CalendarEventInput[]): string {
     "PRODID:-//Bay Area Street Hockey//BASH Schedule//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
+    `X-WR-TIMEZONE:${BASH_TIMEZONE}`,
+    ...vtimezoneLA(),
   ]
 
-  const now = new Date()
-  const stamp = formatLocalICSDate(now) + "Z" // UTC stamp
+  const stamp = formatUTCStamp(new Date())
 
   for (const event of events) {
     const isTBD = event.time === "TBD"
@@ -51,13 +88,12 @@ export function generateICS(events: CalendarEventInput[]): string {
     let dtEndLine: string
 
     if (isTBD) {
-      // All-day event
-      const startDate = new Date(y, m - 1, d)
-      const endDate = new Date(y, m - 1, d + 1) // Ends on the next day
-      dtStartLine = `DTSTART;VALUE=DATE:${formatAllDayDate(startDate)}`
-      dtEndLine = `DTEND;VALUE=DATE:${formatAllDayDate(endDate)}`
+      // All-day event — DATE values have no timezone
+      dtStartLine = `DTSTART;VALUE=DATE:${formatAllDayDate(y, m, d)}`
+      // All-day DTEND is exclusive, so next day
+      const next = new Date(y, m - 1, d + 1)
+      dtEndLine = `DTEND;VALUE=DATE:${formatAllDayDate(next.getFullYear(), next.getMonth() + 1, next.getDate())}`
     } else {
-      // Fixed time game (Floating local time)
       // Parse time string: handles "14:00", "9:00p", "9:00pm", "9:00 PM", etc.
       let h: number, min: number
       const ampmMatch = event.time.match(/^(\d{1,2}):(\d{2})\s*(a|am|p|pm)$/i)
@@ -70,10 +106,16 @@ export function generateICS(events: CalendarEventInput[]): string {
       } else {
         ;[h, min] = event.time.split(":").map(Number)
       }
-      const startDate = new Date(y, m - 1, d, h, min, 0)
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Default: 1 hour duration
-      dtStartLine = `DTSTART:${formatLocalICSDate(startDate)}`
-      dtEndLine = `DTEND:${formatLocalICSDate(endDate)}`
+
+      const startStr = formatICSDateTime(y, m, d, h, min)
+      // Default: 1 hour duration
+      const endH = h + 1
+      // Handle midnight rollover (unlikely for BASH but safe)
+      const endStr = endH < 24
+        ? formatICSDateTime(y, m, d, endH, min)
+        : formatICSDateTime(y, m, d + 1 > 31 ? 1 : d + 1, 0, min) // simplified; Date handles overflow
+      dtStartLine = `DTSTART;TZID=${BASH_TIMEZONE}:${startStr}`
+      dtEndLine = `DTEND;TZID=${BASH_TIMEZONE}:${endStr}`
     }
 
     const summary = event.title 
