@@ -37,6 +37,7 @@ import { ShootoutPanel } from "@/components/scorekeeper/shared/shootout-panel"
 import { TimeoutButton } from "@/components/scorekeeper/shared/timeout-button"
 import { ScorekeeperSectionHeader as SectionHeader } from "@/components/scorekeeper/shared/section-header"
 import { AddPlayerModal } from "@/components/scorekeeper/add-player-modal"
+import { SubBadge } from "@/components/scorekeeper/shared/sub-badge"
 
 /** Safe UUID helper — crypto.randomUUID() is unavailable in non-secure (HTTP) contexts on some mobile browsers */
 function uuid(): string {
@@ -65,6 +66,8 @@ interface Props {
   awayRoster: RosterPlayer[]
   existingState: LiveGameState | null
   initialAuthenticated?: boolean
+  initialSubPlayerIds?: number[]
+  defaultPeriodLength?: number
 }
 
 export function ScorekeeperApp({
@@ -72,6 +75,8 @@ export function ScorekeeperApp({
   homeSlug, awaySlug, homeTeam, awayTeam,
   homeRoster: initialHomeRoster, awayRoster: initialAwayRoster, existingState,
   initialAuthenticated = false,
+  initialSubPlayerIds = [],
+  defaultPeriodLength = 1200,
 }: Props) {
   // ─── PIN Gate ────────────────────────────────────────────────────────────
   const [pin, setPin] = useState("")
@@ -85,9 +90,10 @@ export function ScorekeeperApp({
   const [homeRoster, setHomeRoster] = useState(initialHomeRoster)
   const [awayRoster, setAwayRoster] = useState(initialAwayRoster)
   const [newPlayerIds, setNewPlayerIds] = useState<Set<number>>(new Set())
+  const [subPlayerIds, setSubPlayerIds] = useState<Set<number>>(() => new Set(initialSubPlayerIds))
   const [addPlayerModal, setAddPlayerModal] = useState<{ open: boolean; teamSide: "home" | "away" }>({ open: false, teamSide: "home" })
 
-  const handlePlayerAdded = (player: { id: number; name: string }, isNew: boolean) => {
+  const handlePlayerAdded = (player: { id: number; name: string }, isNew: boolean, isSub: boolean) => {
     const rosterPlayer: RosterPlayer = { id: player.id, name: player.name }
     if (addPlayerModal.teamSide === "home") {
       setHomeRoster((prev) => prev.some((p) => p.id === player.id) ? prev : [...prev, rosterPlayer])
@@ -110,12 +116,19 @@ export function ScorekeeperApp({
     if (isNew) {
       setNewPlayerIds((prev) => new Set(prev).add(player.id))
     }
+    setSubPlayerIds((prev) => {
+      const next = new Set(prev)
+      if (isSub) next.add(player.id)
+      return next
+    })
   }
 
   // ─── Game State ──────────────────────────────────────────────────────────
   const [state, setState] = useState<LiveGameState>(() => {
     if (existingState) return existingState
-    return createInitialState()
+    const initial = createInitialState()
+    initial.clockSeconds = defaultPeriodLength
+    return initial
   })
 
   // ─── Sync ────────────────────────────────────────────────────────────────
@@ -227,12 +240,12 @@ export function ScorekeeperApp({
 
   // ─── Power Play State ──────────────────────────────────────────────────
   const activePenalties = useMemo(
-    () => getActivePenalties(state.penalties, state.period, displayClock),
-    [state.penalties, state.period, displayClock]
+    () => getActivePenalties(state.penalties, state.period, displayClock, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300),
+    [state.penalties, state.period, displayClock, defaultPeriodLength, isPlayoff]
   )
   const ppState = useMemo(
-    () => getPowerPlayState(state.penalties, state.period, displayClock, homeSlug, awaySlug),
-    [state.penalties, state.period, displayClock, homeSlug, awaySlug]
+    () => getPowerPlayState(state.penalties, state.period, displayClock, homeSlug, awaySlug, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300),
+    [state.penalties, state.period, displayClock, homeSlug, awaySlug, defaultPeriodLength, isPlayoff]
   )
 
   // ─── Load from localStorage on mount ─────────────────────────────────────
@@ -420,7 +433,7 @@ export function ScorekeeperApp({
   function startNextPeriod() {
     updateState((prev) => {
       const nextPeriod = prev.period + 1
-      const clockSecs = nextPeriod >= 4 ? (isPlayoff ? 1200 : 300) : 1200
+      const clockSecs = nextPeriod >= 4 ? (isPlayoff ? defaultPeriodLength : 300) : defaultPeriodLength
       const homeShots = [...prev.homeShots]
       const awayShots = [...prev.awayShots]
       while (homeShots.length < (nextPeriod <= 3 ? nextPeriod : 4)) homeShots.push(0)
@@ -448,7 +461,7 @@ export function ScorekeeperApp({
 
   function setPeriodTo(p: number) {
     updateState((prev) => {
-      const clockSecs = p === 0 ? 1200 : p === 4 ? 300 : 1200
+      const clockSecs = p === 0 ? defaultPeriodLength : p === 4 ? 300 : defaultPeriodLength
       const homeShots = [...prev.homeShots]
       const awayShots = [...prev.awayShots]
       while (homeShots.length < (p <= 3 ? p : 4)) homeShots.push(0)
@@ -630,7 +643,7 @@ export function ScorekeeperApp({
   /** Convert elapsed min:sec inputs back to countdown clock string. */
   function elapsedPartsToCountdown(min: string, sec: string, period: number): string {
     const elapsedSecs = (parseInt(min) || 0) * 60 + (parseInt(sec) || 0)
-    const periodLength = period <= 3 ? 1200 : (isPlayoff ? 1200 : 300)
+    const periodLength = period <= 3 ? defaultPeriodLength : (isPlayoff ? defaultPeriodLength : 300)
     const remaining = Math.max(0, periodLength - elapsedSecs)
     const m = Math.floor(remaining / 60)
     const s = remaining % 60
@@ -640,7 +653,7 @@ export function ScorekeeperApp({
   /** Set the clock parts from a countdown clock string, converting to elapsed for display. */
   function setElapsedPartsFromCountdown(clock: string, period: number) {
     const remaining = parseClockString(clock)
-    const periodLength = period <= 3 ? 1200 : (isPlayoff ? 1200 : 300)
+    const periodLength = period <= 3 ? defaultPeriodLength : (isPlayoff ? defaultPeriodLength : 300)
     const elapsed = Math.max(0, periodLength - remaining)
     const m = Math.floor(elapsed / 60)
     const s = elapsed % 60
@@ -717,9 +730,9 @@ export function ScorekeeperApp({
         // End penalty on PP goal
         if (goalPPG) {
           const clockSecs = parseClockString(clock)
-          const result = findPenaltyToEnd(prev.penalties, goalTeam, capturedPeriod, clockSecs)
+          const result = findPenaltyToEnd(prev.penalties, goalTeam, capturedPeriod, clockSecs, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)
           if (result) {
-            const currentElapsed = clockToElapsed(capturedPeriod, clockSecs)
+            const currentElapsed = clockToElapsed(capturedPeriod, clockSecs, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)
             next.penalties = prev.penalties.map((p) => {
               if (p.id !== result.penaltyId) return p
               if (result.action === "end") {
@@ -1131,7 +1144,9 @@ export function ScorekeeperApp({
                 onSelectAll={selectAllAttendance}
                 onUnselectAll={unselectAllAttendance}
                 newPlayerIds={newPlayerIds}
-                onAddPlayer={isAdhocGame ? () => setAddPlayerModal({ open: true, teamSide: "away" }) : undefined}
+                subPlayerIds={subPlayerIds}
+                onAddPlayer={() => setAddPlayerModal({ open: true, teamSide: "away" })}
+                isAdhocGame={isAdhocGame}
               />
               <AttendanceList
                 label={homeTeam}
@@ -1143,14 +1158,16 @@ export function ScorekeeperApp({
                 onSelectAll={selectAllAttendance}
                 onUnselectAll={unselectAllAttendance}
                 newPlayerIds={newPlayerIds}
-                onAddPlayer={isAdhocGame ? () => setAddPlayerModal({ open: true, teamSide: "home" }) : undefined}
+                subPlayerIds={subPlayerIds}
+                onAddPlayer={() => setAddPlayerModal({ open: true, teamSide: "home" })}
+                isAdhocGame={isAdhocGame}
               />
             </div>
 
             <div className="space-y-2">
               <SectionHeader>Goalies</SectionHeader>
-              <GoalieSelect label={awayTeam} players={attendingPlayers(awaySlug)} value={currentGoalieId(awaySlug)} onChange={(v) => setGoalie(awaySlug, v)} />
-              <GoalieSelect label={homeTeam} players={attendingPlayers(homeSlug)} value={currentGoalieId(homeSlug)} onChange={(v) => setGoalie(homeSlug, v)} />
+              <GoalieSelect label={awayTeam} players={attendingPlayers(awaySlug)} value={currentGoalieId(awaySlug)} onChange={(v) => setGoalie(awaySlug, v)} subPlayerIds={subPlayerIds} />
+              <GoalieSelect label={homeTeam} players={attendingPlayers(homeSlug)} value={currentGoalieId(homeSlug)} onChange={(v) => setGoalie(homeSlug, v)} subPlayerIds={subPlayerIds} />
             </div>
 
             {/* Officials */}
@@ -1343,7 +1360,7 @@ export function ScorekeeperApp({
                           )}
                         </div>
                         <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(g.period)} {clockToElapsedDisplay(g.clock, g.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(g.period)} {clockToElapsedDisplay(g.clock, g.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: g.id, type: "goal" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1363,7 +1380,7 @@ export function ScorekeeperApp({
                           <span className="text-[10px] text-muted-foreground/50"> &middot; {p.infraction} &middot; {p.minutes}min</span>
                         </div>
                         <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(p.period)} {clockToElapsedDisplay(p.clock, p.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(p.period)} {clockToElapsedDisplay(p.clock, p.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: p.id, type: "penalty" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1381,7 +1398,7 @@ export function ScorekeeperApp({
                         <div className="flex-1 min-w-0">
                           <span className="text-[11px] font-medium text-muted-foreground">{teamName}</span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(t.period)} {clockToElapsedDisplay(t.clock, t.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(t.period)} {clockToElapsedDisplay(t.clock, t.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: t.id, type: "timeout" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1402,7 +1419,7 @@ export function ScorekeeperApp({
                           <span className="text-[11px] font-medium">{nameById(c.inGoalieId)}</span>
                         </div>
                         <span className="text-[10px] text-muted-foreground/50 shrink-0">{teamName}</span>
-                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(c.period)} {clockToElapsedDisplay(c.clock, c.period)}</span>
+                        <span className="text-[10px] text-muted-foreground/40 tabular-nums font-mono shrink-0">{periodLabel(c.period)} {clockToElapsedDisplay(c.clock, c.period, defaultPeriodLength, isPlayoff ? defaultPeriodLength : 300)}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setConfirmUndo({ id: c.id, type: "goalieChange" }) }}
                           className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-foreground transition-colors"
@@ -1436,10 +1453,10 @@ export function ScorekeeperApp({
           <div className="mt-5">
             <SectionHeader>Attendance</SectionHeader>
             <div className="space-y-3">
-              <AttendanceList label={awayTeam} count={state.awayAttendance.length} team={awaySlug} roster={awayRoster} attendance={state.awayAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} newPlayerIds={newPlayerIds} onAddPlayer={isAdhocGame ? () => setAddPlayerModal({ open: true, teamSide: "away" }) : undefined} />
-              <AttendanceList label={homeTeam} count={state.homeAttendance.length} team={homeSlug} roster={homeRoster} attendance={state.homeAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} newPlayerIds={newPlayerIds} onAddPlayer={isAdhocGame ? () => setAddPlayerModal({ open: true, teamSide: "home" }) : undefined} />
-              <GoalieSelect label={awayTeam} players={attendingPlayers(awaySlug)} value={currentGoalieId(awaySlug)} onChange={(v) => setGoalie(awaySlug, v)} />
-              <GoalieSelect label={homeTeam} players={attendingPlayers(homeSlug)} value={currentGoalieId(homeSlug)} onChange={(v) => setGoalie(homeSlug, v)} />
+              <AttendanceList label={awayTeam} count={state.awayAttendance.length} team={awaySlug} roster={awayRoster} attendance={state.awayAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} newPlayerIds={newPlayerIds} subPlayerIds={subPlayerIds} onAddPlayer={() => setAddPlayerModal({ open: true, teamSide: "away" })} isAdhocGame={isAdhocGame} />
+              <AttendanceList label={homeTeam} count={state.homeAttendance.length} team={homeSlug} roster={homeRoster} attendance={state.homeAttendance} onToggle={toggleAttendance} onSelectAll={selectAllAttendance} onUnselectAll={unselectAllAttendance} newPlayerIds={newPlayerIds} subPlayerIds={subPlayerIds} onAddPlayer={() => setAddPlayerModal({ open: true, teamSide: "home" })} isAdhocGame={isAdhocGame} />
+              <GoalieSelect label={awayTeam} players={attendingPlayers(awaySlug)} value={currentGoalieId(awaySlug)} onChange={(v) => setGoalie(awaySlug, v)} subPlayerIds={subPlayerIds} />
+              <GoalieSelect label={homeTeam} players={attendingPlayers(homeSlug)} value={currentGoalieId(homeSlug)} onChange={(v) => setGoalie(homeSlug, v)} subPlayerIds={subPlayerIds} />
             </div>
           </div>
         )}
@@ -1562,7 +1579,12 @@ export function ScorekeeperApp({
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select player" /></SelectTrigger>
                 <SelectContent>
                   {attendingPlayers(goalTeam).map((p) => (
-                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      <span className="inline-flex items-center">
+                        {p.name}
+                        {subPlayerIds.has(p.id) && <SubBadge />}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1573,7 +1595,12 @@ export function ScorekeeperApp({
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   {attendingPlayers(goalTeam).filter((p) => p.id.toString() !== goalScorer).map((p) => (
-                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      <span className="inline-flex items-center">
+                        {p.name}
+                        {subPlayerIds.has(p.id) && <SubBadge />}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1584,7 +1611,12 @@ export function ScorekeeperApp({
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   {attendingPlayers(goalTeam).filter((p) => p.id.toString() !== goalScorer && p.id.toString() !== goalAssist1).map((p) => (
-                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      <span className="inline-flex items-center">
+                        {p.name}
+                        {subPlayerIds.has(p.id) && <SubBadge />}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1664,7 +1696,12 @@ export function ScorekeeperApp({
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select player" /></SelectTrigger>
                 <SelectContent>
                   {attendingPlayers(penaltyTeam).map((p) => (
-                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      <span className="inline-flex items-center">
+                        {p.name}
+                        {subPlayerIds.has(p.id) && <SubBadge />}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1777,7 +1814,12 @@ export function ScorekeeperApp({
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select player" /></SelectTrigger>
                   <SelectContent>
                     {allAttending.map((pid) => (
-                      <SelectItem key={pid} value={pid.toString()}>{nameById(pid)}</SelectItem>
+                      <SelectItem key={pid} value={pid.toString()}>
+                        <span className="inline-flex items-center">
+                          {nameById(pid)}
+                          {subPlayerIds.has(pid) && <SubBadge />}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1934,18 +1976,18 @@ export function ScorekeeperApp({
         </DialogContent>
       </Dialog>
 
-      {/* ─── Add Player Modal (exhibition/tryout only) ─────────── */}
-      {isAdhocGame && (
-        <AddPlayerModal
-          open={addPlayerModal.open}
-          onOpenChange={(open) => setAddPlayerModal((prev) => ({ ...prev, open }))}
-          gameId={gameId}
-          teamSide={addPlayerModal.teamSide}
-          teamName={addPlayerModal.teamSide === "home" ? homeTeam : awayTeam}
-          pin={pin}
-          onPlayerAdded={handlePlayerAdded}
-        />
-      )}
+      {/* ─── Add Player Modal — for exhibition/tryout it adds team players;
+            for regular-season it defaults to adding subs. ───────────────── */}
+      <AddPlayerModal
+        open={addPlayerModal.open}
+        onOpenChange={(open) => setAddPlayerModal((prev) => ({ ...prev, open }))}
+        gameId={gameId}
+        teamSide={addPlayerModal.teamSide}
+        teamName={addPlayerModal.teamSide === "home" ? homeTeam : awayTeam}
+        pin={pin}
+        adhocGame={isAdhocGame}
+        onPlayerAdded={handlePlayerAdded}
+      />
     </div>
   )
 }
