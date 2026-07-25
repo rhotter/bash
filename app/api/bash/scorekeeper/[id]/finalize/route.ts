@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db, schema } from "@/lib/db"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 import type { LiveGameState, GoalEvent } from "@/lib/scorekeeper-types"
 import { computePulledSeconds, clockToElapsed, parseClockString } from "@/lib/scorekeeper-types"
 import { getSession } from "@/lib/admin-session"
@@ -160,7 +160,25 @@ export async function POST(
       goalieIds.add(change.inGoalieId)
     }
 
-    // 9. Delete old player/goalie stats then insert fresh for attending players
+    // 9. Ensure all referenced players exist (merges can delete players while live game state still references them)
+    const allPlayerIds = [...playerStats.keys(), ...goalieIds]
+    if (allPlayerIds.length > 0) {
+      const existingPlayers = await db
+        .select({ id: schema.players.id })
+        .from(schema.players)
+        .where(inArray(schema.players.id, allPlayerIds))
+      const existingIds = new Set(existingPlayers.map((p) => p.id))
+      const missingIds = allPlayerIds.filter((pid) => !existingIds.has(pid))
+      for (const missingId of missingIds) {
+        await db
+          .insert(schema.players)
+          .values({ id: missingId, name: `Unknown Player #${missingId}` })
+          .onConflictDoNothing()
+        console.warn(`[finalize] Created missing player record for ID ${missingId}`)
+      }
+    }
+
+    // 10. Delete old player/goalie stats then insert fresh for attending players
     await db.delete(schema.playerGameStats).where(eq(schema.playerGameStats.gameId, id))
 
     // Look up which players are subs in this game (from adhoc_game_rosters).
