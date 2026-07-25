@@ -876,8 +876,11 @@ export function ScorekeeperApp({
     }))
   }
 
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
+
   async function handleFinalize() {
     setFinalizing(true)
+    setFinalizeError(null)
     try {
       syncRef.current?.scheduleSync(state)
       await syncRef.current?.flush()
@@ -892,9 +895,15 @@ export function ScorekeeperApp({
         setFinalizeOpen(false)
         setPendingFinalize(false)
         localStorage.removeItem(`bash-finalize-${gameId}`)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        const msg = data.details || data.error || `Server error (${res.status})`
+        setFinalizeError(msg)
+        console.error("Finalize failed:", res.status, data)
       }
-    } catch {
+    } catch (err) {
       // Network error — mark for auto-retry when back online
+      console.error("Finalize network error:", err)
       setPendingFinalize(true)
       localStorage.setItem(`bash-finalize-${gameId}`, "1")
       setFinalizeOpen(false)
@@ -1962,8 +1971,9 @@ export function ScorekeeperApp({
           </DialogHeader>
           <div className="space-y-2 text-xs text-muted-foreground">
             <p>Final score: {awayTeam} {scores.away} — {homeTeam} {scores.home}</p>
-
-
+            {finalizeError && (
+              <p className="text-red-500 font-medium">Error: {finalizeError}</p>
+            )}
           </div>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setFinalizeOpen(false)} className="flex-1">
